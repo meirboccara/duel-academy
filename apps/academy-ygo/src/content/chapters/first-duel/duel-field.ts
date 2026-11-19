@@ -1,0 +1,177 @@
+import type { Lesson } from "@/lib/lesson-types";
+import { SAMPLE } from "@/lib/sample-cards";
+import { lesson, slide, SRC } from "@/content/helpers";
+
+export const duelFieldLesson: Lesson = lesson({
+	id: "duel-field",
+	chapterId: "first-duel",
+	title: "The Duel Field",
+	description: "Tour every zone of the field and learn what each one is used for.",
+	sources: [SRC.rulebook, SRC.rulesFaq],
+	slides: [
+		slide(
+			"field-overview",
+			"The whole field at a glance",
+			"The field is a mat split between you and your opponent. Each side has the same zones. Over the next slides we light up one zone at a time and explain its job.",
+			{
+				template: "duel-field",
+				half: "both",
+				labelAll: true,
+				highlight: [
+					{ zone: "mm3", side: "you" },
+					{ zone: "st3", side: "you" },
+					{ zone: "deck", side: "you" },
+					{ zone: "graveyard", side: "you" },
+					{ zone: "extra", side: "you" },
+					{ zone: "field", side: "you" },
+				],
+				callout: "Your side is at the bottom",
+			},
+			"A full duel field with every zone captioned. Your side is at the bottom and your opponent's side mirrors it at the top.",
+		),
+		slide(
+			"field-main-monster-zones",
+			"Main Monster Zones",
+			"Five Main Monster Zones form the front row. Monsters you summon from your hand are placed here, face-up in Attack Position or face-down in Defense Position.",
+			{
+				template: "duel-field",
+				half: "you",
+				highlight: [
+					{ zone: "mm1", side: "you" },
+					{ zone: "mm2", side: "you" },
+					{ zone: "mm3", side: "you" },
+					{ zone: "mm4", side: "you" },
+					{ zone: "mm5", side: "you" },
+				],
+				cards: [
+					{ zone: "mm2", side: "you", card: SAMPLE.bronzeSoldier },
+					{ zone: "mm4", side: "you", card: SAMPLE.flameCaster },
+				],
+				callout: "5 zones, 1 monster per zone",
+			},
+			"Your half of the field with the five Main Monster Zones lit. Bronze Soldier sits in the second zone and Flame Caster in the fourth.",
+			"Only one card can occupy a zone. If all five are full you cannot summon more monsters there.",
+		),
+		slide(
+			"field-spell-trap-zones",
+			"Spell and Trap Zones",
+			"Five Spell and Trap Zones sit behind your monsters. Continuous Spells stay face-up here, and Traps are Set face-down here. Normal Spells use a zone only while resolving.",
+			{
+				template: "duel-field",
+				half: "you",
+				highlight: [
+					{ zone: "st1", side: "you" },
+					{ zone: "st2", side: "you" },
+					{ zone: "st3", side: "you" },
+					{ zone: "st4", side: "you" },
+					{ zone: "st5", side: "you" },
+				],
+				cards: [
+					{ zone: "st2", side: "you", card: { ...SAMPLE.mirrorBarrier, position: "facedown-spelltrap" } },
+					{ zone: "st4", side: "you", card: SAMPLE.swordBoost },
+				],
+				callout: "Traps are Set face-down here",
+			},
+			"Your five Spell and Trap Zones lit behind the monster row. A face-down Mirror Barrier sits in the second zone and Blade Boost sits face-up in the fourth.",
+			"The two outermost Spell and Trap Zones also act as Pendulum Zones. Pendulum cards are a later lesson.",
+		),
+		slide(
+			"field-field-zone",
+			"The Field Zone",
+			"One extra zone holds Field Spells. Only one Field Spell can be face-up on your side at a time. A Field Spell changes the whole duel, helping some monsters and hurting others.",
+			{
+				template: "duel-field",
+				half: "you",
+				highlight: [{ zone: "field", side: "you" }],
+				cards: [{ zone: "field", side: "you", card: SAMPLE.stormField }],
+				callout: "Field Spells go here",
+			},
+			"The Field Zone lit on your side, holding the Field Spell Storm Territory.",
+		),
+		slide(
+			"field-deck-zone",
+			"The Deck Zone",
+			"Your Main Deck sits face-down in the Deck Zone. You draw from the top at the start of each of your turns. No one may look through it unless a card says so.",
+			{
+				template: "duel-field",
+				half: "you",
+				highlight: [{ zone: "deck", side: "you" }],
+				callout: "Draw from the top",
+			},
+			"The Deck Zone lit on your side with the callout: draw from the top.",
+			"You may count your own deck cards. Do not reorder them without a card effect.",
+		),
+		slide(
+			"field-graveyard",
+			"The Graveyard",
+			"Cards go to the Graveyard when they are destroyed, discarded, or used up. It is face-up and either duelist may look at it. Many effects bring cards back from there.",
+			{
+				template: "duel-field",
+				half: "you",
+				highlight: [{ zone: "graveyard", side: "you" }],
+				cards: [{ zone: "graveyard", side: "you", card: SAMPLE.bronzeSoldier }],
+				callout: "Face-up and public",
+			},
+			"The Graveyard lit on your side with Bronze Soldier lying on top of it, face-up.",
+		),
+		slide(
+			"field-banished",
+			"Banished cards",
+			"Some effects remove cards from the game, called banishing. Banished cards are set aside, usually face-up, and cannot return unless a card specifically says so. They are not in the Graveyard.",
+			{
+				template: "duel-field",
+				half: "you",
+				highlight: [{ zone: "banished", side: "you" }],
+				callout: "Set aside, out of play",
+			},
+			"The banished area lit next to your Graveyard, described as set aside and out of play.",
+			"Banished is not a printed zone on every mat. Players usually keep the cards in a separate pile beside the Graveyard.",
+		),
+		slide(
+			"field-extra-deck",
+			"The Extra Deck Zone",
+			"Your Extra Deck is a separate stack, kept face-down. It holds Fusion, Synchro, Xyz and Link Monsters that are summoned in special ways. You never draw from it.",
+			{
+				template: "duel-field",
+				half: "you",
+				highlight: [{ zone: "extra", side: "you" }],
+				cards: [{ zone: "extra", side: "you", card: SAMPLE.novaDragon }],
+				callout: "Never drawn. Summoned only.",
+			},
+			"The Extra Deck zone lit on your side, with Nova Dragon represented as the type of card kept there.",
+		),
+		slide(
+			"field-extra-monster-zones",
+			"Extra Monster Zones",
+			"Two Extra Monster Zones sit in the middle of the field and are shared by both duelists. Normally each duelist may have only one monster in them at a time.",
+			{
+				template: "duel-field",
+				half: "both",
+				highlight: [
+					{ zone: "emz-left" },
+					{ zone: "emz-right" },
+				],
+				cards: [
+					{ zone: "emz-left", card: SAMPLE.novaDragon },
+				],
+				callout: "Shared zones, usually one monster each",
+			},
+			"Two Extra Monster Zones in the center of the field, shared between both players. Nova Dragon occupies the left one.",
+			"Extra Deck monsters must be summoned there unless a Link arrow points them to a Main Monster Zone. Details come in the Extra Deck chapter.",
+		),
+		slide(
+			"field-hand",
+			"Your hand",
+			"The cards you hold form your hand. You start with five. At the end of your turn you may keep at most six, so discard extras to the Graveyard.",
+			{
+				template: "duel-field",
+				half: "you",
+				highlight: [{ zone: "hand", side: "you" }],
+				showHand: [SAMPLE.bronzeSoldier, SAMPLE.flameCaster, SAMPLE.gigantGuardian, SAMPLE.mirrorBarrier, SAMPLE.polymerization],
+				callout: "Max 6 cards at end of turn",
+			},
+			"Your hand of five cards below the field: Bronze Soldier, Flame Caster, Gigant Guardian, Mirror Barrier and Combine Spell.",
+			"The hand limit only applies at the End Phase. You can hold more than six during your turn.",
+		),
+	],
+});

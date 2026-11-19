@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+/*
+ * `stage:` — the lesson player's desktop layout (framed 16:9 slide). It needs width AND height:
+ * phones in landscape are wide but short, so they keep the full-screen phone deck.
+ */
+@custom-variant stage (@media (min-width: 48rem) and (min-height: 35rem));
+/* A tablet in the hands (an iPad): wide, and not a phone on its side. The map's pad goes to the bottom corners. */
+@custom-variant tablet (@media (min-width: 48rem) and (min-height: 32.01rem));
+/* A phone or a small tablet (iPad mini) held upright: the Junior game asks to be turned sideways. */
+@custom-variant upright-small (@media (orientation: portrait) and (max-width: 47.99rem));
+
+/* Bottom padding that clears the phone home indicator; `stage:pb-*` overrides it on the desktop stage. */
+@utility pb-home-indicator {
+	padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/*
+ * Duel Academy visual system.
+ * Dark navy arena, gold primary actions, electric blue focus, soft purple magic.
+ * Educational diagrams stay the focus — UI chrome stays quiet.
+ */
+
+@theme {
+	--font-display: var(--font-cinzel), "Cinzel", var(--font-heebo), ui-serif, Georgia, serif;
+	--font-body: var(--font-source-sans), "Source Sans 3", var(--font-heebo), ui-sans-serif, system-ui, sans-serif;
+
+	--color-ink-950: #05070f;
+	--color-ink-900: #0a1020;
+	--color-ink-800: #121a2e;
+	--color-ink-700: #1a2540;
+	--color-ink-600: #243356;
+
+	--color-gold-400: #f0c45a;
+	--color-gold-500: #d4a017;
+	--color-gold-600: #a67c00;
+
+	--color-arcane-300: #8ec5ff;
+	--color-arcane-400: #4aa3ff;
+	--color-arcane-500: #1e7ae8;
+
+	--color-violet-400: #b58cff;
+	--color-violet-500: #8b5cf6;
+
+	--color-ember-400: #ff7a6e;
+	--color-ember-500: #e8453c;
+
+	--color-spell: #2f9e5f;
+	--color-trap: #c45aa8;
+	--color-normal-monster: #c9b06a;
+	--color-effect-monster: #c97a3a;
+	--color-fusion: #7a4fb0;
+	--color-synchro: #e8e8ea;
+	--color-xyz: #1a1a22;
+	--color-link: #2a6fb8;
+	--color-ritual: #4a6ec8;
+
+	--color-surface: #0d1528;
+	--color-surface-raised: #152038;
+	--color-border: color-mix(in oklab, white 12%, transparent);
+	--color-fg: #eef2ff;
+	--color-fg-muted: #9aa6c3;
+}
+
+@layer base {
+	html {
+		color-scheme: dark;
+		background: var(--color-ink-950);
+		color: var(--color-fg);
+	}
+
+	body {
+		min-height: 100dvh;
+		font-family: var(--font-body);
+		background:
+			radial-gradient(1200px 600px at 70% -10%, color-mix(in oklab, var(--color-arcane-500) 18%, transparent), transparent 60%),
+			radial-gradient(900px 500px at 10% 0%, color-mix(in oklab, var(--color-violet-500) 12%, transparent), transparent 55%),
+			linear-gradient(180deg, var(--color-ink-950), var(--color-ink-900) 40%, var(--color-ink-950));
+		background-attachment: fixed;
+	}
+
+	/* The site's header and footer, and the height the header takes from a page that fills the screen. */
+	html {
+		--chrome-top: 3.6rem;
+	}
+
+	/* Letter-spacing (used for Latin small caps and headings) breaks Hebrew letter joins and reading. */
+	html[lang="he"] * {
+		letter-spacing: 0 !important;
+	}
+
+	::selection {
+		background: color-mix(in oklab, var(--color-gold-500) 40%, transparent);
+		color: white;
+	}
+
+	:focus-visible {
+		outline: 2px solid var(--color-arcane-400);
+		outline-offset: 2px;
+	}
+}
+
+@layer utilities {
+	.font-display {
+		font-family: var(--font-display);
+		letter-spacing: 0.04em;
+	}
+
+	/* 16:9 stage on `stage:` screens; on phones the slide flows at full width so nothing is clipped. */
+	.slide-canvas {
+		width: 100%;
+
+		@variant stage {
+			aspect-ratio: 16 / 9;
+			width: min(100%, 1280px);
+		}
+	}
+
+	/* Widest 16:9 slide that still leaves room for the toolbar and controls. */
+	.stage-frame {
+		@variant stage {
+			max-width: min(1280px, calc((100dvh - 12rem) * 16 / 9));
+		}
+	}
+
+	.presentation-lock {
+		overflow: hidden;
+		height: 100dvh;
+	}
+
+	.text-balance {
+		text-wrap: balance;
+	}
+}
+
+/*
+ * The game in full screen (`useImmersive`): no header, no footer, only the game. Outside any layer on purpose:
+ * unlayered rules beat the header's own `flex` utility. The page stops scrolling only while the map fills the screen
+ * (`data-whole-screen`); a level, the list of levels and the title screen keep scrolling, so nothing is cut off on
+ * a small phone.
+ */
+html[data-immersive] {
+	--chrome-top: 0rem;
+
+	[data-site-chrome] {
+		display: none;
+	}
+}
+html[data-immersive]:has([data-whole-screen]) {
+	overflow: hidden;
+	overscroll-behavior: none;
+
+	body {
+		overflow: hidden;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}

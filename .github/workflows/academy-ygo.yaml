@@ -1,0 +1,124 @@
+name: CI/CD for Duel Academy (Vercel)
+
+# Builds apps/academy-ygo on the runner and uploads the result to its Vercel project (`vercel pull`,
+# `vercel build`, `vercel deploy --prebuilt`), so only this app deploys, and only when it or what it
+# is built from changes. The Vercel project (academy-ygo) is NOT connected to the GitHub repository;
+# apps/academy-ygo/vercel.json turns Git deploys off should it ever be. Same pattern as
+# duel-nextjs.yaml: main deploys to Vercel Production, feature branches to a Preview deployment.
+# The app has no database and needs no runtime secrets.
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+    paths:
+      - 'apps/academy-ygo/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/academy-ygo.yaml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/academy-ygo/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/academy-ygo.yaml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter "academy-ygo..."
+
+      - name: Typecheck
+        run: pnpm --filter academy-ygo run typecheck
+
+      - name: Test
+        run: pnpm --filter academy-ygo run test:ci
+
+      # A push is built by the deploy job with the Vercel project's settings; a pull request only here.
+      - name: Build
+        if: github.event_name == 'pull_request'
+        run: pnpm --filter academy-ygo run build
+
+  deploy:
+    needs: verify
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'Develop' }}
+    permissions:
+      contents: read
+    concurrency:
+      group: academy-ygo-deploy-${{ github.ref == 'refs/heads/main' && 'prod' || 'Develop' }}
+      cancel-in-progress: false
+    timeout-minutes: 20
+
+    # Every vercel command runs from the repository root: with these set the CLI targets the project
+    # without a committed .vercel/ folder, and the project's Root Directory (apps/academy-ygo) points
+    # it at the app.
+    env:
+      VERCEL_ORG_ID: ${{ secrets.ACADEMY_VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.ACADEMY_VERCEL_PROJECT_ID }}
+      VERCEL_TARGET: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+      VERCEL_PROD_FLAG: ${{ github.ref == 'refs/heads/main' && '--prod' || '' }}
+
+    steps:
+      - name: Verify the Vercel settings exist
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "❌ VERCEL_TOKEN, ACADEMY_VERCEL_ORG_ID or ACADEMY_VERCEL_PROJECT_ID is not set in the '${{ github.ref == 'refs/heads/main' && 'prod' || 'Develop' }}' environment"
+            exit 1
+          fi
+          echo "✅ Vercel settings are configured"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter "academy-ygo..."
+
+      - name: Install the Vercel CLI
+        run: npm install --global vercel@62.7.0
+
+      - name: Pull the Vercel project
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment="$VERCEL_TARGET"
+
+      - name: Build
+        run: vercel build $VERCEL_PROD_FLAG
+
+      - name: Deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          url=$(vercel deploy --prebuilt $VERCEL_PROD_FLAG)
+          echo "✅ Deployed: $url"
+          echo "### Duel Academy deployed" >> "$GITHUB_STEP_SUMMARY"
+          echo "$url" >> "$GITHUB_STEP_SUMMARY"

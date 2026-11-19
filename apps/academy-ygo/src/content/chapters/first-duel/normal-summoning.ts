@@ -1,0 +1,221 @@
+import type { Lesson } from "@/lib/lesson-types";
+import { SAMPLE } from "@/lib/sample-cards";
+import { facedown, lesson, slide, SRC } from "@/content/helpers";
+
+export const normalSummoningLesson: Lesson = lesson({
+	id: "normal-summoning",
+	chapterId: "first-duel",
+	title: "Normal Summoning Monsters",
+	description: "How to bring monsters from your hand onto the field, including Tribute Summons and Setting.",
+	sources: [SRC.rulebook, SRC.rulesFaq],
+	slides: [
+		slide(
+			"summon-basics",
+			"Normal Summon: play a monster",
+			"To Normal Summon, take a monster from your hand and place it face-up in a Main Monster Zone, in Attack Position. You do this during your Main Phase.",
+			{
+				template: "sequence",
+				step: 1,
+				of: 1,
+				action: "Normal Summon Bronze Soldier from your hand",
+				scene: {
+					hand: [SAMPLE.bronzeSoldier, SAMPLE.flameCaster, SAMPLE.mirrorBarrier],
+					monsters: [null, SAMPLE.bronzeSoldier, null, null, null],
+				},
+				motion: "hand-to-field",
+			},
+			"Bronze Soldier moves from a hand of three cards into the second Main Monster Zone, face-up in Attack Position.",
+		),
+		slide(
+			"summon-level-4",
+			"Level 4 or lower: no cost",
+			"Monsters of Level 4 or lower can be Normal Summoned with no extra cost. Bronze Soldier and Flame Caster are both Level 4, so either may be played directly from your hand.",
+			{
+				template: "numeric",
+				terms: [
+					{ value: 4, label: "Level", tone: "gold" },
+					{ value: 0, label: "Tributes needed", tone: "green" },
+				],
+				op: "range",
+				cards: [SAMPLE.bronzeSoldier, SAMPLE.flameCaster],
+				footnote: "Levels 1-4: 0 Tributes",
+			},
+			"A numeric panel: Level 4 needs 0 Tributes, shown with Bronze Soldier and Flame Caster.",
+		),
+		slide(
+			"summon-once-per-turn",
+			"Only one Normal Summon per turn",
+			"You get exactly one Normal Summon or Set each turn. After summoning Bronze Soldier, you cannot Normal Summon Flame Caster as well. Special Summons are separate and have their own rules.",
+			{
+				template: "comparison",
+				headings: ["Allowed", "Not allowed"],
+				before: {
+					label: "1 Normal Summon",
+					cards: [SAMPLE.bronzeSoldier],
+					note: "Bronze Soldier uses your Normal Summon.",
+					tone: "green",
+				},
+				after: {
+					label: "2nd Normal Summon",
+					cards: [{ ...SAMPLE.flameCaster, ghost: true }],
+					note: "Flame Caster must wait until next turn.",
+					tone: "red",
+				},
+				arrowLabel: "same turn",
+			},
+			"Left: Bronze Soldier is Normal Summoned and uses up the turn's allowance. Right: a dimmed Flame Caster that cannot also be Normal Summoned this turn.",
+			"A Normal Summon and a Set share the same single allowance. Setting a monster uses it too.",
+		),
+		slide(
+			"summon-tribute-one",
+			"Level 5 or 6: Tribute 1 monster",
+			"A Level 5 or Level 6 monster is too strong to summon for free. You must Tribute 1 monster you control, sending it to the Graveyard, then Normal Summon the bigger one.",
+			{
+				template: "sequence",
+				step: 1,
+				of: 2,
+				action: "Tribute Bronze Soldier to Summon Middle Titan",
+				scene: {
+					hand: [SAMPLE.middleTitan],
+					monsters: [null, { ...SAMPLE.bronzeSoldier, ghost: true }, null, null, null],
+					graveyard: [],
+					result: SAMPLE.middleTitan,
+				},
+				motion: "field-to-graveyard",
+			},
+			"Bronze Soldier is dimmed as a Tribute and moves toward the Graveyard so that Middle Titan, Level 5, can be Normal Summoned.",
+		),
+		slide(
+			"summon-tribute-two",
+			"Level 7 or higher: Tribute 2 monsters",
+			"A Level 7, 8, 9 or higher monster needs 2 Tributes. You send two monsters from your own side of the field to the Graveyard, then place the big monster.",
+			{
+				template: "sequence",
+				step: 1,
+				of: 2,
+				action: "Tribute 2 monsters to Summon Gigant Guardian",
+				scene: {
+					hand: [SAMPLE.gigantGuardian],
+					monsters: [
+						{ ...SAMPLE.bronzeSoldier, ghost: true },
+						null,
+						{ ...SAMPLE.flameCaster, ghost: true },
+						null,
+						null,
+					],
+					result: SAMPLE.gigantGuardian,
+				},
+				motion: "field-to-graveyard",
+			},
+			"Two dimmed Tributes, Bronze Soldier and Flame Caster, go to the Graveyard so that Level 7 Gigant Guardian can be Normal Summoned.",
+		),
+		slide(
+			"summon-tribute-table",
+			"How many Tributes?",
+			"Match the Level to the Tribute count. Levels 1 to 4 need none, Levels 5 and 6 need one, and Level 7 and above need two. The Tributes come from your side only.",
+			{
+				template: "numeric",
+				terms: [
+					{ value: "5-6", label: "Level", tone: "gold" },
+					{ value: 1, label: "Tribute", tone: "blue" },
+					{ value: "7+", label: "Level", tone: "gold" },
+					{ value: 2, label: "Tributes", tone: "blue" },
+				],
+				op: "range",
+				cards: [SAMPLE.middleTitan, SAMPLE.gigantGuardian],
+				footnote: "1-4: 0 Tributes | 5-6: 1 Tribute | 7+: 2 Tributes",
+			},
+			"A table of rules: Level 1 to 4 needs 0 Tributes, Level 5 to 6 needs 1 Tribute, Level 7 and higher needs 2 Tributes, shown with Middle Titan and Gigant Guardian.",
+		),
+		slide(
+			"summon-set-monster",
+			"Set a monster face-down",
+			"Instead of summoning face-up, you may Set a monster. It is placed face-down in Defense Position, hiding its identity. A Set uses your one Normal Summon for the turn.",
+			{
+				template: "sequence",
+				step: 1,
+				of: 1,
+				action: "Set Bronze Soldier face-down in Defense Position",
+				scene: {
+					hand: [SAMPLE.bronzeSoldier, SAMPLE.mirrorBarrier],
+					monsters: [null, null, facedown(SAMPLE.bronzeSoldier), null, null],
+				},
+				motion: "hand-to-field",
+			},
+			"Bronze Soldier moves from the hand to the middle Main Monster Zone, placed face-down sideways in Defense Position.",
+			"A Level 5 or higher monster can also be Set, but you still have to pay the Tributes.",
+		),
+		slide(
+			"summon-vs-special",
+			"Normal Summon is not the only way",
+			"Special Summons are summons done by card effects or special methods, like Fusion or Synchro. They do not use your Normal Summon for the turn. You will study them in later chapters.",
+			{
+				template: "illustration",
+				cards: [SAMPLE.bronzeSoldier, SAMPLE.novaDragon],
+				chips: [
+					{ label: "Normal Summon: 1 per turn", tone: "gold" },
+					{ label: "Special Summon: by effects", tone: "purple" },
+				],
+			},
+			"Bronze Soldier is labelled Normal Summon, one per turn. Nova Dragon is labelled Special Summon, made by card effects.",
+		),
+		slide(
+			"summon-zone-choice",
+			"You choose the zone",
+			"You may place your summoned monster in any empty Main Monster Zone. Position matters later for some effects, but for now just pick an open slot, left to right or any other.",
+			{
+				template: "duel-field",
+				half: "you",
+				highlight: [
+					{ zone: "mm1", side: "you" },
+					{ zone: "mm2", side: "you" },
+					{ zone: "mm3", side: "you" },
+					{ zone: "mm4", side: "you" },
+					{ zone: "mm5", side: "you" },
+				],
+				cards: [{ zone: "mm3", side: "you", card: SAMPLE.middleTitan }],
+				showHand: [SAMPLE.bronzeSoldier],
+				callout: "Any empty zone works",
+			},
+			"Your five Main Monster Zones lit, with Middle Titan in the center zone and Bronze Soldier waiting in hand.",
+		),
+		slide(
+			"summon-common-mistakes",
+			"Common beginner mistakes",
+			"You cannot Tribute your opponent's monsters. You cannot Normal Summon a second time. And you must have enough monsters on your side to pay the Tributes before summoning.",
+			{
+				template: "comparison",
+				headings: ["Wrong", "Right"],
+				before: {
+					label: "Not enough Tributes",
+					cards: [SAMPLE.gigantGuardian],
+					note: "Level 7 with only 1 monster: illegal.",
+					tone: "red",
+				},
+				after: {
+					label: "Enough Tributes",
+					cards: [SAMPLE.gigantGuardian],
+					note: "Level 7 with 2 monsters: legal.",
+					tone: "green",
+				},
+				arrowLabel: "fix",
+			},
+			"Left: Gigant Guardian with only one monster available, which is illegal. Right: Gigant Guardian with two monsters available, which is legal.",
+		),
+		slide(
+			"summon-recap",
+			"Summoning in one glance",
+			"One Normal Summon or Set per turn. Level 4 or lower: free. Level 5 or 6: 1 Tribute. Level 7 or higher: 2 Tributes. A Set monster sits face-down in Defense Position.",
+			{
+				template: "illustration",
+				cards: [SAMPLE.bronzeSoldier, SAMPLE.middleTitan, SAMPLE.gigantGuardian],
+				chips: [
+					{ label: "Level 1-4: 0", tone: "green" },
+					{ label: "Level 5-6: 1", tone: "blue" },
+					{ label: "Level 7+: 2", tone: "red" },
+				],
+			},
+			"Three monsters labelled with Tribute counts: Bronze Soldier needs 0, Middle Titan needs 1, Gigant Guardian needs 2.",
+		),
+	],
+});
