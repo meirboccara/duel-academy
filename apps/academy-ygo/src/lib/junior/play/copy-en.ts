@@ -1,8 +1,11 @@
 import { cardOf, monsterOf, type CardId } from "./cards";
 import { atkOf } from "./engine";
 import { printedWords } from "./card-words";
-import { MASTERS, MASTER_NAMES, masterLevelId } from "./masters";
+import { MASTERS, MASTER_NAMES, MASTER_TIER, masterLevelId, type Tier } from "./masters";
 import type { PlayCopy } from "./copy";
+
+/** The level of a trainer of the masters' island, after its name. */
+const TIER_WORDS: Record<Tier, string> = { basic: "beginner", medium: "medium", strong: "strong", expert: "expert" };
 
 /** Card text follows the wording printed on real cards: a cost before the ";", "Target" only when the card targets. */
 const written: Partial<PlayCopy["cards"]> = {
@@ -194,7 +197,7 @@ export function englishCopy(RIVAL: string): PlayCopy {
 			"st-battle": { title: "The Battle Step", goal: "Battle Ox attacks Silver Fang. Keep Silver Fang: which card acts at the right moment?" },
 			"st-damage": { title: "The Damage Step", goal: "Two attacks are coming. Let the Battle Step pass, then act in the Damage Step. Keep your 1000 Life Points." },
 			"x-duel": { title: "The Extra Deck duel", goal: "A whole duel on the whole mat. Use your Extra Deck. Bring Nox's Life Points to 0!" },
-			...Object.fromEntries(MASTERS.map((master) => [masterLevelId(master), { title: `Duel: ${MASTER_NAMES[master]}`, goal: `A whole duel against ${MASTER_NAMES[master]}: 40 shuffled cards, 8000 Life Points. Bring them down to 0!` }])),
+			...Object.fromEntries(MASTERS.map((master) => [masterLevelId(master), { title: `Duel: ${MASTER_NAMES[master]} · ${TIER_WORDS[MASTER_TIER[master]]}`, goal: `A whole duel against ${MASTER_NAMES[master]}: 40 shuffled cards, 8000 Life Points. Bring them down to 0!` }])),
 		},
 		cards,
 		kinds: { monster: "Monster", spell: "Spell", trap: "Trap" },

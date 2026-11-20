@@ -1,8 +1,11 @@
 import { cardOf, monsterOf, type CardId } from "./cards";
 import { atkOf } from "./engine";
 import { printedWords } from "./card-words";
-import { MASTERS, MASTER_NAMES, masterLevelId } from "./masters";
+import { MASTERS, MASTER_NAMES, MASTER_TIER, masterLevelId, type Tier } from "./masters";
 import type { PlayCopy } from "./copy";
+
+/** The level of a trainer of the masters' island, after its name. */
+const TIER_WORDS: Record<Tier, string> = { basic: "débutant", medium: "moyen", strong: "fort", expert: "expert" };
 
 /*
  * French follows the site's Konami-based vocabulary (docs/academy-french-terminology.md): phase names stay in English.
@@ -199,7 +202,7 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 			"st-battle": { title: "La Battle Step", goal: "Bœuf de Combat attaque Croc Argenté. Garde Croc Argenté : quelle carte agit au bon moment ?" },
 			"st-damage": { title: "La Damage Step", goal: "Deux attaques arrivent. Laisse passer la Battle Step, puis agis dans la Damage Step. Garde tes 1000 Points de Vie." },
 			"x-duel": { title: "Le duel de l’Extra Deck", goal: "Un duel entier sur tout le tapis. Utilise ton Extra Deck. Fais tomber Nox à 0 Point de Vie !" },
-			...Object.fromEntries(MASTERS.map((master) => [masterLevelId(master), { title: `Duel : ${MASTER_NAMES[master]}`, goal: `Un duel entier contre ${MASTER_NAMES[master]} : 40 cartes mélangées, 8000 Points de Vie. Fais-les tomber à 0 !` }])),
+			...Object.fromEntries(MASTERS.map((master) => [masterLevelId(master), { title: `Duel : ${MASTER_NAMES[master]} · ${TIER_WORDS[MASTER_TIER[master]]}`, goal: `Un duel entier contre ${MASTER_NAMES[master]} : 40 cartes mélangées, 8000 Points de Vie. Fais-les tomber à 0 !` }])),
 		},
 		cards,
 		kinds: { monster: "Monstre", spell: "Magie", trap: "Piège" },

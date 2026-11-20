@@ -63,7 +63,7 @@ describe("the trainer bot", () => {
 		const { apply, board } = await import("./engine");
 		let state = board({ full: true, turn: "rival", phase: "battle", you: { lp: 8000 }, rival: { hand: ["pot-of-greed"], deck: ["pocket-cub", "pocket-cub"], monsters: ["iron-boar", "river-otter", "thorn-fox"] } });
 		for (let step = 0; step < 6 && state.turn === "rival"; step++) {
-			const result = apply(state, botMove(state, { aggression: 1, skill: 1, caution: 1 }, seeded(1)));
+			const result = apply(state, botMove(state, { aggression: 1, skill: 1, caution: 1, answers: 1 }, seeded(1)));
 			if (!result.ok) break;
 			state = result.board;
 		}

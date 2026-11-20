@@ -29,22 +29,51 @@ export const MASTER_NAMES: Record<MasterId, string> = {
 	atem: "Atem",
 };
 
-/** How each trainer plays: the first ones are gentle and make mistakes, the last ones play their best. */
-export const PERSONAS: Record<MasterId, Persona> = {
-	"rex-raptor": { aggression: 1.6, skill: 0.45, caution: 0.3 },
-	"weevil-underwood": { aggression: 0.9, skill: 0.5, caution: 1 },
-	"mako-tsunami": { aggression: 1.1, skill: 0.55, caution: 0.7 },
-	"joey-wheeler": { aggression: 1.4, skill: 0.6, caution: 0.5 },
-	arkana: { aggression: 1, skill: 0.65, caution: 0.8 },
-	"yami-bakura": { aggression: 1.2, skill: 0.7, caution: 0.8 },
-	"maximillion-pegasus": { aggression: 1, skill: 0.75, caution: 1 },
-	"yugi-muto": { aggression: 0.9, skill: 0.8, caution: 1.2 },
-	"jaden-yuki": { aggression: 1.3, skill: 0.8, caution: 0.7 },
-	"yusei-fudo": { aggression: 1, skill: 0.85, caution: 1 },
-	"yami-marik": { aggression: 1.3, skill: 0.85, caution: 0.8 },
-	"seto-kaiba": { aggression: 1.7, skill: 0.9, caution: 0.6 },
-	atem: { aggression: 1.1, skill: 0.95, caution: 1 },
+/**
+ * The trainers' levels (the owner's choice): the first ones are really basic, then medium, strong, and expert.
+ * A basic trainer often plays a weaker move and sometimes forgets its Traps; an expert always plays its best.
+ */
+export const TIERS = ["basic", "medium", "strong", "expert"] as const;
+export type Tier = (typeof TIERS)[number];
+export const MASTER_TIER: Record<MasterId, Tier> = {
+	"rex-raptor": "basic",
+	"weevil-underwood": "basic",
+	"mako-tsunami": "basic",
+	"joey-wheeler": "medium",
+	arkana: "medium",
+	"yami-bakura": "medium",
+	"maximillion-pegasus": "strong",
+	"yugi-muto": "strong",
+	"jaden-yuki": "strong",
+	"yusei-fudo": "strong",
+	"yami-marik": "expert",
+	"seto-kaiba": "expert",
+	atem: "expert",
 };
+const TIER_PLAY: Record<Tier, Omit<Persona, "aggression">> = {
+	basic: { skill: 0.25, caution: 0.2, answers: 0.5 },
+	medium: { skill: 0.6, caution: 0.7, answers: 0.8 },
+	strong: { skill: 0.85, caution: 1, answers: 1 },
+	expert: { skill: 1, caution: 1.2, answers: 1 },
+};
+/** How much each trainer goes for the opponent's Life Points: Kaiba and Rex attack, Yugi and Weevil wait. */
+const AGGRESSION: Record<MasterId, number> = {
+	"rex-raptor": 1.6,
+	"weevil-underwood": 0.9,
+	"mako-tsunami": 1.1,
+	"joey-wheeler": 1.4,
+	arkana: 1,
+	"yami-bakura": 1.2,
+	"maximillion-pegasus": 1,
+	"yugi-muto": 0.9,
+	"jaden-yuki": 1.3,
+	"yusei-fudo": 1,
+	"yami-marik": 1.3,
+	"seto-kaiba": 1.7,
+	atem: 1.1,
+};
+export const PERSONAS = Object.fromEntries(MASTERS.map((master) => [master, { aggression: AGGRESSION[master], ...TIER_PLAY[MASTER_TIER[master]] }])) as Record<MasterId, Persona>;
+
 
 export const MAIN_DECK = 40;
 export const EXTRA_DECK = 15;

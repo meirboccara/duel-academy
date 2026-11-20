@@ -13,9 +13,11 @@ export interface Persona {
 	skill: number;
 	/** How much the bot fears leaving a monster weaker than the opponent's strongest one in Attack Position. */
 	caution: number;
+	/** How often (0 to 1) the bot answers when an answer would help: a basic trainer forgets its Traps. */
+	answers: number;
 }
 /** The persona used for the child's hints: the best move, carefully. */
-export const HINT_PERSONA: Persona = { aggression: 1, skill: 1, caution: 1 };
+export const HINT_PERSONA: Persona = { aggression: 1, skill: 1, caution: 1, answers: 1 };
 
 const WIN = 1_000_000;
 /** A random number generator in [0, 1) from a seed: the same seed gives the same duel. */
@@ -87,6 +89,7 @@ export function botMove(state: Board, persona: Persona, random: () => number = M
 			const value = score(play.board);
 			if (value > bestScore + WORTH) [best, bestScore] = [play, value];
 		}
+		if (best && best !== pass && pass && random() > persona.answers) return pass.move;
 		return best?.move ?? { type: "pass" };
 	}
 	if (state.phase === "draw" && !state.drawn && state.turnNumber > 1 && plays.some((play) => play.move.type === "draw")) return { type: "draw" };

@@ -1,8 +1,11 @@
 import { cardOf, monsterOf, type CardId } from "./cards";
 import { atkOf } from "./engine";
-import { MASTERS, MASTER_NAMES, masterLevelId } from "./masters";
+import { MASTERS, MASTER_NAMES, MASTER_TIER, masterLevelId, type Tier } from "./masters";
 import type { PlayCopy } from "./copy";
 import { en } from "./copy-en";
+
+/** The level of a trainer of the masters' island, after its name. */
+const TIER_WORDS: Record<Tier, string> = { basic: "מתחילים", medium: "בינוני", strong: "חזק", expert: "מומחה" };
 
 /*
  * Hebrew is an unofficial educational translation in the plural address used by the pilot. Real cards do not exist in
@@ -185,7 +188,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 			"st-battle": { title: L("Battle Step"), goal: `${name("iron-boar")} תוקף את ${name("pocket-cub")}. שמרו על ${name("pocket-cub")}: איזה קלף פועל ברגע הנכון?` },
 			"st-damage": { title: L("Damage Step"), goal: `שתי התקפות מגיעות. תנו ל־${L("Battle Step")} לעבור, ופעלו ב־${L("Damage Step")}. שמרו על 1000 ${LP}.` },
 			"x-duel": { title: `הדו־קרב של ${EXTRA}`, goal: `דו־קרב שלם על המשטח כולו. השתמשו ב${EXTRA}. הורידו את ${LP} של נוקס ל־0!` },
-			...Object.fromEntries(MASTERS.map((master) => [masterLevelId(master), { title: `דו־קרב: ${L(MASTER_NAMES[master])}`, goal: `דו־קרב שלם מול ${L(MASTER_NAMES[master])}: 40 קלפים מעורבבים ו־8000 ${LP}. הורידו אותו ל־0!` }])),
+			...Object.fromEntries(MASTERS.map((master) => [masterLevelId(master), { title: `דו־קרב: ${L(MASTER_NAMES[master])} · ${TIER_WORDS[MASTER_TIER[master]]}`, goal: `דו־קרב שלם מול ${L(MASTER_NAMES[master])}: 40 קלפים מעורבבים ו־8000 ${LP}. הורידו אותו ל־0!` }])),
 		},
 		cards,
 		kinds: { monster: w("מפלצת", "Monster"), spell: w("לחש", "Spell"), trap: w("מלכודת", "Trap") },

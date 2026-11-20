@@ -58,3 +58,11 @@ All five steps are built and tested (918 tests, typecheck, production build). Wh
   database; Hebrew shows them in English without a written meaning.
 - The bot is greedy (one move ahead): it never plans a combo over two turns, and it never sees face-down cards.
 - Not tried with children: deck size (40) and 8000 Life Points make long duels.
+
+## Owner's answers (2026-11-20, after the first build)
+
+- Non-anime cards in a deck are fine when the anime gives too few the engine plays (`filler` in `master-decks.ts`).
+- Trainers have levels: basic (Rex Raptor, Weevil, Mako), medium (Joey, Arkana, Yami Bakura), strong (Pegasus,
+  Yugi, Jaden, Yusei), expert (Yami Marik, Kaiba, Atem). The level is shown after the trainer's name. A basic trainer
+  often plays a weaker move and answers with its Traps only half the time; an expert always plays its best
+  (`MASTER_TIER`, `TIER_PLAY` in `masters.ts`).

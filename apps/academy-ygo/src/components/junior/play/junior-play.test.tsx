@@ -584,12 +584,12 @@ describe("full screen", () => {
 describe("the masters' island", () => {
 	it("asks for a starter Deck first, then deals a whole duel against the trainer at 8000 Life Points", async () => {
 		const user = setup(masterLevelId("rex-raptor"));
-		await openLevel(user, "Duel: Rex Raptor");
+		await openLevel(user, "Duel: Rex Raptor · beginner");
 		expect(screen.getByText("To challenge the masters, you need a Deck of 40 cards.")).toBeTruthy();
 		await user.click(button("Choose your starter Deck"));
 		await user.click(screen.getByRole("button", { name: /^Choose: Dragons\./ }));
 		expect(JSON.parse(window.localStorage.getItem(`${PLAY_PROGRESS_KEY}:deck`) ?? "null")).toMatchObject({ starter: "dragon" });
-		expect(screen.getByRole("heading", { level: 2, name: "Duel: Rex Raptor" })).toBeTruthy();
+		expect(screen.getByRole("heading", { level: 2, name: "Duel: Rex Raptor · beginner" })).toBeTruthy();
 		expect(screen.getAllByText(/Your Life Points: 8000/).length).toBeGreaterThan(0);
 		expect(screen.getAllByText(/Rex Raptor's Life Points: 8000/).length).toBeGreaterThan(0);
 	});
