@@ -4,7 +4,7 @@ import { animate, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { cardArtUrl } from "@/lib/junior/play/card-art";
 import { CARDS, cardOf, monsterOf, tributesFor, type CardId } from "@/lib/junior/play/cards";
-import { PLAY_COPY, type PlayCopy } from "@/lib/junior/play/copy";
+import { PLAY_COPY, cardType, type PlayCopy } from "@/lib/junior/play/copy";
 import { EXTRA_ZONE, PHASES, START_LP, atkOf, defOf, mainZones, type Board, type GameEvent, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
 import type { PhaseBar as PhaseBarKind } from "@/lib/junior/play/levels";
 
@@ -160,7 +160,7 @@ export function CardFace({ card, copy, atk, def, full, defending, compact, mater
 					)}
 				</>
 			) : (
-				<span className="text-[11px] font-semibold uppercase leading-tight text-fg-muted">{info.kind !== "monster" && info.icon ? copy.icons[info.icon] : copy.kinds[info.kind]}</span>
+				<span className="text-[11px] font-semibold uppercase leading-tight text-fg-muted">{cardType(copy, card)}</span>
 			)}
 			{full && printed && (
 				<span dir={copy.englishCards ? "ltr" : undefined} lang={copy.englishCards ? "en" : undefined} className="whitespace-pre-line text-[11px] leading-snug text-fg">
@@ -260,12 +260,16 @@ function SmallBoard({ board, copy, moving, glow, chosen, onZone, landing, counti
 		const monster = row === "monsters" ? board[side].monsters[zone] : null;
 		const back = row === "backrow" ? board[side].backrow[zone] : null;
 		const zoneName = row === "monsters" ? copy.monsterZone(side, zone + 1) : copy.backZone(side, zone + 1);
-		const content = monster ? monsterLabel(copy, board, monster) : back ? (side === "you" ? `${copy.cards[back.card].name}, ${copy.faceDown}` : copy.faceDown) : copy.empty;
+		const content = monster ? monsterLabel(copy, board, monster) : back ? (back.open ? `${copy.cards[back.card].name}, ${copy.faceUp}` : side === "you" ? `${copy.cards[back.card].name}, ${copy.faceDown}` : copy.faceDown) : copy.empty;
 		const ring = chosen?.has(key) ? "border-arcane-400 bg-arcane-500/20" : glow?.has(key) ? "border-gold-400 bg-gold-400/15" : "border-white/20 bg-surface-raised";
 		const inside = monster ? (
 			<motion.span key={monster.card} layout={moving} initial={moving ? { scale: 0.6, opacity: 0 } : false} animate={{ scale: 1, opacity: 1, rotate: monster.position === "defense" ? 90 : 0 }} transition={{ delay: landing?.get(key) ?? 0 }} className="block h-24 w-20">
 				<HeldFace hold={holding?.get(key)} playId={playId} card={monster.card} copy={copy} atk={atkOf(monster, board)} def={defOf(monster, board)} defending={monster.position === "defense"} />
 			</motion.span>
+		) : back?.open ? (
+			<span className="block h-14 w-12">
+				<CardFace card={back.card} copy={copy} compact />
+			</span>
 		) : back ? (
 			<motion.span initial={moving ? { scale: 0.6, opacity: 0 } : false} animate={{ scale: 1, opacity: 1 }} className="flex min-h-11 w-full items-center justify-center gap-1 rounded-lg border-2 border-trap bg-ink-700 px-1 text-center">
 				<span aria-hidden className="text-xl">
@@ -356,8 +360,8 @@ function FullMat({ board, copy, moving, glow, chosen, onZone, onPile, landing, c
 		const slot = board[side].backrow[at];
 		/* The leftmost and rightmost Spell & Trap Zones are the Pendulum Zones while a Pendulum Monster is there. */
 		const label = slot?.up ? copy.pendulumZone(side, at === 0 ? 1 : 2) : copy.backZone(side, at + 1);
-		const content = !slot ? copy.empty : slot.up ? `${copy.cards[slot.card].name}, ${copy.faceUp}, ${copy.scale} ${monsterOf(slot.card).scale ?? 0}` : side === "you" ? `${copy.cards[slot.card].name}, ${copy.faceDown}` : copy.faceDown;
-		const inside = !slot ? null : slot.up ? (
+		const content = !slot ? copy.empty : slot.up ? `${copy.cards[slot.card].name}, ${copy.faceUp}, ${copy.scale} ${monsterOf(slot.card).scale ?? 0}` : slot.open ? `${copy.cards[slot.card].name}, ${copy.faceUp}` : side === "you" ? `${copy.cards[slot.card].name}, ${copy.faceDown}` : copy.faceDown;
+		const inside = !slot ? null : slot.up || slot.open ? (
 			<span className="block h-12 w-full max-w-11">
 				<CardFace card={slot.card} copy={copy} compact />
 			</span>
@@ -534,6 +538,10 @@ export function PhaseBar({ bar, board, copy, enabled, hinted, onDraw, onPhase }:
 export function ClashBanner({ events, copy, moving }: { events: readonly GameEvent[]; copy: PlayCopy; moving: boolean }) {
 	const battle = events.find((event) => event.type === "battle");
 	const direct = events.find((event) => event.type === "direct");
+	/* The step of the attack, as Konami names it: the Battle Step while an attack waits for an answer, the Damage Step when the monsters meet. */
+	const step = (name: string) => <span className="basis-full text-center text-xs font-semibold uppercase tracking-wider text-fg-muted">{name}</span>;
+	const declared = events.find((event) => event.type === "attack-declared");
+	const waiting = events.some((event) => event.type === "window");
 	if (battle?.type === "battle") {
 		const high = Math.max(battle.attackerValue, battle.defenderValue);
 		const low = Math.min(battle.attackerValue, battle.defenderValue);
@@ -546,7 +554,8 @@ export function ClashBanner({ events, copy, moving }: { events: readonly GameEve
 			</motion.span>
 		);
 		return (
-			<div aria-hidden dir="ltr" data-clash className="mx-auto flex max-w-md items-center justify-center gap-3 rounded-xl border-2 border-ember-400 bg-ember-500/10 p-2">
+			<div aria-hidden dir="ltr" data-clash className="mx-auto flex max-w-md flex-wrap items-center justify-center gap-x-3 rounded-xl border-2 border-ember-400 bg-ember-500/10 p-2">
+				{step(copy.steps.damage)}
 				{fighter(battle.attacker, battle.attackerValue, copy.atk, -40)}
 				<span className="text-2xl">💥</span>
 				{fighter(battle.defender, battle.defenderValue, battle.defenderPosition === "attack" ? copy.atk : copy.def, 40)}
@@ -558,10 +567,22 @@ export function ClashBanner({ events, copy, moving }: { events: readonly GameEve
 	}
 	if (direct?.type === "direct") {
 		return (
-			<div aria-hidden dir="ltr" data-clash className="mx-auto flex max-w-md items-center justify-center gap-3 rounded-xl border-2 border-ember-400 bg-ember-500/10 p-2">
+			<div aria-hidden dir="ltr" data-clash className="mx-auto flex max-w-md flex-wrap items-center justify-center gap-x-3 rounded-xl border-2 border-ember-400 bg-ember-500/10 p-2">
+				{step(copy.steps.damage)}
 				<span className="text-3xl">{cardOf(direct.attacker).art}</span>
 				<span className="text-2xl">➜ 🏮</span>
 				<span className="text-lg font-bold text-gold-400">− {direct.amount}</span>
+			</div>
+		);
+	}
+	if (declared?.type === "attack-declared" && waiting) {
+		const damage = events.some((event) => event.type === "damage-step");
+		return (
+			<div aria-hidden dir="ltr" data-clash className="mx-auto flex max-w-md flex-wrap items-center justify-center gap-x-3 rounded-xl border-2 border-gold-400 bg-gold-400/10 p-2">
+				{step(damage ? copy.steps.damage : copy.steps.battle)}
+				<span className="text-3xl">{cardOf(declared.attacker).art}</span>
+				<span className="text-2xl">⚔️</span>
+				<span className="text-3xl">{declared.target ? cardOf(declared.target).art : "🏮"}</span>
 			</div>
 		);
 	}

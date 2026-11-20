@@ -7,7 +7,8 @@ import type { Locale } from "@/lib/i18n/locales";
 import { CARD_ART } from "@/lib/junior/play/card-art";
 import type { PlayCopy } from "@/lib/junior/play/copy";
 import { CONTROLS_COPY } from "@/lib/junior/world/controls-copy";
-import { RARITIES, SHOP_CARDS, priceOf, rarityOf } from "@/lib/junior/world/shop";
+import { RARITIES, SHOP_CARDS, onSale, priceOf, rarityOf } from "@/lib/junior/world/shop";
+import type { PlayProgress } from "@/lib/junior/play/progress";
 import { trainerPicture } from "@/lib/junior/world/trainers";
 import type { Outfit } from "@/lib/junior/world/wardrobe";
 import { Modal, bigButton, quietButton } from "../home/confirm-dialog";
@@ -23,7 +24,8 @@ export type { WardrobeActions };
  * price. A card is bought from its large view, with one button; a card the child cannot afford yet says how many
  * stars are missing. Nothing random is sold.
  */
-export function ShopDialog({ stars, bought, wardrobe, preview, copy, locale, onBuy, onClose }: { stars: number; bought: readonly string[]; wardrobe?: WardrobeActions; preview?: (outfit: Outfit) => ReactNode; copy: PlayCopy; locale: Locale; onBuy: (card: string) => boolean; onClose: () => void }) {
+/** `progress`: which cards are on sale; a trainer's cards open once that trainer of the masters' island is beaten. Without it, every card is shown. */
+export function ShopDialog({ stars, bought, wardrobe, preview, copy, locale, progress, onBuy, onClose }: { stars: number; bought: readonly string[]; wardrobe?: WardrobeActions; preview?: (outfit: Outfit) => ReactNode; copy: PlayCopy; locale: Locale; progress?: PlayProgress; onBuy: (card: string) => boolean; onClose: () => void }) {
 	const words = CONTROLS_COPY[locale];
 	const [tab, setTab] = useState<"cards" | "hero">("cards");
 	const [picked, setPicked] = useState<string | null>(null);
@@ -73,7 +75,7 @@ export function ShopDialog({ stars, bought, wardrobe, preview, copy, locale, onB
 				large(picked)
 			) : (
 				<ul className="grid max-h-[50svh] grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4">
-					{SHOP_CARDS.map((item, i) => {
+					{SHOP_CARDS.filter((item) => !progress || onSale(item, progress)).map((item, i) => {
 						const owned = bought.includes(item.card);
 						const label = `${name(item.card)}, ${words.rarity[item.rarity]}, ${owned ? words.owned : words.price(item.price)}`;
 						return (

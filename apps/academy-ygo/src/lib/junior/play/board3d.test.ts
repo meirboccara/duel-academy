@@ -406,9 +406,9 @@ describe("what the 3D mat shows and where it can be tapped", () => {
 		expect(holdPiles(now, now, new Map())).toEqual(now);
 	});
 
-	it("prints a card for the hand with both numbers, and a Spell with its kind", () => {
+	it("prints a card for the hand with both numbers, and a Spell with its type", () => {
 		expect(printedFace(copy, "pocket-cub")).toMatchObject({ name: copy.cards["pocket-cub"].name, line: "1200 / 800", note: "★★★" });
-		expect(printedFace(copy, "monster-reborn").line).toBe(copy.kinds.spell);
+		expect(printedFace(copy, "monster-reborn").line).toBe(copy.spellTypes.normal);
 		const state = board({ you: { monsters: ["pocket-cub"] } });
 		expect(monsterFace(copy, state, state.you.monsters[0]!, { atk: 1, def: 2 }).line).toBe("ATK 1");
 	});

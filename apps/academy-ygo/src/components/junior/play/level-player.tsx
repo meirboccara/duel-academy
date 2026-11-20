@@ -3,10 +3,11 @@
 import { ArrowLeft, ArrowRight, Box, CircleCheck, Hand, Lightbulb, MonitorPlay, Printer, RotateCcw, Square, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
 import type { Locale } from "@/lib/i18n/locales";
-import { cardOf, hasRulesText, monsterOf, spellTarget, tributesFor, type CardId } from "@/lib/junior/play/cards";
-import { PLAY_COPY, VOICE_LOCALE, narrateAll, type PlayCopy } from "@/lib/junior/play/copy";
-import { mainZones, scalesOf, type Board, type Move, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
-import type { Level } from "@/lib/junior/play/levels";
+import { cardOf, hasRulesText, isQuickPlay, monsterOf, spellTarget, tributesFor, type CardId } from "@/lib/junior/play/cards";
+import { PLAY_COPY, VOICE_LOCALE, narrateAll, phasesStarted, playCopyFor, stepsStarted, type PlayCopy } from "@/lib/junior/play/copy";
+import { MASTER_NAMES, masterPicture } from "@/lib/junior/play/masters";
+import { mainZones, scalesOf, type Board, type GameEvent, type Move, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
+import { WORLD_IDS, type Level } from "@/lib/junior/play/levels";
 import { hint as askHint, next, outcome, play, restart, start, undo, type Outcome, type Session } from "@/lib/junior/play/session";
 import { chime, speak, stopSpeaking } from "@/lib/junior/play/sound";
 import { BEAT, BoardStage } from "./board-stage";
@@ -17,13 +18,18 @@ import { CardFace, ChainTower, ClashBanner, PhaseBar, PileViewer, pileKey, print
 
 /** What the child is holding between two taps. */
 type Holding =
-	| { kind: "hand"; card: CardId }
+	/** A card of the hand; `set`: a Quick-Play Spell to Set face-down instead of activating it. */
+	| { kind: "hand"; card: CardId; set?: true }
 	/** A Spell placed in a zone, waiting for the Monster it should hit. */
 	| { kind: "aim"; card: CardId; zone: number }
 	| { kind: "tributes"; card: CardId; chosen: number[] }
 	| { kind: "monster"; zone: number }
-	/** A Set Trap flipped in answer, waiting for the Monster it should save. */
-	| { kind: "trap"; zone: number }
+	/** A Set card being flipped, waiting for the Monster it targets: one of the child's (`you`) or of the rival. */
+	| { kind: "trap"; zone: number; aim: Side }
+	/** Call of the Haunted being flipped, waiting for the monster in the child's Graveyard. */
+	| { kind: "haunt"; zone: number }
+	/** Junk Synchron's effect right after its Normal Summon, waiting for the monster in the child's Graveyard. */
+	| { kind: "revive"; zone: number }
 	/** A Monster whose effect is being used, waiting for its target. */
 	| { kind: "ability"; zone: number }
 	/** A Spell with a cost, waiting for the card to discard. */
@@ -100,10 +106,27 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 	const failView = view.fail;
 	const three = useMemo<Board3d | null>(() => (solid ? { slot, locale, fail: failView } : null), [solid, slot, locale, failView]);
 
-	const line = session.rejected ? copy.reasons[session.rejected] : narrateAll(copy, session.events);
+	/*
+	 * With the phase bar, each of the child's phases is explained in one sentence the first time it starts in this
+	 * level. Worked out once per batch of events, so going back and forth never says it twice.
+	 */
+	/* From the island of steps on, the two steps of an attack are explained the same way. */
+	const withSteps = WORLD_IDS.indexOf(level.world) >= WORLD_IDS.indexOf("steps");
+	type Topic = Phase | "battle-step" | "damage-step";
+	const taught = useRef<{ events: readonly GameEvent[] | null; fresh: Topic[]; seen: Set<Topic> }>({ events: null, fresh: [], seen: new Set() });
+	if (taught.current.events !== session.events) {
+		const phases: Topic[] = level.bar === "none" ? [] : phasesStarted(session.events);
+		const steps: Topic[] = withSteps ? stepsStarted(session.events).map((step): Topic => (step === "battle" ? "battle-step" : "damage-step")) : [];
+		const fresh = [...phases, ...steps].filter((topic) => !taught.current.seen.has(topic));
+		for (const topic of fresh) taught.current.seen.add(topic);
+		taught.current = { events: session.events, fresh, seen: taught.current.seen };
+	}
+	const explain = (words: PlayCopy, topic: Topic) => (topic === "battle-step" ? words.stepHelp.battle : topic === "damage-step" ? words.stepHelp.damage : words.phaseHelp[topic]);
+	const told = (words: PlayCopy) => [narrateAll(words, session.events), ...taught.current.fresh.map((topic) => explain(words, topic))].filter(Boolean).join(" ");
+	const line = session.rejected ? copy.reasons[session.rejected] : told(copy);
 	/* Voice and sounds follow what just happened. They start only after the child's own tap. Hebrew is spoken in English, like the cards. */
-	const voice = PLAY_COPY[VOICE_LOCALE[locale]];
-	const voiceLine = session.rejected ? voice.reasons[session.rejected] : narrateAll(voice, session.events);
+	const voice = level.duel ? playCopyFor(VOICE_LOCALE[locale], MASTER_NAMES[level.duel.master]) : PLAY_COPY[VOICE_LOCALE[locale]];
+	const voiceLine = session.rejected ? voice.reasons[session.rejected] : told(voice);
 	const spoken = useRef("");
 	useEffect(() => {
 		if (!sound || demo) return;
@@ -147,6 +170,12 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 		setNoHint(false);
 	};
 	const act = (move: Move) => update(play(session, move));
+	/* Against a trainer of the masters' island, the trainer plays its turn by itself, one move at a time. */
+	useEffect(() => {
+		if (!level.duel || session.status !== "rival") return;
+		const timer = window.setTimeout(() => update(next(session)), moving ? 700 : 250);
+		return () => window.clearTimeout(timer);
+	}, [level.duel?.master, session, moving]);
 	const showHint = (from: Session) => {
 		const { move, session: counted } = askHint(from);
 		setSession(counted);
@@ -194,6 +223,8 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 	const onPileCard = (index: number) => {
 		if (!open || !free) return;
 		if (open.pile === "graveyard" && pick?.kind === "grave") return act({ type: "place", card: pick.card, row: "backrow", zone: pick.zone, grave: { side: open.side, index } });
+		if (open.pile === "graveyard" && pick?.kind === "haunt") return act({ type: "spring", zone: pick.zone, grave: { side: open.side, index } });
+		if (open.pile === "graveyard" && pick?.kind === "revive") return act({ type: "ability", zone: pick.zone, grave: { side: open.side, index } });
 		const card = open.pile === "extra" ? board.you.extra[index] : undefined;
 		if (!card) return;
 		/* A Fusion Monster cannot be Summoned from here: the move is tried, and the rule says what it needs. */
@@ -210,10 +241,11 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 		if (pick?.kind === "pendulum") return act({ type: "pendulum", cards: pick.chosen.flatMap((at) => board.you.hand[at] ?? []) });
 	};
 	const onZone = (side: Side, row: Row, zone: number) => {
+		/* A Set card that targets: the Monster tapped on the side it aims at. */
+		if ((status === "answer" || free) && pick?.kind === "trap" && row === "monsters") return side === pick.aim ? act({ type: "spring", zone: pick.zone, target: zone }) : undefined;
 		if (status === "answer") {
 			if (pick?.kind === "ability" && side === "rival" && row === "monsters") return act({ type: "ability", zone: pick.zone, target: zone });
 			if (side !== "you") return;
-			if (pick?.kind === "trap" && row === "monsters") return act({ type: "spring", zone: pick.zone, target: zone });
 			if (row === "monsters") {
 				const slot = board.you.monsters[zone];
 				if (slot && (monsterOf(slot.card).ability || monsterOf(slot.card).detach)) setPick(pick?.kind === "ability" && pick.zone === zone ? null : { kind: "ability", zone });
@@ -222,7 +254,10 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 			if (row !== "backrow") return;
 			const slot = board.you.backrow[zone];
 			const info = slot ? cardOf(slot.card) : null;
-			if (info?.kind === "trap" && info.effect.type === "return-to-hand" && board.pending?.kind === "spell") return setPick({ kind: "trap", zone });
+			/* A Trap that targets one of your Monsters, or a Quick-Play Spell, waits for its target to be tapped. */
+			const answers = info?.kind === "trap" && ((info.effect.type === "return-to-hand" && board.pending?.kind === "spell") || (info.effect.type === "reinforce" && board.pending?.kind === "attack"));
+			if (answers) return setPick({ kind: "trap", zone, aim: "you" });
+			if (slot && isQuickPlay(slot.card) && needsTarget(slot.card)) return setPick({ kind: "trap", zone, aim: aimsAt(slot.card) });
 			return act({ type: "spring", zone });
 		}
 		if (!free) return;
@@ -247,12 +282,23 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 			if (pick?.kind === "hand") {
 				/* A Pendulum Monster tapped onto the Spell & Trap row is placed as a Scale. */
 				if (cardOf(pick.card).kind === "monster" && monsterOf(pick.card).scale !== undefined) return act({ type: "place", card: pick.card, row, zone });
+				if (pick.set) return act({ type: "place", card: pick.card, row, zone, set: true });
 				if (needsTarget(pick.card) && !board.you.backrow[zone]) return setPick({ kind: "aim", card: pick.card, zone });
 				if (cardOf(pick.card).kind === "spell" && !board.you.backrow[zone]) return placeSpell(pick.card, zone);
 				return act({ type: "place", card: pick.card, row, zone });
 			}
 			if (pick?.kind === "tributes") return act({ type: "place", card: pick.card, row, zone });
-			if (board.you.backrow[zone]) return act({ type: "spring", zone });
+			const held = board.you.backrow[zone];
+			if (held && !held.up && !held.open) {
+				/* A Set card flipped on the child's own turn: a Quick-Play Spell waits for its target, Call of the Haunted for a monster in the Graveyard. */
+				const info = cardOf(held.card);
+				if (info.kind === "trap" && info.effect.type === "haunt" && !held.setThisTurn) {
+					setPick({ kind: "haunt", zone });
+					return setOpen({ side: "you", pile: "graveyard" });
+				}
+				if (isQuickPlay(held.card) && needsTarget(held.card) && !held.setThisTurn) return setPick({ kind: "trap", zone, aim: aimsAt(held.card) });
+			}
+			if (held) return act({ type: "spring", zone });
 			return;
 		}
 		/* A Spell that helps one of your Monsters may be dropped straight onto it. */
@@ -287,6 +333,9 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 			/* A Pendulum Monster may also go to a Pendulum Zone: the leftmost or rightmost Spell & Trap Zone. */
 			if (info.kind === "monster" && info.scale !== undefined && board.full) for (const zone of [0, all.length - 1]) if (!board.you.backrow[zone]) glow.add(zoneKey("you", "backrow", zone));
 		}
+	} else if (pick?.kind === "haunt" || pick?.kind === "revive") {
+		chosen.add(zoneKey("you", "backrow", pick.zone));
+		glow.add(pileKey("you", "graveyard"));
 	} else if (pick?.kind === "grave") {
 		chosen.add(zoneKey("you", "backrow", pick.zone));
 		glow.add(pileKey("you", "graveyard"));
@@ -307,7 +356,7 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 		for (const zone of every) if (board.rival.monsters[zone]) glow.add(zoneKey("rival", "monsters", zone));
 	} else if (pick?.kind === "trap") {
 		chosen.add(zoneKey("you", "backrow", pick.zone));
-		for (const zone of every) if (board.you.monsters[zone]) glow.add(zoneKey("you", "monsters", zone));
+		for (const zone of every) if (board[pick.aim].monsters[zone]) glow.add(zoneKey(pick.aim, "monsters", zone));
 	} else if (pick?.kind === "ability") {
 		chosen.add(zoneKey("you", "monsters", pick.zone));
 		for (const zone of every) if (board.rival.monsters[zone]) glow.add(zoneKey("rival", "monsters", zone));
@@ -321,7 +370,7 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 			if (slot && ability?.quick && !(ability.oncePerTurn && board.used.includes(`you:${slot.card}`))) glow.add(zoneKey("you", "monsters", zone));
 			if (slot && monsterOf(slot.card).detach && (slot.materials?.length ?? 0) > 0 && board.pending?.kind === "attack") glow.add(zoneKey("you", "monsters", zone));
 		}
-		for (const zone of all) if (board.you.backrow[zone]?.up) glow.delete(zoneKey("you", "backrow", zone));
+		for (const zone of all) if (board.you.backrow[zone]?.up || board.you.backrow[zone]?.open) glow.delete(zoneKey("you", "backrow", zone));
 	}
 	if (hinted?.type === "extra") glow.add(pileKey("you", "extra"));
 	if (hinted?.type === "place" && hinted.grave) glow.add(pileKey(hinted.grave.side, "graveyard"));
@@ -339,7 +388,7 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 	const detaching = !!pickedAbility && !!monsterOf(pickedAbility.card).detach;
 	/** The words for the choice being made: what to tap, and the sum so far. */
 	const choosing = (): string => {
-		if (pick?.kind === "grave") return copy.chooseGrave;
+		if (pick?.kind === "grave" || pick?.kind === "haunt" || pick?.kind === "revive") return copy.chooseGrave;
 		if (pick?.kind === "pendulum") return scales ? copy.choosePendulum(scales.low, scales.high) : "";
 		if (pick?.kind === "materials") {
 			if (pick.mode === "fusion") return copy.chooseFusion;
@@ -419,7 +468,8 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 			<p className="text-sm font-semibold text-gold-400">
 				{copy.worlds[level.world].title} · {copy.levelOf(number, total)}
 			</p>
-			<h2 ref={headingRef} id="level-title" data-step-heading tabIndex={-1} className={solid ? "font-display text-xl text-fg outline-none" : "font-display text-2xl text-fg md:text-3xl"}>
+			<h2 ref={headingRef} id="level-title" data-step-heading tabIndex={-1} className={`flex items-center gap-2 ${solid ? "font-display text-xl text-fg outline-none" : "font-display text-2xl text-fg md:text-3xl"}`}>
+				{level.duel && <img src={masterPicture(level.duel.master)} alt="" height={256} className={`${solid ? "h-10" : "h-14"} w-auto object-contain`} />}
 				{text?.title}
 			</h2>
 			<p className={`flex items-start gap-3 rounded-2xl border border-white/15 bg-surface-raised text-fg ${solid ? "p-2 text-base" : "p-3 text-lg"}`}>
@@ -469,7 +519,7 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 								<p dir={copy.englishCards ? "ltr" : undefined} lang={copy.englishCards ? "en" : undefined} className="whitespace-pre-line text-start text-fg">
 									{printed}
 								</p>
-								{copy.englishCards && copy.cards[reading].text && (
+								{copy.englishCards && copy.cards[reading].text && copy.cards[reading].text !== PLAY_COPY.en.cards[reading].text && (
 									<>
 										<p className="font-semibold text-gold-400">{copy.meaning}</p>
 										<p className="whitespace-pre-line text-fg">{copy.cards[reading].text}</p>
@@ -502,6 +552,23 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 							{free && (pick?.kind === "materials" || pick?.kind === "extra" || pick?.kind === "pendulum") && (
 								<button type="button" onClick={confirm} className={primary}>
 									{copy.confirmSummon}
+								</button>
+							)}
+							{free && !pick && board.summonTrigger?.side === "you" && (
+								<button
+									type="button"
+									onClick={() => {
+										setPick({ kind: "revive", zone: board.summonTrigger?.zone ?? 0 });
+										setOpen({ side: "you", pile: "graveyard" });
+									}}
+									className={primary}
+								>
+									{copy.useEffect}
+								</button>
+							)}
+							{free && pick?.kind === "hand" && !pick.set && isQuickPlay(pick.card) && (
+								<button type="button" onClick={() => setPick({ ...pick, set: true })} className={quiet}>
+									{copy.setFaceDown}
 								</button>
 							)}
 							{pickedSpecial && (

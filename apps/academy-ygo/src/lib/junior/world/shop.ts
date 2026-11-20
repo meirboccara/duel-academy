@@ -1,4 +1,5 @@
 import { LEVELS, WORLD_IDS } from "../play/levels";
+import { MASTER_STARS, masterLevelId, type MasterId } from "../play/masters";
 import type { PlayProgress } from "../play/progress";
 import { islandStatus } from "./status";
 import type { Avatar } from "@/lib/junior/profiles";
@@ -24,8 +25,10 @@ export interface ShopCard {
 	card: string;
 	rarity: Rarity;
 	price: number;
+	/** On sale only once this trainer of the masters' island has been beaten: the shop opens new cards as the child goes on. */
+	unlock?: MasterId;
 }
-const sell = (rarity: Rarity, cards: readonly string[]): ShopCard[] => cards.map((card) => ({ card, rarity, price: RARITY_PRICE[rarity] }));
+const sell = (rarity: Rarity, cards: readonly string[], unlock?: MasterId): ShopCard[] => cards.map((card) => ({ card, rarity, price: RARITY_PRICE[rarity], ...(unlock ? { unlock } : {}) }));
 
 /** What the shop sells, cheapest first: friendly, famous cards of the first series. Prices in stars, by rarity. */
 export const SHOP_CARDS: readonly ShopCard[] = [
@@ -34,7 +37,36 @@ export const SHOP_CARDS: readonly ShopCard[] = [
 	...sell("super", ["winged-kuriboh", "swords-of-revealing-light", "gaia-the-fierce-knight", "mirror-force"]),
 	...sell("ultra", ["summoned-skull", "toon-dark-magician-girl", "blue-eyes-toon-dragon", "dark-magician-girl"]),
 	...sell("secret", ["red-eyes-black-dragon"]),
+	/* Each trainer beaten on the masters' island puts some of the cards of their deck on sale. */
+	...sell("common", ["two-headed-king-rex"], "rex-raptor"),
+	...sell("rare", ["serpent-night-dragon"], "rex-raptor"),
+	...sell("common", ["hercules-beetle"], "weevil-underwood"),
+	...sell("rare", ["laser-cannon-armor"], "weevil-underwood"),
+	...sell("common", ["kairyu-shin"], "mako-tsunami"),
+	...sell("rare", ["umi"], "mako-tsunami"),
+	...sell("common", ["axe-raider"], "joey-wheeler"),
+	...sell("super", ["jinzo"], "joey-wheeler"),
+	...sell("common", ["book-of-secret-arts"], "arkana"),
+	...sell("rare", ["thousand-knives"], "arkana"),
+	...sell("common", ["the-earl-of-demise"], "yami-bakura"),
+	...sell("rare", ["just-desserts"], "yami-bakura"),
+	...sell("common", ["parrot-dragon"], "maximillion-pegasus"),
+	...sell("rare", ["shine-palace"], "maximillion-pegasus"),
+	...sell("common", ["alpha-the-magnet-warrior", "beta-the-magnet-warrior", "gamma-the-magnet-warrior"], "yugi-muto"),
+	...sell("super", ["buster-blader"], "yugi-muto"),
+	...sell("common", ["elemental-hero-avian", "elemental-hero-burstinatrix"], "jaden-yuki"),
+	...sell("rare", ["elemental-hero-sparkman"], "jaden-yuki"),
+	...sell("rare", ["junk-synchron"], "yusei-fudo"),
+	...sell("super", ["junk-warrior"], "yusei-fudo"),
+	...sell("rare", ["bowganian"], "yami-marik"),
+	...sell("super", ["legendary-fiend"], "yami-marik"),
+	...sell("rare", ["vorse-raider"], "seto-kaiba"),
+	...sell("ultra", ["luster-dragon-2"], "seto-kaiba"),
+	...sell("super", ["magic-cylinder"], "atem"),
+	...sell("ultra", ["gaia-the-dragon-champion"], "atem"),
 ];
+/** Is this card on sale for this child: always, or once its trainer is beaten. */
+export const onSale = (item: ShopCard, progress: PlayProgress): boolean => !item.unlock || masterLevelId(item.unlock) in progress.levels;
 const BY_CARD = new Map(SHOP_CARDS.map((item) => [item.card, item]));
 export const priceOf = (card: string): number | undefined => BY_CARD.get(card)?.price;
 export const rarityOf = (card: string): Rarity | undefined => BY_CARD.get(card)?.rarity;
@@ -43,13 +75,15 @@ export const rarityOf = (card: string): Rarity | undefined => BY_CARD.get(card)?
 export const ISLAND_STARS = 2;
 export const DUEL_STARS = 2;
 const DUELS = new Set(LEVELS.filter((level) => level.open).map((level) => level.id));
+/** A trainer of the masters' island beaten the first time: more stars, to buy the cards the shop opens. */
+const MASTER_DUELS = new Set(LEVELS.filter((level) => level.duel).map((level) => level.id));
 
 /**
  * One star per mission solved (two for a real duel), one more when it was solved on the first try, and two for each
  * finished island.
  */
 export function starsEarned(progress: PlayProgress): number {
-	const missions = Object.entries(progress.levels).reduce((sum, [id, record]) => sum + (DUELS.has(id) ? DUEL_STARS : 1) + (record.firstTry ? 1 : 0), 0);
+	const missions = Object.entries(progress.levels).reduce((sum, [id, record]) => sum + (MASTER_DUELS.has(id) ? MASTER_STARS : DUELS.has(id) ? DUEL_STARS : 1) + (record.firstTry ? 1 : 0), 0);
 	return missions + ISLAND_STARS * WORLD_IDS.filter((world) => islandStatus(progress, world) === "done").length;
 }
 /** What one solve of `levelId` won, from the record before it to the record after: shown on the map. */
@@ -141,7 +175,8 @@ export type Bought = { ok: true; bought: string[] } | Refused;
 /** Buys one card. The stored record is read again first, so a purchase made in another tab is kept and counted. */
 export function buy(storage: Pick<Storage, "getItem" | "setItem">, key: string, progress: PlayProgress, card: string, avatar?: Avatar): Bought {
 	const price = priceOf(card);
-	if (price === undefined) return { ok: false, reason: "not-for-sale" };
+	const item = BY_CARD.get(card);
+	if (price === undefined || !item || !onSale(item, progress)) return { ok: false, reason: "not-for-sale" };
 	const record = loadShop(storage, key);
 	if (record.cards.includes(card)) return { ok: false, reason: "owned" };
 	if (starsLeft(progress, record.cards, record.items, avatar) < price) return { ok: false, reason: "too-few-stars" };

@@ -56,9 +56,9 @@ describe("effect cues", () => {
 		expect(find(beats, "strike")[0]).toMatchObject({ style: "quake", spot: { zone: 1 } });
 	});
 
-	it("Spark Dash: the ATK gained rises from the monster", () => {
+	it("Rush Recklessly: the ATK gained rises from the monster", () => {
 		const beats = cuesOf({ you: { hand: ["spark-dash"], monsters: ["pocket-cub"] } }, { type: "place", card: "spark-dash", row: "backrow", zone: 0, target: 0 });
-		expect(find(beats, "stat")[0]).toMatchObject({ amount: 500, spot: { at: "zone", side: "you", zone: 0 } });
+		expect(find(beats, "stat")[0]).toMatchObject({ amount: 700, spot: { at: "zone", side: "you", zone: 0 } });
 	});
 
 	it("a monster keeps showing its old ATK and DEF until the beat where the change is shown", () => {
@@ -83,13 +83,13 @@ describe("effect cues", () => {
 		expect(find(beats, "lp")[0]).toMatchObject({ side: "rival", from: 4000, to: 3600 });
 	});
 
-	it("Traps answering an attack: a vine stops it, an explosion destroys the attacker, a swirl banishes it", () => {
+	it("Traps answering an attack: a shield stops it, an explosion destroys the attacker, a swirl banishes it, a boost lifts the defender", () => {
 		const attack = (trap: "sticky-vine" | "sakuretsu-armor" | "dimensional-prison" | "fog-snare") =>
-			cuesOf({ you: { monsters: ["lantern-owl"] }, rival: { monsters: ["thorn-fox"], backrow: [trap] }, phase: "battle" }, { type: "attack", attacker: 0, target: 0 }, { type: "spring", zone: 0 });
+			cuesOf({ you: { monsters: ["lantern-owl"] }, rival: { monsters: ["thorn-fox"], backrow: [trap] }, phase: "battle" }, { type: "attack", attacker: 0, target: 0 }, { type: "spring", zone: 0, target: 0 });
 		expect(find(attack("sticky-vine"), "block")[0]).toMatchObject({ art: "🌿", spot: { side: "you", zone: 0 } });
 		expect(find(attack("sakuretsu-armor"), "strike")[0]).toMatchObject({ style: "burst", spot: { side: "you", zone: 0 } });
 		expect(find(attack("dimensional-prison"), "leave")[0]).toMatchObject({ how: "banished", card: "lantern-owl", to: { at: "pile", side: "you", pile: "banished" } });
-		expect(find(attack("fog-snare"), "stat")[0]).toMatchObject({ amount: -500, spot: { side: "you", zone: 0 } });
+		expect(find(attack("fog-snare"), "stat")[0]).toMatchObject({ amount: 500, spot: { side: "rival", zone: 0 } });
 	});
 
 	it("a Tribute Summon: the Tribute leaves first, and the board waits for it before the new monster lands", () => {

@@ -1,11 +1,12 @@
 import { FORBIDDEN_LIMBS, cardOf, type CardId } from "./cards";
 import { EXTRA_ZONE, type Material, type Move, type Setup, type Side } from "./engine";
+import { MASTERS, masterLevelId, type MasterId } from "./masters";
 
 /** The rules of the Junior course, in teaching order. Each is taught by one level and used again by later ones. */
-export const RULE_IDS = ["zones", "battle", "defense", "direct", "summon", "tribute", "phases", "spell", "trap", "chain", "cost", "target", "quick", "once", "timing", "graveyard", "field", "banish", "ritual", "fusion", "synchro", "xyz", "detach", "link", "pendulum", "notarget", "then", "condition", "exodia"] as const;
+export const RULE_IDS = ["zones", "battle", "defense", "direct", "summon", "tribute", "phases", "spell", "trap", "chain", "cost", "target", "quick", "once", "timing", "graveyard", "field", "banish", "quickplay", "counter", "continuous", "equip", "ritual", "fusion", "synchro", "xyz", "detach", "link", "pendulum", "notarget", "then", "condition", "exodia", "steps"] as const;
 export type RuleId = (typeof RULE_IDS)[number];
 
-export const WORLD_IDS = ["wake", "shield", "friend", "magic", "puzzles", "tower", "rival", "reading", "mat", "ritual", "fusion", "synchro", "xyz", "link", "pendulum", "words", "legends", "final"] as const;
+export const WORLD_IDS = ["wake", "shield", "friend", "magic", "puzzles", "tower", "rival", "reading", "mat", "icons", "ritual", "fusion", "synchro", "xyz", "link", "pendulum", "words", "legends", "steps", "final", "masters"] as const;
 export type WorldId = (typeof WORLD_IDS)[number];
 
 /** What the scripted rival does on its turn. A step that is no longer possible is skipped. */
@@ -51,6 +52,11 @@ export interface Level {
 	rivalRepeat?: readonly RivalStep[];
 	/** The last duel of the course: its certificate names the Extra Deck. */
 	final?: boolean;
+	/**
+	 * A duel against a trainer of the masters' island: no script and no recorded solution. The board is dealt when the
+	 * duel starts (the child's Deck and the trainer's, shuffled with `seed`), and the trainer is a bot.
+	 */
+	duel?: { master: MasterId; seed?: number };
 	bar: PhaseBar;
 	/** One way to solve it, the player's moves only. Checked by the tests. */
 	solution: readonly Move[];
@@ -64,6 +70,10 @@ const phase = (to: "standby" | "main1" | "battle" | "main2" | "end"): Move => ({
 const turn = (zone: number): Move => ({ type: "position", zone });
 const draw: Move = { type: "draw" };
 const spring = (zone: number, target?: number): Move => ({ type: "spring", zone, ...(target === undefined ? {} : { target }) });
+/** A Quick-Play Spell Set face-down, to be activated on a later turn. */
+const setCard = (card: CardId, zone = 0): Move => ({ type: "place", card, row: "backrow", zone, set: true });
+/** Call of the Haunted: flipped in the Main Phase, targeting a monster in the child's own Graveyard. */
+const haunt = (zone: number, index: number): Move => ({ type: "spring", zone, grave: { side: "you", index } });
 const effect = (zone: number, target: number): Move => ({ type: "ability", zone, target });
 const fromHand = (card: CardId): Move => ({ type: "hand", card });
 const detach = (zone: number): Move => ({ type: "ability", zone });
@@ -92,7 +102,7 @@ const mat = { ...puzzle, full: true } as const;
 /** One Exodia lesson board: the four limbs in the hand, the head on top of the Deck. */
 const FIFTH_PIECE: Setup = { ...strict, full: true, you: { hand: [...LIMBS], deck: ["exodia-the-forbidden-one"] }, rival: { monsters: ["blue-eyes-white-dragon"] } };
 
-export const LEVELS: readonly Level[] = [
+const LEVELS_ALL: Level[] = [
 	/* World 1: the three kinds of cards and their zones, then the first battles. */
 	{ id: "w1-field", world: "wake", teaches: "zones", uses: [], bar: "none", goal: { type: "place-all" }, setup: { you: { hand: ["pocket-cub", "glow-charm", "sticky-vine"] } }, solution: [place("pocket-cub"), place("glow-charm"), place("sticky-vine")] },
 	{ id: "w1-field-2", world: "wake", uses: ["zones"], bar: "none", goal: { type: "place-all" }, setup: { you: { hand: ["moss-beetle", "thunder-clap", "fog-snare"] }, rival: { monsters: ["mud-toad"] } }, solution: [place("moss-beetle"), place("thunder-clap", 0, { target: 0 }), place("fog-snare")] },
@@ -121,7 +131,7 @@ export const LEVELS: readonly Level[] = [
 	{ id: "w4-spell", world: "magic", teaches: "spell", uses: ["phases", "direct"], bar: "four", goal: { type: "win" }, setup: { ...strict, you: { deck: ["thunder-clap"], monsters: ["river-otter"] }, rival: { lp: 1500, monsters: ["iron-boar"] } }, solution: [draw, phase("main1"), place("thunder-clap", 0, { target: 0 }), phase("battle"), attack(0, "direct")] },
 	{ id: "w4-boost", world: "magic", uses: ["spell", "phases", "battle"], bar: "four", goal: { type: "win" }, setup: { ...strict, you: { deck: ["spark-dash"], monsters: ["pocket-cub"] }, rival: { lp: 300, monsters: ["thorn-fox"] } }, solution: [draw, phase("main1"), place("spark-dash", 0, { target: 0 }), phase("battle"), attack(0, 0)] },
 	{ id: "w4-ambush", world: "magic", teaches: "trap", uses: ["phases"], bar: "four", goal: { type: "hold", lp: 4000, keep: ["pocket-cub"] }, setup: { ...strict, you: { deck: ["sticky-vine"], monsters: ["pocket-cub"] }, rival: { monsters: ["iron-boar"] } }, rival: [[{ do: "attack", attacker: "iron-boar", target: "pocket-cub" }]], solution: [draw, phase("main1"), place("sticky-vine"), phase("end"), spring(0)] },
-	{ id: "w4-counter", world: "magic", uses: ["trap", "phases", "summon", "direct"], bar: "four", goal: { type: "win" }, setup: { ...strict, you: { deck: ["fog-snare", "pocket-cub"], monsters: ["river-otter"] }, rival: { lp: 3000, monsters: ["iron-boar"] } }, rival: [[{ do: "attack", attacker: "iron-boar", target: "river-otter" }]], solution: [draw, phase("main1"), place("fog-snare"), phase("end"), spring(0), draw, phase("main1"), place("pocket-cub", 1), phase("battle"), attack(0, "direct"), attack(1, "direct")] },
+	{ id: "w4-counter", world: "magic", uses: ["trap", "phases", "summon", "direct"], bar: "four", goal: { type: "win" }, setup: { ...strict, you: { deck: ["fog-snare", "pocket-cub"], monsters: ["river-otter"] }, rival: { lp: 3000, monsters: ["iron-boar"] } }, rival: [[{ do: "attack", attacker: "iron-boar", target: "river-otter" }]], solution: [draw, phase("main1"), place("fog-snare"), phase("end"), spring(0, 0), draw, phase("main1"), place("pocket-cub", 1), phase("battle"), attack(0, "direct"), attack(1, "direct")] },
 
 	/* World 5: "win this turn" boards. No new rule; each needs earlier rules without saying which. */
 	{ id: "p1", world: "puzzles", uses: ["battle", "direct", "phases"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { monsters: ["pocket-cub", "lantern-owl"] }, rival: { lp: 1900, monsters: ["night-bat"] } }, solution: [phase("battle"), attack(0, 0), attack(1, "direct")] },
@@ -129,15 +139,17 @@ export const LEVELS: readonly Level[] = [
 	{ id: "p3", world: "puzzles", uses: ["tribute", "battle"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["storm-stag"], monsters: ["pebble-crab", "river-otter"] }, rival: { lp: 1300, monsters: ["iron-boar", "mud-toad"] } }, solution: [place("storm-stag", 0, { tributes: [0] }), phase("battle"), attack(0, 0), attack(1, 1)] },
 	{ id: "p4", world: "puzzles", uses: ["spell", "summon", "direct"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["thunder-clap", "pocket-cub"], monsters: ["river-otter"] }, rival: { lp: 2700, monsters: ["shadow-wolf"] } }, solution: [place("thunder-clap", 0, { target: 0 }), place("pocket-cub", 1), phase("battle"), attack(0, "direct"), attack(1, "direct")] },
 	{ id: "p5", world: "puzzles", uses: ["spell", "battle", "direct"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["spark-dash"], monsters: ["pocket-cub", "pebble-crab"] }, rival: { lp: 900, monsters: ["thorn-fox"] } }, solution: [place("spark-dash", 0, { target: 0 }), phase("battle"), attack(0, 0), attack(1, "direct")] },
-	{ id: "p6", world: "puzzles", uses: ["trap", "defense"], bar: "four", goal: { type: "hold", lp: 1000, keep: ["lantern-owl"] }, setup: { ...puzzle, you: { lp: 1000, hand: ["fog-snare"], monsters: ["lantern-owl"] }, rival: { monsters: ["shadow-wolf", "thorn-fox"] } }, rival: [[{ do: "auto-attack" }]], solution: [place("fog-snare"), phase("end"), spring(0)] },
+	{ id: "p6", world: "puzzles", uses: ["trap", "defense"], bar: "four", goal: { type: "hold", lp: 1000, keep: ["lantern-owl"] }, setup: { ...puzzle, you: { lp: 1000, hand: ["fog-snare"], monsters: ["lantern-owl"] }, rival: { monsters: ["shadow-wolf", "thorn-fox"] } }, rival: [[{ do: "auto-attack" }]], solution: [place("fog-snare"), phase("end"), spring(0, 0)] },
 	{ id: "p7", world: "puzzles", uses: ["tribute", "defense", "direct"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["mountain-bison"], monsters: ["pocket-cub", "pebble-crab", "river-otter"] }, rival: { lp: 1500, monsters: [{ card: "stone-golem", position: "defense" }] } }, solution: [place("mountain-bison", 0, { tributes: [0, 1] }), phase("battle"), attack(0, 0), attack(2, "direct")] },
 	{ id: "p8", world: "puzzles", uses: ["tribute", "spell", "battle"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["storm-stag", "thunder-clap", "spark-dash"], monsters: ["pocket-cub"] }, rival: { lp: 1100, monsters: ["shadow-wolf", "iron-boar"] } }, solution: [place("storm-stag", 0, { tributes: [0] }), place("thunder-clap", 0, { target: 0 }), place("spark-dash", 0, { target: 0 }), phase("battle"), attack(0, 1)] },
 	{ id: "p9", world: "puzzles", uses: ["spell", "defense"], bar: "four", goal: { type: "hold", lp: 800, keep: ["moss-beetle"] }, setup: { ...puzzle, you: { lp: 300, hand: ["glow-charm"], monsters: ["moss-beetle"] }, rival: { monsters: ["iron-boar"] } }, rival: [[{ do: "auto-attack" }]], solution: [place("glow-charm"), turn(0), phase("end")] },
 	{ id: "p10", world: "puzzles", uses: ["tribute", "spell", "defense", "direct"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["thunder-clap", "storm-stag"], monsters: [{ card: "lantern-owl", position: "defense" }, "pebble-crab"] }, rival: { lp: 2700, monsters: [{ card: "stone-golem", position: "defense" }, "thorn-fox"] } }, solution: [place("storm-stag", 1, { tributes: [1] }), place("thunder-clap", 0, { target: 0 }), turn(0), phase("battle"), attack(1, 1), attack(0, "direct")] },
 
-	/* World 6: a two-link chain, and the six phase names. */
+	/* World 6: a two-link chain, and the six phases: the Standby Phase, and Main Phase 2 after the battle. */
 	{ id: "w6-tower", world: "tower", teaches: "chain", uses: ["trap"], bar: "six", goal: { type: "hold", lp: 4000, keep: ["pocket-cub"] }, setup: { strict: true, turn: "rival", you: { monsters: ["pocket-cub"], backrow: ["quick-burrow"] }, rival: { hand: ["thunder-clap"] } }, rival: [[{ do: "spell", card: "thunder-clap", target: "pocket-cub" }]], solution: [spring(0, 0)] },
 	{ id: "w6-double", world: "tower", uses: ["chain", "trap", "phases"], bar: "six", goal: { type: "hold", lp: 4000, keep: ["river-otter"] }, setup: { ...strict, you: { deck: ["sticky-vine"], hand: ["quick-burrow"], monsters: ["river-otter"] }, rival: { hand: ["thunder-clap"], monsters: ["iron-boar"] } }, rival: [[{ do: "spell", card: "thunder-clap", target: "river-otter" }, { do: "attack", attacker: "iron-boar", target: "river-otter" }]], solution: [draw, phase("standby"), phase("main1"), place("quick-burrow", 0), place("sticky-vine", 1), phase("end"), spring(0, 0), spring(1)] },
+
+	{ id: "w6-main2", world: "tower", uses: ["phases", "battle", "summon"], bar: "six", goal: { type: "place-all" }, setup: { ...puzzle, you: { hand: ["lantern-owl"], monsters: ["river-otter", "pocket-cub", "pebble-crab"] }, rival: { monsters: ["bramble-ram"] } }, solution: [phase("battle"), attack(0, 0), phase("main2"), place("lantern-owl", 0)] },
 
 	/* World 7: a whole short duel against the rival, from the first turn. */
 	{
@@ -156,17 +168,17 @@ export const LEVELS: readonly Level[] = [
 			[{ do: "summon", card: "thorn-fox" }, { do: "auto-attack" }],
 		],
 		rivalRepeat: [{ do: "auto-attack" }],
-		solution: [phase("main1"), place("river-otter"), place("fog-snare"), phase("end"), spring(0), draw, phase("main1"), place("pocket-cub", 1), phase("battle"), attack(0, "direct"), attack(1, "direct"), phase("end"), draw, phase("main1"), place("thunder-clap", 0, { target: 0 }), phase("battle"), attack(0, "direct")],
+		solution: [phase("main1"), place("river-otter"), place("fog-snare"), phase("end"), spring(0, 0), draw, phase("main1"), place("pocket-cub", 1), phase("battle"), attack(0, "direct"), attack(1, "direct"), phase("end"), draw, phase("main1"), place("thunder-clap", 0, { target: 0 }), phase("battle"), attack(0, "direct")],
 	},
 
 	/* World 8: reading real card text. Costs, targets, Quick Effects and once per turn, each in the words printed on cards. */
-	{ id: "r-cost", world: "reading", teaches: "cost", uses: ["spell", "direct", "phases"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["spark-trade", "mud-toad"], monsters: ["lantern-owl"] }, rival: { lp: 1800, monsters: ["shadow-wolf"] } }, solution: [place("spark-trade", 0, { discard: "mud-toad" }), phase("battle"), attack(0, "direct")] },
-	{ id: "r-paid", world: "reading", uses: ["cost", "trap", "chain", "direct"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["spark-trade", "mud-toad"], monsters: ["lantern-owl"] }, rival: { lp: 1200, monsters: ["river-otter"], backrow: ["quick-burrow"] } }, solution: [place("spark-trade", 0, { discard: "mud-toad" }), phase("battle"), attack(0, "direct")] },
+	{ id: "r-cost", world: "reading", teaches: "cost", uses: ["spell", "direct", "phases"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["spark-trade", "mud-toad"], monsters: ["lantern-owl"] }, rival: { lp: 1800, monsters: ["shadow-wolf"] } }, solution: [place("spark-trade", 0, { discard: "mud-toad", target: 0 }), phase("battle"), attack(0, "direct")] },
+	{ id: "r-paid", world: "reading", uses: ["cost", "trap", "chain", "direct"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["spark-trade", "mud-toad"], monsters: ["lantern-owl"] }, rival: { lp: 1200, monsters: ["river-otter"], backrow: ["quick-burrow"] } }, solution: [place("spark-trade", 0, { discard: "mud-toad", target: 0 }), phase("battle"), attack(0, "direct")] },
 	{ id: "r-target", world: "reading", teaches: "target", uses: ["spell", "battle", "direct", "phases"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["thunder-clap"], monsters: ["lantern-owl", "river-otter"] }, rival: { lp: 1500, monsters: ["shadow-wolf", "mud-toad"] } }, solution: [place("thunder-clap", 0, { target: 0 }), phase("battle"), attack(0, 1), attack(1, "direct")] },
 	{ id: "r-quick", world: "reading", teaches: "quick", uses: ["battle"], bar: "four", goal: { type: "hold", lp: 4000, keep: ["river-otter"] }, setup: { strict: true, turn: "rival", you: { monsters: ["river-otter", "glint-lynx", "cinder-hedgehog"] }, rival: { monsters: ["iron-boar"] } }, rival: [[{ do: "attack", attacker: "iron-boar", target: "river-otter" }]], solution: [effect(1, 0)] },
 	{ id: "r-main", world: "reading", uses: ["quick", "phases", "battle", "direct"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { monsters: ["cinder-hedgehog", "river-otter"] }, rival: { lp: 1100, monsters: ["iron-boar"] } }, solution: [effect(0, 0), phase("battle"), attack(1, 0), attack(0, "direct")] },
 	{ id: "r-once", world: "reading", teaches: "once", uses: ["quick", "trap"], bar: "four", goal: { type: "hold", lp: 4000, keep: ["river-otter"] }, setup: { strict: true, turn: "rival", you: { monsters: ["river-otter", "glint-lynx"], backrow: ["sticky-vine"] }, rival: { monsters: ["shadow-wolf", "iron-boar"] } }, rival: [[{ do: "attack", attacker: "shadow-wolf", target: "river-otter" }, { do: "attack", attacker: "iron-boar", target: "river-otter" }]], solution: [effect(1, 0), spring(0)] },
-	{ id: "r-when", world: "reading", teaches: "timing", uses: ["cost", "summon", "direct", "phases"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["spark-trade", "dozy-moth", "busy-bee"] }, rival: { lp: 900, monsters: ["shadow-wolf"] } }, solution: [place("spark-trade", 0, { discard: "busy-bee" }), place("dozy-moth", 0), phase("battle"), attack(0, "direct")] },
+	{ id: "r-when", world: "reading", teaches: "timing", uses: ["cost", "summon", "direct", "phases"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["spark-trade", "dozy-moth", "busy-bee"] }, rival: { lp: 900, monsters: ["shadow-wolf"] } }, solution: [place("spark-trade", 0, { discard: "busy-bee", target: 0 }), place("dozy-moth", 0), phase("battle"), attack(0, "direct")] },
 	{ id: "r-last", world: "reading", uses: ["timing", "summon", "phases"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["dozy-moth"] }, rival: { lp: 500, monsters: ["iron-boar"] } }, rival: [[{ do: "auto-attack" }]], solution: [place("dozy-moth", 0), phase("end")] },
 	{ id: "r-boss", world: "reading", uses: ["target", "quick", "once", "battle", "direct"], bar: "four", goal: { type: "win" }, setup: { ...puzzle, you: { hand: ["thunder-clap"], monsters: ["glint-lynx", "lantern-owl"] }, rival: { lp: 1500, monsters: ["shadow-wolf", "iron-boar"] } }, solution: [place("thunder-clap", 0, { target: 0 }), effect(0, 1), phase("battle"), attack(1, 1), attack(0, "direct")] },
 
@@ -178,6 +190,14 @@ export const LEVELS: readonly Level[] = [
 	{ id: "m-banish", world: "mat", teaches: "banish", uses: ["trap", "timing"], bar: "four", goal: { type: "hold", lp: 500, keep: [] }, setup: { full: true, strict: true, turn: "rival", you: { lp: 500, backrow: ["sakuretsu-armor", "dimensional-prison"] }, rival: { monsters: ["busy-bee"] } }, rival: [[{ do: "auto-attack" }]], solution: [spring(1)] },
 	{ id: "m-desires", world: "mat", uses: ["banish", "cost", "spell", "direct", "phases"], bar: "four", goal: { type: "win" }, setup: { ...mat, you: { hand: ["pot-of-desires"], deck: [...TEN, "thunder-clap", "spark-dash"], monsters: ["river-otter"] }, rival: { lp: 2000, monsters: ["iron-boar"] } }, solution: [place("pot-of-desires"), place("thunder-clap", 0, { target: 0 }), place("spark-dash", 0, { target: 0 }), phase("battle"), attack(0, "direct")] },
 	{ id: "m-mat", world: "mat", uses: ["zones", "field", "graveyard", "trap"], bar: "none", goal: { type: "place-all" }, setup: { full: true, you: { hand: ["mountain", "river-otter", "sticky-vine", "monster-reborn"], graveyard: ["storm-stag"] } }, solution: [inField("mountain"), place("river-otter"), place("sticky-vine"), reborn("you", 0, 1)] },
+
+	/* World 9b: the six icons of Spells and Traps. Quick-Play, Counter, Continuous and Equip; Normal and Field were met before. */
+	{ id: "ic-quick", world: "icons", teaches: "quickplay", uses: ["trap", "phases"], bar: "four", goal: { type: "hold", lp: 4000, keep: ["river-otter"] }, setup: { ...mat, you: { hand: ["spark-dash"], monsters: ["river-otter"] }, rival: { monsters: ["iron-boar"] } }, rival: [[{ do: "attack", attacker: "iron-boar", target: "river-otter" }]], solution: [setCard("spark-dash"), phase("end"), spring(0, 0)] },
+	{ id: "ic-quick-2", world: "icons", uses: ["quickplay", "target", "phases"], bar: "four", goal: { type: "hold", lp: 4000, keep: ["pocket-cub"] }, setup: { ...mat, you: { hand: ["thunder-clap"], monsters: ["pocket-cub"] }, rival: { hand: ["shadow-wolf"] } }, rival: [[{ do: "summon", card: "shadow-wolf" }, { do: "attack", attacker: "shadow-wolf", target: "pocket-cub" }]], solution: [setCard("thunder-clap"), phase("end"), spring(0, 0)] },
+	{ id: "ic-counter", world: "icons", teaches: "counter", uses: ["trap"], bar: "four", goal: { type: "hold", lp: 4000, keep: ["pocket-cub"] }, setup: { full: true, strict: true, turn: "rival", you: { monsters: ["pocket-cub"], backrow: ["negate-attack"] }, rival: { monsters: ["shadow-wolf", "iron-boar"] } }, rival: [[{ do: "attack", attacker: "shadow-wolf", target: "pocket-cub" }, { do: "attack", attacker: "iron-boar", target: "pocket-cub" }]], solution: [spring(0)] },
+	{ id: "ic-banner", world: "icons", teaches: "continuous", uses: ["spell", "battle", "phases"], bar: "four", goal: { type: "win" }, setup: { ...mat, you: { hand: ["banner-of-courage"], monsters: ["river-otter", "pocket-cub"] }, rival: { lp: 900, monsters: ["bramble-ram", "mud-toad"] } }, solution: [place("banner-of-courage"), phase("battle"), attack(0, 1)] },
+	{ id: "ic-equip", world: "icons", teaches: "equip", uses: ["spell", "target", "battle", "phases"], bar: "four", goal: { type: "win" }, setup: { ...mat, you: { hand: ["legendary-sword"], monsters: ["masaki", "pebble-crab"] }, rival: { lp: 300, monsters: ["night-bat"] } }, solution: [place("legendary-sword", 0, { target: 0 }), phase("battle"), attack(0, 0)] },
+	{ id: "ic-haunted", world: "icons", uses: ["continuous", "graveyard", "battle", "phases"], bar: "four", goal: { type: "win" }, setup: { ...mat, you: { backrow: ["call-of-the-haunted"], graveyard: ["storm-stag"] }, rival: { lp: 600, monsters: ["iron-boar"] } }, solution: [haunt(0, 0), phase("battle"), attack(0, 0)] },
 
 	/* World 10: the Ritual Summon. A Spell Summons a monster from the hand; the Tributes' Levels are added up. */
 	{ id: "ri-first", world: "ritual", teaches: "ritual", uses: ["spell", "tribute", "battle", "phases"], bar: "four", goal: { type: "win" }, setup: { ...mat, you: { hand: ["black-luster-ritual", "black-luster-soldier"], monsters: ["storm-stag", "pebble-crab"] }, rival: { lp: 100, monsters: ["mountain-bison"] } }, solution: [ritual(onField(0), onField(1)), phase("battle"), attack(0, 0)] },
@@ -222,7 +242,11 @@ export const LEVELS: readonly Level[] = [
 	{ id: "lg-exodia", world: "legends", teaches: "exodia", uses: ["phases"], bar: "four", goal: { type: "win" }, setup: FIFTH_PIECE, solution: [draw] },
 	{ id: "lg-exodia-2", world: "legends", uses: ["exodia", "then"], bar: "four", goal: { type: "win" }, setup: { ...mat, you: { hand: ["exodia-the-forbidden-one", "right-arm-of-the-forbidden-one", "left-arm-of-the-forbidden-one", "right-leg-of-the-forbidden-one", "upstart-goblin"], deck: ["left-leg-of-the-forbidden-one"] }, rival: { monsters: ["blue-eyes-ultimate-dragon"] } }, solution: [place("upstart-goblin")] },
 
-	/* World 18: the last duel, on the whole mat. Nox uses its Extra Deck too. */
+	/* World 18: the steps of an attack. The Battle Step, then the Damage Step, and what can be used in each. */
+	{ id: "st-battle", world: "steps", teaches: "steps", uses: ["trap", "quick"], bar: "six", goal: { type: "hold", lp: 0, keep: ["pocket-cub"] }, setup: { full: true, strict: true, turn: "rival", you: { hand: ["kuriboh"], monsters: ["pocket-cub"], backrow: ["sakuretsu-armor"] }, rival: { monsters: ["iron-boar"] } }, rival: [[{ do: "attack", attacker: "iron-boar", target: "pocket-cub" }]], solution: [spring(0)] },
+	{ id: "st-damage", world: "steps", uses: ["steps", "quickplay", "quick"], bar: "six", goal: { type: "hold", lp: 1000, keep: [] }, setup: { full: true, strict: true, turn: "rival", you: { lp: 1000, hand: ["kuriboh"], monsters: ["river-otter"], backrow: ["spark-dash"] }, rival: { monsters: ["shadow-wolf", "iron-boar"] } }, rival: [[{ do: "attack", attacker: "shadow-wolf", target: "river-otter" }, { do: "attack", attacker: "iron-boar", target: "river-otter" }]], solution: [pass, spring(0, 0), fromHand("kuriboh")] },
+
+	/* World 19: the last duel, on the whole mat. Nox uses its Extra Deck too. */
 	{
 		id: "x-duel",
 		world: "final",
@@ -250,6 +274,21 @@ export const LEVELS: readonly Level[] = [
 	},
 ];
 
+/** World 20: the masters' island. One duel per trainer; the board is dealt when the duel starts (masters.ts). */
+const MASTER_LEVELS: readonly Level[] = MASTERS.map((master) => ({
+	id: masterLevelId(master),
+	world: "masters",
+	uses: ["phases", "summon", "tribute", "spell", "trap", "battle", "direct", "steps"],
+	bar: "six",
+	goal: { type: "win" },
+	open: true,
+	duel: { master },
+	setup: { full: true, strict: true },
+	solution: [],
+}));
+LEVELS_ALL.push(...MASTER_LEVELS);
+export const LEVELS: readonly Level[] = LEVELS_ALL;
+
 export const levelById = (id: string): Level | undefined => LEVELS.find((level) => level.id === id);
 export const levelsOf = (world: WorldId): Level[] => LEVELS.filter((level) => level.world === world);
 
@@ -269,14 +308,18 @@ export const DEMOS: Record<RuleId, Demo> = {
 	spell: { setup: { ...puzzle, you: { hand: ["thunder-clap"], monsters: ["pocket-cub"] }, rival: { lp: 1200, monsters: ["iron-boar"] } }, moves: [place("thunder-clap", 1, { target: 0 }), phase("battle"), attack(0, "direct")] },
 	trap: { setup: { ...puzzle, you: { hand: ["sticky-vine"], monsters: ["pebble-crab"] }, rival: { monsters: ["thorn-fox"] } }, moves: [place("sticky-vine", 1), phase("end"), attack(0, 0), spring(1)] },
 	chain: { setup: { turn: "rival", you: { monsters: ["pebble-crab"], backrow: ["quick-burrow"] }, rival: { hand: ["thunder-clap"] } }, moves: [place("thunder-clap", 0, { target: 0 }), spring(0, 0)] },
-	cost: { setup: { you: { hand: ["spark-trade", "pebble-crab"] }, rival: { monsters: ["iron-boar"] } }, moves: [place("spark-trade", 1, { discard: "pebble-crab" })] },
+	cost: { setup: { you: { hand: ["spark-trade", "pebble-crab"] }, rival: { monsters: ["iron-boar"] } }, moves: [place("spark-trade", 1, { discard: "pebble-crab", target: 0 })] },
 	target: { setup: { you: { hand: ["thunder-clap"] }, rival: { monsters: ["iron-boar"], backrow: ["quick-burrow"] } }, moves: [place("thunder-clap", 1, { target: 0 }), spring(0, 0)] },
 	quick: { setup: { turn: "rival", you: { monsters: ["river-otter", "glint-lynx"] }, rival: { monsters: ["iron-boar"] } }, moves: [attack(0, 0), effect(1, 0)] },
-	timing: { setup: { you: { hand: ["spark-trade", "dozy-moth"] }, rival: { monsters: ["iron-boar"] } }, moves: [place("spark-trade", 1, { discard: "dozy-moth" })] },
+	timing: { setup: { you: { hand: ["spark-trade", "dozy-moth"] }, rival: { monsters: ["iron-boar"] } }, moves: [place("spark-trade", 1, { discard: "dozy-moth", target: 0 })] },
 	once: { setup: { turn: "rival", you: { monsters: ["river-otter", "glint-lynx"] }, rival: { monsters: ["iron-boar", "shadow-wolf"] } }, moves: [attack(0, 0), effect(1, 0), attack(1, 0)] },
 	graveyard: { setup: { full: true, you: { hand: ["monster-reborn"], graveyard: ["storm-stag"] } }, moves: [reborn("you", 0)] },
 	field: { setup: { full: true, you: { hand: ["mountain"], monsters: ["lantern-owl", "river-otter"] }, rival: { monsters: ["lantern-owl"] } }, moves: [inField("mountain")] },
 	banish: { setup: { full: true, turn: "rival", you: { backrow: ["dimensional-prison"] }, rival: { monsters: ["busy-bee"] } }, moves: [attack(0, "direct"), spring(0)] },
+	quickplay: { setup: { full: true, you: { hand: ["spark-dash"], monsters: ["river-otter"] }, rival: { monsters: ["iron-boar"] } }, moves: [setCard("spark-dash", 1), phase("end"), attack(0, 0), spring(1, 0)] },
+	counter: { setup: { full: true, turn: "rival", you: { monsters: ["pocket-cub"], backrow: ["negate-attack"] }, rival: { monsters: ["shadow-wolf", "iron-boar"] } }, moves: [attack(0, 0), spring(0)] },
+	continuous: { setup: { full: true, you: { hand: ["banner-of-courage"], monsters: ["river-otter"] }, rival: { monsters: ["mud-toad"] } }, moves: [place("banner-of-courage", 1), phase("battle"), attack(0, 0)] },
+	equip: { setup: { full: true, you: { hand: ["legendary-sword"], monsters: ["masaki"] } }, moves: [place("legendary-sword", 1, { target: 0 })] },
 	ritual: { setup: { full: true, you: { hand: ["black-luster-ritual", "black-luster-soldier"], monsters: ["storm-stag", "pebble-crab"] } }, moves: [ritual(onField(0), onField(1))] },
 	fusion: { setup: { full: true, you: { hand: ["polymerization", "masaki"], monsters: ["flame-manipulator"], extra: ["flame-swordsman"] } }, moves: [fuse(inHand("masaki"), onField(0))] },
 	synchro: { setup: { full: true, you: { monsters: ["tune-warrior", "giant-soldier-of-stone"], extra: ["gaia-knight"] } }, moves: [fromExtra("gaia-knight", 0, 1)] },
@@ -288,4 +331,5 @@ export const DEMOS: Record<RuleId, Demo> = {
 	then: { setup: { full: true, you: { hand: ["upstart-goblin"], deck: ["thunder-clap"] }, rival: { lp: 800 } }, moves: [place("upstart-goblin")] },
 	condition: { setup: { full: true, you: { hand: ["cyber-dragon"] }, rival: { monsters: ["thorn-fox"] } }, moves: [special("cyber-dragon")] },
 	exodia: { setup: FIFTH_PIECE, moves: [draw] },
+	steps: { setup: { full: true, turn: "rival", you: { hand: ["kuriboh"] }, rival: { monsters: ["iron-boar"] } }, moves: [attack(0, "direct"), fromHand("kuriboh")] },
 };

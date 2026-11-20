@@ -16,9 +16,9 @@ describe("a card's picture", () => {
 		expect(container.innerHTML).not.toContain("ygoprodeck");
 	});
 	it("stays the emoji on an original card", () => {
-		const { container } = render(<CardFace card="spark-dash" copy={PLAY_COPY.en} compact />);
+		const { container } = render(<CardFace card="glint-lynx" copy={PLAY_COPY.en} compact />);
 		expect(container.querySelector("img")).toBeNull();
-		expect(container.textContent).toContain("⚡");
+		expect(container.textContent).toContain("🐆");
 	});
 	it("shows the art in a compact zone too", () => {
 		const { container } = render(<CardFace card="blue-eyes-white-dragon" copy={PLAY_COPY.en} compact />);

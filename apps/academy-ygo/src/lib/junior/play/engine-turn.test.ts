@@ -55,7 +55,7 @@ describe("playing cards from the hand", () => {
 	});
 	it("raises ATK with a boost Spell until the end of the turn only", () => {
 		const boosted = play(board({ you: { hand: ["spark-dash"], monsters: ["pocket-cub"] } }), { type: "place", card: "spark-dash", row: "backrow", zone: 0, target: 0 });
-		expect(atkOf(boosted.you.monsters[0]!, boosted)).toBe(1700);
+		expect(atkOf(boosted.you.monsters[0]!, boosted)).toBe(1900);
 		const next = play(boosted, { type: "phase", to: "end" });
 		expect(atkOf(next.you.monsters[0]!, next)).toBe(1200);
 	});
@@ -87,9 +87,10 @@ describe("Traps", () => {
 		expect(declared.board.you.monsters[0]?.card).toBe("pocket-cub");
 		expect(reason(declared.board, { type: "phase", to: "end" })).toBe("answer-first");
 		const sprung = ok(declared.board, { type: "spring", zone: 0 });
-		expect(sprung.events.map((event) => event.type)).toEqual(["sprung", "attack-stopped"]);
+		expect(sprung.events.map((event) => event.type)).toEqual(["sprung", "attack-stopped", "gained"]);
 		expect(sprung.board.you.monsters[0]?.card).toBe("pocket-cub");
-		expect(sprung.board.you.lp).toBe(4000);
+		/* Draining Shield: "gain LP equal to that target's ATK". */
+		expect(sprung.board.you.lp).toBe(4000 + atkOf(declared.board.rival.monsters[0]!, declared.board));
 		expect(sprung.board.you.graveyard).toEqual(["sticky-vine"]);
 		expect(reason(sprung.board, { type: "attack", attacker: 0, target: 0 })).toBe("already-attacked");
 	});
@@ -100,12 +101,26 @@ describe("Traps", () => {
 		expect(passed.you.lp).toBe(3500);
 		expect(passed.you.backrow[0]?.card).toBe("sticky-vine");
 	});
-	it("can turn a battle around by weakening the attacker", () => {
+	it("can turn a battle around by making the defender stronger", () => {
 		const start = board({ you: { monsters: ["river-otter"], backrow: ["fog-snare"] }, rival: { monsters: ["iron-boar"] }, turn: "rival" });
-		const after = play(start, { type: "attack", attacker: 0, target: 0 }, { type: "spring", zone: 0 });
+		const declared = play(start, { type: "attack", attacker: 0, target: 0 });
+		expect(reason(declared, { type: "spring", zone: 0 })).toBe("no-target");
+		const after = play(declared, { type: "spring", zone: 0, target: 0 });
 		expect(after.rival.monsters[0]).toBeNull();
 		expect(after.rival.lp).toBe(3700);
 		expect(after.you.monsters[0]?.card).toBe("river-otter");
+	});
+	it("skip the next Draw Phase when a card says so: Offerings to the Doomed", () => {
+		const start = board({ strict: true, you: { hand: ["thunder-clap"], deck: ["pocket-cub"], monsters: ["river-otter"] }, rival: { monsters: ["iron-boar"] } });
+		const cast = play(start, { type: "place", card: "thunder-clap", row: "backrow", zone: 0, target: 0 });
+		expect(cast.rival.monsters[0]).toBeNull();
+		expect(cast.you.skipDraw).toBe(true);
+		const rivalTurn = play(cast, { type: "phase", to: "end" });
+		const back = ok(rivalTurn, { type: "phase", to: "end" });
+		expect(back.events.at(-1)).toEqual({ type: "skip-draw", side: "you" });
+		expect(reason(back.board, { type: "draw" })).toBe("already-drew");
+		expect(ok(back.board, { type: "phase", to: "main1" }).board.you.hand).toEqual([]);
+		expect(back.board.you.skipDraw).toBeUndefined();
 	});
 	it("do not answer the wrong thing, and do nothing without an opponent's action", () => {
 		const start = board({ you: { monsters: ["river-otter"], backrow: ["quick-burrow", "sticky-vine"] }, rival: { monsters: ["iron-boar"] } });
@@ -154,7 +169,9 @@ describe("the phases of a turn, moved by hand", () => {
 	it("only goes forward, and keeps Spells and Summons for a Main Phase", () => {
 		const battle = play(turn(), { type: "draw" }, { type: "phase", to: "main1" }, { type: "phase", to: "battle" });
 		expect(reason(battle, { type: "phase", to: "main1" })).toBe("cannot-go-back");
-		expect(reason(battle, { type: "place", card: "spark-dash", row: "backrow", zone: 0, target: 0 })).toBe("not-main-phase");
+		/* A Quick-Play Spell may be activated in the Battle Phase; a Normal Spell may not. */
+		expect(reason(battle, { type: "place", card: "spark-dash", row: "backrow", zone: 0, target: 0 })).toBe("accepted");
+		expect(reason(board({ strict: true, phase: "battle", you: { hand: ["glow-charm"] } }), { type: "place", card: "glow-charm", row: "backrow", zone: 0 })).toBe("not-main-phase");
 		expect(reason(battle, { type: "place", card: "river-otter", row: "monsters", zone: 1 })).toBe("not-main-phase");
 		const main2 = play(battle, { type: "phase", to: "main2" });
 		expect(play(main2, { type: "place", card: "river-otter", row: "monsters", zone: 1 }).you.monsters[1]?.card).toBe("river-otter");

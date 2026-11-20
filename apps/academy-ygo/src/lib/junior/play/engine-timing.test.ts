@@ -9,7 +9,7 @@ function ok(state: Board, move: Move) {
 const types = (move: ReturnType<typeof ok>) => move.events.map((event) => event.type);
 
 describe('"If… you can" and "When… you can" when a card goes to the Graveyard', () => {
-	const trade = (discard: "busy-bee" | "dozy-moth") => ok(board({ you: { hand: ["spark-trade", discard] }, rival: { lp: 2000, monsters: ["iron-boar"] } }), { type: "place", card: "spark-trade", row: "backrow", zone: 0, discard });
+	const trade = (discard: "busy-bee" | "dozy-moth") => ok(board({ you: { hand: ["lightning-vortex", discard] }, rival: { lp: 2000, monsters: ["iron-boar"] } }), { type: "place", card: "lightning-vortex", row: "backrow", zone: 0, discard });
 	it('"If…" always works: discarded as a cost, Busy Bee still deals its damage once the Spell has resolved', () => {
 		const done = trade("busy-bee");
 		expect(types(done)).toEqual(["activated", "discarded", "destroyed", "trigger", "lp"]);
@@ -41,7 +41,7 @@ describe('"If… you can" and "When… you can" when a card goes to the Graveyar
 		expect(types(bee)).toEqual(["summoned", "trigger", "lp"]);
 	});
 	it("gives each waiting effect its chance in the order the cards reached the Graveyard", () => {
-		const done = ok(board({ you: { hand: ["spark-trade", "busy-bee"] }, rival: { lp: 2000, monsters: ["dozy-moth", "iron-boar"] } }), { type: "place", card: "spark-trade", row: "backrow", zone: 0, discard: "busy-bee" });
+		const done = ok(board({ you: { hand: ["lightning-vortex", "busy-bee"] }, rival: { lp: 2000, monsters: ["dozy-moth", "iron-boar"] } }), { type: "place", card: "lightning-vortex", row: "backrow", zone: 0, discard: "busy-bee" });
 		expect(done.events.filter((event) => event.type === "trigger").map((event) => event.type === "trigger" && [event.side, event.card])).toEqual([
 			["you", "busy-bee"],
 			["rival", "dozy-moth"],
@@ -54,8 +54,8 @@ describe('"If… you can" and "When… you can" when a card goes to the Graveyar
 		expect(done.board.triggers).toEqual([]);
 	});
 	it("waits until the Chain has resolved", () => {
-		const guarded = board({ you: { hand: ["spark-trade", "busy-bee"] }, rival: { lp: 2000, monsters: ["river-otter"], backrow: ["quick-burrow"] } });
-		const activated = ok(guarded, { type: "place", card: "spark-trade", row: "backrow", zone: 0, discard: "busy-bee" });
+		const guarded = board({ you: { hand: ["lightning-vortex", "busy-bee"] }, rival: { lp: 2000, monsters: ["river-otter"], backrow: ["quick-burrow"] } });
+		const activated = ok(guarded, { type: "place", card: "lightning-vortex", row: "backrow", zone: 0, discard: "busy-bee" });
 		expect(types(activated)).toEqual(["activated", "discarded", "chain", "window"]);
 		const answered = ok(activated.board, { type: "spring", zone: 0, target: 0 });
 		expect(types(answered).slice(-3)).toEqual(["no-effect", "trigger", "lp"]);

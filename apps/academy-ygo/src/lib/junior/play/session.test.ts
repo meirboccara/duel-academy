@@ -108,9 +108,19 @@ describe("the rival's turn", () => {
 	});
 });
 
+describe("Main Phase 2", () => {
+	it("is where the child Summons once a battle has freed a zone: in Main Phase 1 every zone is taken", () => {
+		const first = start(level("w6-main2"));
+		expect(play(first, { type: "place", card: "lantern-owl", row: "monsters", zone: 0 }).rejected).toBe("zone-taken");
+		const done = run(first, level("w6-main2").solution);
+		expect(done.status).toBe("solved");
+		expect(done.board.phase).toBe("main2");
+	});
+});
+
 describe("the rival answering the child", () => {
 	it("flips its Set Trap when the child activates a Spell: the cost stays paid and the Spell does nothing", () => {
-		const cast = play(start(level("r-paid")), { type: "place", card: "spark-trade", row: "backrow", zone: 0, discard: "mud-toad" });
+		const cast = play(start(level("r-paid")), { type: "place", card: "spark-trade", row: "backrow", zone: 0, discard: "mud-toad", target: 0 });
 		expect(cast.status).toBe("rival");
 		expect(cast.events.map((event) => event.type)).toEqual(["activated", "discarded", "chain", "window"]);
 		const answered = next(cast);
@@ -151,7 +161,7 @@ describe("hints", () => {
 });
 
 describe("every level", () => {
-	it.each(LEVELS.map((item) => [item.id, item] as const))("%s is solved by its recorded solution", (_id, item) => {
+	it.each(LEVELS.filter((item) => !item.duel).map((item) => [item.id, item] as const))("%s is solved by its recorded solution", (_id, item) => {
 		const done = run(start(item), item.solution);
 		expect(done.rejected).toBeNull();
 		expect(done.status).toBe("solved");
@@ -178,7 +188,8 @@ describe("every level", () => {
 		const done = run(start(level("x-duel")), level("x-duel").solution);
 		expect(done.board.winner).toBe("you");
 		expect(done.board.turnNumber).toBe(5);
-		expect(done.board.you.lp).toBe(4000);
+		/* Draining Shield stopped Battle Ox's attack and gave its 1700 ATK as Life Points. */
+		expect(done.board.you.lp).toBe(5700);
 	});
 });
 

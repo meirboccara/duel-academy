@@ -1,12 +1,12 @@
 import type { Locale } from "@/lib/i18n/locales";
-import type { CardId, CardKind, Frame, MonsterType } from "./cards";
+import { cardOf, type CardId, type CardKind, type Frame, type Icon, type MonsterType } from "./cards";
 import type { Board, GameEvent, Move, Phase, Reason, Side } from "./engine";
 import type { RuleId, WorldId } from "./levels";
 import type { Mastery } from "./progress";
 import type { FailReason } from "./session";
-import { en } from "./copy-en";
-import { fr } from "./copy-fr";
-import { he } from "./copy-he";
+import { en, englishCopy } from "./copy-en";
+import { fr, frenchCopy } from "./copy-fr";
+import { he, hebrewCopy } from "./copy-he";
 
 /** Every word a child reads or hears in Junior play. One line at a time, short enough to be said aloud. */
 export interface PlayCopy {
@@ -28,8 +28,10 @@ export interface PlayCopy {
 	types: Record<MonsterType, string>;
 	/** The special kinds of monster, as printed on the Type line. */
 	frames: Record<Frame, string>;
-	/** The icon of a Spell that is not a Normal Spell. */
-	icons: Record<"field" | "ritual", string>;
+	/** The type of a Spell, by its icon: "normal" when it has none. */
+	spellTypes: Record<"normal" | Exclude<Icon, "counter">, string>;
+	/** The type of a Trap, by its icon: "normal" when it has none. */
+	trapTypes: Record<"normal" | "continuous" | "counter", string>;
 	tuner: string;
 	rank: string;
 	linkRating: string;
@@ -39,6 +41,12 @@ export interface PlayCopy {
 	rules: Record<RuleId, string>;
 	mastery: Record<Mastery, string>;
 	phases: Record<Phase, string>;
+	/** What each phase is for, in one sentence: said the first time the phase starts in a try (Rulebook v10 pp. 34-40). */
+	phaseHelp: Record<Phase, string>;
+	/** The steps of an attack, named as Konami names them (in English in every language). */
+	steps: Record<"battle" | "damage", string>;
+	/** What happens in each step, in a few words: said the first time it comes in a try, from the steps island on. */
+	stepHelp: Record<"battle" | "damage", string>;
 	level: string;
 	atk: string;
 	def: string;
@@ -126,6 +134,8 @@ export interface PlayCopy {
 	choosePendulum: (low: number, high: number) => string;
 	confirmSummon: string;
 	specialSummon: string;
+	/** Set a Quick-Play Spell face-down instead of activating it. */
+	setFaceDown: string;
 	pendulumSummon: string;
 	detach: string;
 	useFromHand: string;
@@ -149,6 +159,19 @@ export interface PlayCopy {
 }
 
 export const PLAY_COPY: Record<Locale, PlayCopy> = { en, fr, he };
+const FOR_RIVAL = { en: englishCopy, fr: frenchCopy, he: hebrewCopy } as const;
+const byRival = new Map<string, PlayCopy>();
+/** The words for a duel against this rival, by name: Nox's are PLAY_COPY. Hebrew keeps a Latin name left to right. */
+export function playCopyFor(locale: Locale, rival: string | null): PlayCopy {
+	if (!rival) return PLAY_COPY[locale];
+	const key = `${locale}:${rival}`;
+	let words = byRival.get(key);
+	if (!words) {
+		words = FOR_RIVAL[locale](locale === "he" ? `⁦${rival}⁩` : rival);
+		byRival.set(key, words);
+	}
+	return words;
+}
 
 /**
  * The language the voice speaks. Hebrew speaks English: the cards a Hebrew-speaking child reads are in English,
@@ -159,4 +182,32 @@ export const VOICE_LOCALE: Record<Locale, Locale> = { en: "en", fr: "fr", he: "e
 /** The spoken or announced line for everything a move did. */
 export function narrateAll(copy: PlayCopy, events: readonly GameEvent[]): string {
 	return events.map((event) => copy.narrate(event)).filter(Boolean).join(" ");
+}
+
+/** The child's own phases that start in these events: a phase, or the Draw Phase of a new turn. In order, once each. */
+export function phasesStarted(events: readonly GameEvent[]): Phase[] {
+	const started: Phase[] = [];
+	for (const event of events) {
+		if (event.type !== "phase" && event.type !== "turn" && event.type !== "drew") continue;
+		if (event.side !== "you") continue;
+		const phase = event.type === "phase" ? event.phase : "draw";
+		if (!started.includes(phase)) started.push(phase);
+	}
+	return started;
+}
+
+/** The steps of an attack these events show: the Battle Step once an attack is declared, the Damage Step once it goes on to damage. */
+export function stepsStarted(events: readonly GameEvent[]): ("battle" | "damage")[] {
+	const steps: ("battle" | "damage")[] = [];
+	if (events.some((event) => event.type === "attack-declared")) steps.push("battle");
+	if (events.some((event) => event.type === "damage-step" || event.type === "battle" || event.type === "direct")) steps.push("damage");
+	return steps;
+}
+
+/** The type line of a Spell or Trap as printed: "Quick-Play Spell", "Counter Trap"; the kind of card for a Monster. */
+export function cardType(copy: PlayCopy, card: CardId): string {
+	const info = cardOf(card);
+	if (info.kind === "monster") return copy.kinds.monster;
+	if (info.kind === "spell") return copy.spellTypes[info.icon && info.icon !== "counter" ? info.icon : "normal"];
+	return copy.trapTypes[info.icon === "continuous" || info.icon === "counter" ? info.icon : "normal"];
 }

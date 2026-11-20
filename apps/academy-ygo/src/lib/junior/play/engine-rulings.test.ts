@@ -13,33 +13,33 @@ function reason(state: Board, move: Move) {
 const play = (state: Board, ...moves: Move[]) => moves.reduce((current, move) => ok(current, move).board, state);
 
 describe("a cost: the part before the semicolon", () => {
-	const start = () => board({ you: { hand: ["spark-trade", "mud-toad"], monsters: ["lantern-owl"] }, rival: { monsters: ["shadow-wolf", "iron-boar"] } });
+	const start = () => board({ you: { hand: ["lightning-vortex", "mud-toad"], monsters: ["lantern-owl"] }, rival: { monsters: ["shadow-wolf", "iron-boar"] } });
 	it("is paid when the card is activated: the discarded card goes to the Graveyard first", () => {
-		const { board: after, events } = ok(start(), { type: "place", card: "spark-trade", row: "backrow", zone: 0, discard: "mud-toad" });
+		const { board: after, events } = ok(start(), { type: "place", card: "lightning-vortex", row: "backrow", zone: 0, discard: "mud-toad" });
 		expect(events.map((event) => event.type)).toEqual(["activated", "discarded", "destroyed", "destroyed"]);
 		expect(events[1]).toEqual({ type: "discarded", side: "you", card: "mud-toad" });
 		expect(after.you.hand).toEqual([]);
-		expect(after.you.graveyard).toEqual(["mud-toad", "spark-trade"]);
+		expect(after.you.graveyard).toEqual(["mud-toad", "lightning-vortex"]);
 		expect(after.rival.monsters).toEqual([null, null, null]);
 	});
 	it("must be paid: no card chosen, or no other card in hand, means no activation", () => {
-		expect(reason(start(), { type: "place", card: "spark-trade", row: "backrow", zone: 0 })).toBe("cost-needed");
-		expect(reason(start(), { type: "place", card: "spark-trade", row: "backrow", zone: 0, discard: "spark-trade" })).toBe("cost-needed");
-		const alone = board({ you: { hand: ["spark-trade"] }, rival: { monsters: ["iron-boar"] } });
-		expect(reason(alone, { type: "place", card: "spark-trade", row: "backrow", zone: 0, discard: "mud-toad" })).toBe("cost-needed");
+		expect(reason(start(), { type: "place", card: "lightning-vortex", row: "backrow", zone: 0 })).toBe("cost-needed");
+		expect(reason(start(), { type: "place", card: "lightning-vortex", row: "backrow", zone: 0, discard: "lightning-vortex" })).toBe("cost-needed");
+		const alone = board({ you: { hand: ["lightning-vortex"] }, rival: { monsters: ["iron-boar"] } });
+		expect(reason(alone, { type: "place", card: "lightning-vortex", row: "backrow", zone: 0, discard: "mud-toad" })).toBe("cost-needed");
 	});
 	it("stays paid when the effect ends up doing nothing", () => {
-		const guarded = board({ you: { hand: ["spark-trade", "mud-toad"] }, rival: { monsters: ["river-otter"], backrow: ["quick-burrow"] } });
-		const activated = ok(guarded, { type: "place", card: "spark-trade", row: "backrow", zone: 0, discard: "mud-toad" });
-		expect(activated.board.pending).toEqual({ kind: "spell", card: "spark-trade" });
+		const guarded = board({ you: { hand: ["lightning-vortex", "mud-toad"] }, rival: { monsters: ["river-otter"], backrow: ["quick-burrow"] } });
+		const activated = ok(guarded, { type: "place", card: "lightning-vortex", row: "backrow", zone: 0, discard: "mud-toad" });
+		expect(activated.board.pending).toEqual({ kind: "spell", card: "lightning-vortex" });
 		expect(activated.board.you.graveyard).toEqual(["mud-toad"]);
 		const answered = ok(activated.board, { type: "spring", zone: 0, target: 0 });
 		expect(answered.events.map((event) => event.type)).toEqual(["sprung", "chain", "resolve", "returned", "resolve", "no-effect"]);
 		expect(answered.board.rival.hand).toEqual(["river-otter"]);
-		expect(answered.board.you.graveyard).toEqual(["mud-toad", "spark-trade"]);
+		expect(answered.board.you.graveyard).toEqual(["mud-toad", "lightning-vortex"]);
 	});
 	it("needs something for the effect to hit, even without a target", () => {
-		expect(reason(board({ you: { hand: ["spark-trade", "mud-toad"] } }), { type: "place", card: "spark-trade", row: "backrow", zone: 0, discard: "mud-toad" })).toBe("nothing-to-hit");
+		expect(reason(board({ you: { hand: ["lightning-vortex", "mud-toad"] } }), { type: "place", card: "lightning-vortex", row: "backrow", zone: 0, discard: "mud-toad" })).toBe("nothing-to-hit");
 	});
 });
 
@@ -78,7 +78,7 @@ describe("a Quick Effect", () => {
 		const cast = play(board({ turn: "rival", you: { monsters: ["glint-lynx"] }, rival: { hand: ["spark-dash"], monsters: ["thorn-fox"] } }), { type: "place", card: "spark-dash", row: "backrow", zone: 0, target: 0 });
 		const used = ok(cast, { type: "ability", zone: 0, target: 0 });
 		expect(used.events.map((event) => event.type)).toEqual(["ability", "chain", "resolve", "boosted", "resolve", "boosted"]);
-		expect(atkOf(used.board.rival.monsters[0]!, used.board)).toBe(1400 - 800 + 500);
+		expect(atkOf(used.board.rival.monsters[0]!, used.board)).toBe(1400 - 800 + 700);
 	});
 });
 
@@ -90,7 +90,7 @@ describe("once per turn", () => {
 		expect(second.pending).toMatchObject({ kind: "attack" });
 		expect(reason(second, { type: "ability", zone: 1, target: 1 })).toBe("once-per-turn");
 		expect(legalMoves(second).some((move) => move.type === "ability")).toBe(false);
-		expect(ok(second, { type: "spring", zone: 0 }).events.map((event) => event.type)).toEqual(["sprung", "attack-stopped"]);
+		expect(ok(second, { type: "spring", zone: 0 }).events.map((event) => event.type)).toEqual(["sprung", "attack-stopped", "gained"]);
 	});
 	it("is available again on the next turn", () => {
 		const used = play(board({ you: { monsters: ["glint-lynx"] }, rival: { monsters: ["iron-boar"] } }), { type: "ability", zone: 0, target: 0 });
@@ -109,9 +109,9 @@ describe("once per turn", () => {
 
 describe("listing moves with costs and effects", () => {
 	it("offers the discard choices and the effect targets", () => {
-		const moves = legalMoves(board({ you: { hand: ["spark-trade", "mud-toad"], monsters: ["cinder-hedgehog"] }, rival: { monsters: ["iron-boar"] } }));
-		expect(moves).toContainEqual({ type: "place", card: "spark-trade", row: "backrow", zone: 0, discard: "mud-toad" });
-		expect(moves).not.toContainEqual({ type: "place", card: "spark-trade", row: "backrow", zone: 0 });
+		const moves = legalMoves(board({ you: { hand: ["lightning-vortex", "mud-toad"], monsters: ["cinder-hedgehog"] }, rival: { monsters: ["iron-boar"] } }));
+		expect(moves).toContainEqual({ type: "place", card: "lightning-vortex", row: "backrow", zone: 0, discard: "mud-toad" });
+		expect(moves).not.toContainEqual({ type: "place", card: "lightning-vortex", row: "backrow", zone: 0 });
 		expect(moves).toContainEqual({ type: "ability", zone: 0, target: 0 });
 	});
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Check, House, Lock, Play, Shirt, Smartphone, Star, Store, Volume2, VolumeX } from "lucide-react";
+import { BookOpen, Check, House, Layers, Lock, Play, Shirt, Smartphone, Star, Store, Volume2, VolumeX } from "lucide-react";
 import { MotionConfig } from "motion/react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -8,7 +8,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLanguage } from "@/lib/i18n/provider";
 import { HOME_COPY } from "@/lib/junior/home/copy";
 import { requestPersist } from "@/lib/junior/persist";
-import { PLAY_COPY } from "@/lib/junior/play/copy";
+import { PLAY_COPY, playCopyFor } from "@/lib/junior/play/copy";
+import { seeded } from "@/lib/junior/play/bot";
+import { DECK_COPY } from "@/lib/junior/play/deck-copy";
+import { NO_DECK, deckKeyFor, deckReady, deckable, loadDeck, saveDeck, startWith, starterCards, type DeckRecord } from "@/lib/junior/play/deck-record";
+import { MASTER_NAMES, duelSetup } from "@/lib/junior/play/masters";
 import { LEVELS, RULE_IDS, WORLD_IDS, levelById, levelsOf, type WorldId } from "@/lib/junior/play/levels";
 import { PLAY_PROGRESS_KEY, emptyPlayProgress, isSolved, isUnlocked, loadPlayProgress, mergePlayProgress, nextLevel, recordSolve, ruleMastery, savePlayProgress, type PlayProgress, type PlayStorage } from "@/lib/junior/play/progress";
 import type { Outcome } from "@/lib/junior/play/session";
@@ -22,6 +26,7 @@ import type { Outfit } from "@/lib/junior/world/wardrobe";
 import { type Dorm, dormCapId, dormKeyFor, dormToChoose, loadDorm, saveDorm } from "@/lib/junior/world/dorm";
 import { IslandWorld } from "../world/island-world";
 import { AlbumCards, AlbumDialog } from "./album-dialog";
+import { DeckDialog, StarterDialog } from "./deck-dialog";
 import { LevelPlayer } from "./level-player";
 import { RewardReveal } from "./reward-reveal";
 import { ShopDialog, type WardrobeActions } from "./shop-dialog";
@@ -93,6 +98,12 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 	dormRef.current = dorm;
 	/* Closed without choosing: asked again on the next visit. */
 	const [dormLater, setDormLater] = useState(false);
+	/* The Deck for the masters' island (a starter chosen once, then edited), stored the same way under its own key. */
+	const deckKey = deckKeyFor(storageKey);
+	const [deck, setDeck] = useState<DeckRecord>(NO_DECK);
+	const [deckOpen, setDeckOpen] = useState(false);
+	/* Each duel against a trainer is dealt anew: a fresh seed every time the duel is opened. */
+	const [duelSeed, setDuelSeed] = useState(1);
 	const [shopOpen, setShopOpen] = useState(false);
 	const [albumOpen, setAlbumOpen] = useState(false);
 	const [heroOpen, setHeroOpen] = useState(false);
@@ -137,9 +148,10 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 		if (storage && cap && stillMine && !record.items.includes(cap)) record = giveItem(storage, shopKey, cap) ?? record;
 		setShop(record);
 		setDorm(chosen);
+		setDeck(loadDeck(storage, deckKey));
 		setDeviceReduced(typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 		setHydrated(true);
-	}, [apply, storageOf, shopKey, dormKey]);
+	}, [apply, storageOf, shopKey, dormKey, deckKey]);
 	useEffect(() => {
 		if (typeof window.matchMedia !== "function") return;
 		const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -152,6 +164,7 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 		const onStorage = (event: StorageEvent) => {
 			if (event.key === shopKey) return setShop(loadShop(getStorage(), shopKey));
 			if (event.key === dormKey) return setDorm(loadDorm(getStorage(), dormKey));
+			if (event.key === deckKey) return setDeck(loadDeck(getStorage(), deckKey));
 			if (event.key !== storageKey) return;
 			const latest = loadPlayProgress(storageOf());
 			/* Sound stays as this tab has it: another tab turning it on must not make this one speak. */
@@ -159,7 +172,7 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 		};
 		window.addEventListener("storage", onStorage);
 		return () => window.removeEventListener("storage", onStorage);
-	}, [apply, storageKey, storageOf, shopKey, dormKey]);
+	}, [apply, storageKey, storageOf, shopKey, dormKey, deckKey]);
 	/* Each new screen starts at its heading, for keyboard and screen-reader users. */
 	const shown = useRef(active);
 	useEffect(() => {
@@ -177,6 +190,7 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 		solvedAtOpen.current = isSolved(progressRef.current, id);
 		/* A mission opened from the map closes the map's dialogs: back on the map, none comes back by itself. */
 		setHeroOpen(false);
+		setDuelSeed(Math.floor(Math.random() * 1_000_000_000) + 1);
 		setActive(id);
 	};
 	/* Cards that joined the binder with the last solve: shown once, large, back on the map. */
@@ -207,8 +221,20 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 		},
 		[active, commit],
 	);
+	/* A duel against a trainer is dealt once per opening: the same board until the child leaves it. */
+	const played = useMemo(() => (level?.duel ? { ...level, duel: { ...level.duel, seed: duelSeed }, setup: duelSetup(level.duel.master, deck, seeded(duelSeed)) } : level), [level, duelSeed, deck]);
 	const upNext = nextLevel(progress);
-	const cards = binder(progress, bought, dorm);
+	/* The binder: the cards played with, the trainers' cards, the cards bought, and the starter Deck's cards. */
+	const cards = binder(progress, [...bought, ...starterCards(deck)], dorm);
+	const owned = useMemo(() => deckable(cards), [cards]);
+	const ownedSet = useMemo(() => new Set<string>(owned), [owned]);
+	const deckWords = DECK_COPY[locale];
+	const keepDeck = (record: DeckRecord) => {
+		const storage = shopStorage();
+		if (!storage || !saveDeck(storage, deckKey, record)) return;
+		setDeck(record);
+		setDeckOpen(false);
+	};
 	/* Things this character cannot hold (bought before each character had its own) are refunded: they cost nothing. */
 	const heroAvatar = player?.avatar ?? DEFAULT_AVATAR;
 	const stars = starsLeft(progress, bought, shop.items, heroAvatar);
@@ -285,6 +311,13 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 			</span>
 		</button>
 	);
+	/* The Deck for the masters' island, once that island is reached. */
+	const mastersOpen = islandStatus(progress, "masters") !== "locked";
+	const deckButton = mastersOpen && (
+		<button type="button" onClick={() => setDeckOpen(true)} aria-label={deckWords.deckButton} title={deckWords.deckButton} className="pointer-events-auto grid h-12 w-12 place-items-center rounded-full border-2 border-white/70 bg-ink-950/55 text-white backdrop-blur-sm">
+			<Layers className="h-6 w-6" aria-hidden />
+		</button>
+	);
 	const islandCards = useMemo(() => islandCardUrls(progress, dorm), [progress, dorm]);
 	/* Whether the island world is shown: null until known. With it, the map is the whole page; without it, the list is. */
 	const [islands, setIslands] = useState<boolean | null>(null);
@@ -348,6 +381,7 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 			</button>
 			{heroButton}
 			{albumButton}
+			{deckButton}
 		</div>
 	);
 	const trainer = (world: WorldId) => <TrainerTalk world={world} dorm={dorm} done={islandStatus(progress, world) === "done"} locale={locale} />;
@@ -397,13 +431,30 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 					</div>
 				)}
 				{/* In full screen the map is all there is: the rules and the album below it come back on leaving. */}
-				{onMap ? (immersive.on ? null : <div className="mx-auto max-w-240 space-y-6 px-4 md:px-6">{extras}</div>) : level ? (
+				{onMap ? (immersive.on ? null : <div className="mx-auto max-w-240 space-y-6 px-4 md:px-6">{extras}</div>) : level?.duel && !deckReady(deck, ownedSet) ? (
+					/* A duel against a trainer needs the child's own Deck: chosen first, then kept within the rules. */
+					<section className="space-y-3">
+						<h2 data-step-heading tabIndex={-1} className="font-display text-2xl text-fg">
+							{copy.levels[level.id]?.title}
+						</h2>
+						<p className="text-fg">{deckWords.needDeck}</p>
+						<div className="flex flex-wrap gap-2">
+							<button type="button" onClick={() => setDeckOpen(true)} className={toggle(true)}>
+								<Layers className="h-5 w-5" aria-hidden />
+								{deck.starter ? deckWords.editDeck : deckWords.chooseTitle}
+							</button>
+							<button type="button" onClick={() => setActive(null)} className={toggle(false)}>
+								{copy.backToMap}
+							</button>
+						</div>
+					</section>
+				) : level ? (
 					<LevelPlayer
-						key={level.id}
-						level={level}
+						key={level.duel ? `${level.id}:${duelSeed}` : level.id}
+						level={played ?? level}
 						number={levelsOf(level.world).indexOf(level) + 1}
 						total={levelsOf(level.world).length}
-						copy={copy}
+						copy={level.duel ? playCopyFor(locale, MASTER_NAMES[level.duel.master]) : copy}
 						locale={locale}
 						moving={moving}
 						sound={progress.sound}
@@ -499,7 +550,9 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 					/>
 				)}
 				{!level && albumOpen && <AlbumDialog cards={cards} rewards={rewards} copy={copy} locale={locale} onClose={() => setAlbumOpen(false)} />}
-				{!level && shopOpen && <ShopDialog stars={stars} bought={bought} wardrobe={wardrobe} preview={previewOk ? preview : undefined} copy={copy} locale={locale} onBuy={onBuy} onClose={() => setShopOpen(false)} />}
+				{deckOpen && !deck.starter && <StarterDialog copy={copy} locale={locale} onChoose={(starter) => keepDeck(startWith(starter))} onClose={() => setDeckOpen(false)} />}
+				{deckOpen && deck.starter && <DeckDialog deck={deck} owned={owned} copy={copy} locale={locale} onSave={keepDeck} onClose={() => setDeckOpen(false)} />}
+				{!level && shopOpen && <ShopDialog stars={stars} bought={bought} wardrobe={wardrobe} preview={previewOk ? preview : undefined} copy={copy} locale={locale} progress={progress} onBuy={onBuy} onClose={() => setShopOpen(false)} />}
 				{!level && revealed.length > 0 && <RewardReveal
 						cards={revealed}
 						copy={copy}

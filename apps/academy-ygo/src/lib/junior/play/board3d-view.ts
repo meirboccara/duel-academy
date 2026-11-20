@@ -1,6 +1,6 @@
 import type { MatLayout, MatPlace } from "./board3d-layout";
 import { cardOf, monsterOf, type CardId } from "./cards";
-import type { PlayCopy } from "./copy";
+import { cardType, type PlayCopy } from "./copy";
 import { EXTRA_ZONE, atkOf, defOf, type Board, type MonsterSlot, type Row, type Side } from "./engine";
 
 /**
@@ -71,7 +71,7 @@ const stars = (count: number) => "★".repeat(Math.min(count, 12));
 export function printedFace(copy: PlayCopy, card: CardId): FaceSpec {
 	const info = cardOf(card);
 	const name = copy.cards[card].name;
-	if (info.kind !== "monster") return { card, name, line: info.icon ? copy.icons[info.icon] : copy.kinds[info.kind] };
+	if (info.kind !== "monster") return { card, name, line: cardType(copy, card) };
 	const grade = info.link ? `🔗 ${info.link}` : info.rank ? `${copy.rank} ${info.rank}` : stars(info.level);
 	return { card, name, line: info.link ? `${copy.atk} ${info.atk}` : `${info.atk} / ${info.def}`, note: info.scale !== undefined ? `${grade}  ◈${info.scale}` : grade };
 }
@@ -117,8 +117,14 @@ export function matView({ board, copy, layout, glow, chosen, landing, holding, o
 			}
 			case "backrow": {
 				const slot = mine.backrow[zone];
-				/* A Pendulum Monster in a Pendulum Zone is face-up and shows its Scale; anything else here is Set face-down. */
-				const card: CardView | undefined = !slot ? undefined : slot.up ? { id: `${key}:${slot.card}`, face: { card: slot.card, name: copy.cards[slot.card].name, line: `${copy.scale} ${monsterOf(slot.card).scale ?? 0}`, compact: true }, turned: false, under: 0, delay: 0 } : { id: `${key}:${slot.card}`, face: null, ...(side === "you" ? { backName: copy.cards[slot.card].name } : {}), turned: false, under: 0, delay: 0 };
+				/* A Pendulum Monster in a Pendulum Zone is face-up and shows its Scale; a Continuous or Equip card is face-up; anything else here is Set face-down. */
+				const card: CardView | undefined = !slot
+					? undefined
+					: slot.up
+						? { id: `${key}:${slot.card}`, face: { card: slot.card, name: copy.cards[slot.card].name, line: `${copy.scale} ${monsterOf(slot.card).scale ?? 0}`, compact: true }, turned: false, under: 0, delay: 0 }
+						: slot.open
+							? { id: `${key}:${slot.card}`, face: { ...printedFace(copy, slot.card), compact: true }, turned: false, under: 0, delay: 0 }
+							: { id: `${key}:${slot.card}`, face: null, ...(side === "you" ? { backName: copy.cards[slot.card].name } : {}), turned: false, under: 0, delay: 0 };
 				/* Nothing can be done with the rival's Spell & Trap row: it is shown, not offered as a control. */
 				return { place, state, quiet, ...zoneTap("backrow", side === "you"), ...(card ? { card } : {}) };
 			}

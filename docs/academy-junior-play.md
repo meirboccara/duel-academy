@@ -7,8 +7,10 @@ and 3 to 9. Step 2 (testing with children) and step 10 (parents' corner) were le
 
 ## What it is
 
-Seventy-nine short levels. Worlds 1 to 8 are played on a mini duel board (three Monster Zones and three Spell & Trap
-Zones per side, 4000 Life Points); worlds 9 to 18 on the whole mat (see "The whole mat" below). Each level adds at most one rule. There is no question screen: the child taps a card and then a zone, or a
+A hundred and one levels on 21 islands (88 lessons and puzzles, then 13 duels against the trainers of the masters'
+island; see "Phases, card types, steps and the masters' island" below). Worlds 1 to 8 are played on a mini duel board
+(three Monster Zones and three Spell & Trap Zones per side, 4000 Life Points); the later worlds on the whole mat (see
+"The whole mat" below). Each level adds at most one rule. There is no question screen: the child taps a card and then a zone, or a
 Monster and then its target, and the board plays the rule out.
 
 | World | Levels | Rules |
@@ -142,10 +144,10 @@ Left out on the whole mat as well:
 - **Number 39: Utopia** negates an attack only in answer to the rival's attack, not the child's own. When it is
   attacked with no material and destroyed, the attack goes on as a direct attack only if nothing else is in the
   way; otherwise it ends (a full replay is not played).
-- **Kuriboh** is offered when the attack is declared, since Junior has no Damage Step.
+- **Kuriboh** is offered in the Damage Step, as its text says ("During damage calculation").
 - **Chains** stay at two links. A Synchro, Xyz, Link or Pendulum Summon starts no Chain; placing a Scale is not
   offered an answer. A Field Spell can be answered like any Spell, and only counts once it has resolved.
-- The Extra Deck is never sorted by the child before a duel, and Decks are never shuffled.
+- The Extra Deck is never sorted by the child before a duel. Decks are shuffled only on the masters' island.
 - **Exodia the Forbidden One** wins only from the hand, checked once a move is done; pieces on the field or in the
   Graveyard do not count. No other alternative win condition is in Junior.
 
@@ -184,3 +186,38 @@ the engine. Each language has a sentence for every event of every level. Run:
 - The whole mat is tight on a phone: seven columns leave about 45 px a zone, so a zone shows a picture and one
   number. Looked at in a browser at 520 px wide in English, French and Hebrew; not on a real phone.
 - The duel uses the Junior engine, not `packages/duel-engine`, and the rival follows a fixed script.
+
+## Phases, card types, steps and the masters' island (2026-11-20)
+
+The owner's decisions and the plan: `docs/research/academy-phases-spells-traps-endgame.md` §5.8 and
+`docs/academy-junior-masters-plan.md`.
+
+- **Real Spells and Traps on islands 1 to 8.** The seven invented ones became real cards with official art, under
+  the same ids: Red Medicine, Rush Recklessly (Quick-Play), Offerings to the Doomed (Quick-Play, "skip your next Draw
+  Phase" is played), Tribute to the Doomed, Reinforcements, Draining Shield, Compulsory Evacuation Device. Where a real
+  card may target either player's monster, Junior offers only the side the lesson needs (left out, not changed).
+- **The six phases explained.** With the phase bar, the mentor says one sentence for each of the child's phases the
+  first time it starts in a level (`phaseHelp`). Island 6 adds "After the battle", which needs Main Phase 2.
+- **Every Spell and Trap type** has a printed type line ("Normal Spell", "Quick-Play Spell", "Counter Trap"…) and
+  island 10, "The six icons", teaches Quick-Play (Set, then used on the rival's turn), Counter (Negate Attack),
+  Continuous Spell (Banner of Courage), Equip (Legendary Sword) and Continuous Trap (Call of the Haunted).
+- **The steps of an attack.** An attack is a Battle Step (Traps that answer a declared attack) then a Damage Step
+  (only cards that change ATK, and Kuriboh); the Damage Step opens a window only when the defender can act there. The
+  clash banner names the step; from the island of steps on, each step is explained once per level. Island 19, "The
+  island of steps", has two levels.
+- **The masters' island** (island 21, after the Nox duel): one duel per trainer, 13 trainers. Each trainer is a bot
+  (`bot.ts`: every legal move is tried and the board it leads to scored, with a personality per trainer, gentle at
+  first) playing an anime deck (`master-decks.ts`: 40 cards, Extra Deck up to 15). Decks are shuffled from a seed,
+  5 cards each, a coin decides who goes first, 8000 Life Points. The child chooses a starter deck once
+  (`starters.ts`), whose cards join the binder, and edits the deck with any playable card of the binder (`DeckDialog`).
+  A first win gives 5 stars, a rematch is always open, and each beaten trainer opens some of their cards in the shop.
+  Hints come from the same bot, playing the child's side.
+- **Trainers' cards.** About 150 real cards were added (209 playable cards in all): their numbers, Types, Attributes and texts come from
+  `card-art.ts` (generated); each effect is written by hand in `cards.ts` and played by `engine.ts`. A card the engine
+  cannot play exactly is left out of a deck. Arkana, Yami Bakura, Pegasus, Yami Marik and Yusei have too few such
+  anime cards: their decks carry `filler` cards, listed apart in `master-decks.ts`.
+
+Still left out: Set Monsters and Flip effects, replays, the hand size limit, Spell Speed beyond "a Counter Trap answers
+an attack", Trap Hole and other cards that answer a Summon, and the anime cards with effects the engine does not play
+yet (Stardust Dragon, Toons, Time Wizard, the Egyptian Gods among them).
+

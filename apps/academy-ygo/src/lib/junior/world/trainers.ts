@@ -61,6 +61,7 @@ export const ISLAND_TRAINERS: Record<WorldId, IslandTrainer> = {
 	rival: { trainers: ["seto-kaiba"], cards: ["blue-eyes-white-dragon"] },
 	reading: { trainers: ["joey-wheeler"], cards: ["time-wizard"] },
 	mat: { trainers: [], cards: ["monster-reborn"] },
+	icons: { trainers: ["mai-valentine"], cards: ["negate-attack"] },
 	ritual: { trainers: ["yami-yugi"], cards: ["black-luster-soldier"] },
 	fusion: { trainers: ["jaden-yuki"], cards: ["elemental-hero-flame-wingman"] },
 	synchro: { trainers: ["yusei-fudo"], cards: ["stardust-dragon"] },
@@ -69,7 +70,9 @@ export const ISLAND_TRAINERS: Record<WorldId, IslandTrainer> = {
 	pendulum: { trainers: ["yuya-sakaki"], cards: ["odd-eyes-pendulum-dragon"] },
 	words: { trainers: ["zane-truesdale"], cards: ["cyber-dragon"] },
 	legends: { trainers: ["yami-yugi", "seto-kaiba"], cards: ["exodia-the-forbidden-one", "blue-eyes-ultimate-dragon"] },
+	steps: { trainers: ["yugi-muto"], cards: ["kuriboh"] },
 	final: { trainers: ["yami-yugi", "seto-kaiba"], cards: [] },
+	masters: { trainers: ["yami-yugi", "seto-kaiba"], cards: [] },
 };
 
 /**
@@ -182,6 +185,7 @@ export const TRAINER_LINES: Record<Locale, TrainerLines> = {
 		puzzles: { hello: "Puzzle time! Every board here can be won this turn. Look at everything before you tap.", done: "All ten puzzles solved! Even Yugi would be proud." },
 		rival: { hello: "I am Seto Kaiba. Today Nox duels with my monsters. Beat them, if you can.", done: "Hmph. You won. Blue-Eyes White Dragon is in your binder. Don't get used to it." },
 		reading: { hello: "Hey, I'm Joey! My Time Wizard says “Once per turn”. Reading every word is how you win!", done: "You read like a pro! Time Wizard is yours now." },
+		icons: { hello: "Mai again! One small icon beside SPELL or TRAP changes how a card works. Negate Attack is my favourite Counter Trap.", done: "Now you read every icon. Negate Attack is yours." },
 		ritual: { hello: "A Ritual needs a Ritual Spell and Tributes. Black Luster Soldier is waiting.", done: "The Ritual is complete. Black Luster Soldier joins you." },
 		fusion: { hello: "I'm Jaden Yuki! Two heroes become one: Elemental HERO Flame Wingman. Get your game on!", done: "Sweet! Flame Wingman is in your binder." },
 		synchro: { hello: "I'm Yusei Fudo. A Tuner and its friends add up their Levels. That is how Stardust Dragon comes.", done: "Clear mind, clean Summon. Stardust Dragon is yours." },
@@ -190,7 +194,9 @@ export const TRAINER_LINES: Record<Locale, TrainerLines> = {
 		pendulum: { hello: "I'm Yuya Sakaki! Set two Scales and Summon everything between them. Here comes Odd-Eyes Pendulum Dragon!", done: "What a show! Odd-Eyes Pendulum Dragon is in your binder." },
 		words: { hello: "I am Zane Truesdale. Every word on a card counts. Cyber Dragon says “If only your opponent controls a monster”.", done: "Respect. Cyber Dragon is yours." },
 		legends: { hello: "Yugi and Kaiba are here. Meet the legends: Exodia the Forbidden One and Blue-Eyes Ultimate Dragon.", done: "You met the legends! Both cards join your binder." },
+		steps: { hello: "Yugi again! An attack has steps. My Kuriboh waits for the Damage Step, just as its card says.", done: "You know every step now. Kuriboh is yours!" },
 		final: { hello: "The final duel, with your own Extra Deck. We are watching!", done: "You are a real duelist now!" },
+		masters: { hello: "Every master of the anime is here, each with their own Deck. Choose your Deck, and beat them all!", done: "You beat every master. You are the champion of the Academy!" },
 	},
 	fr: {
 		wake: {
@@ -203,6 +209,7 @@ export const TRAINER_LINES: Record<Locale, TrainerLines> = {
 		puzzles: { hello: "C’est l’heure des énigmes ! Chaque plateau peut être gagné ce tour-ci. Regarde tout avant de toucher.", done: "Les dix énigmes sont résolues ! Même Yugi serait fier de toi." },
 		rival: { hello: "Je suis Seto Kaiba. Aujourd’hui, Nox joue avec mes monstres. Bats-les, si tu peux.", done: "Hum. Tu as gagné. Dragon Blanc aux Yeux Bleus est dans ton classeur. Ne t’y habitue pas." },
 		reading: { hello: "Salut, moi c’est Joey ! Mon Magicien du Temps dit « Une fois par tour ». Lire chaque mot, c’est comme ça qu’on gagne !", done: "Tu lis comme un pro ! Magicien du Temps est à toi." },
+		icons: { hello: "Encore moi, Mai ! Une petite icône à côté de MAGIE ou PIÈGE change tout. Annulation d’Attaque est mon Contre-Piège préféré.", done: "Tu lis toutes les icônes maintenant. Annulation d’Attaque est à toi." },
 		ritual: { hello: "Un Rituel demande une Magie Rituelle et des Sacrifices. Soldat du Lustre Noir t’attend.", done: "Le Rituel est accompli. Soldat du Lustre Noir te rejoint." },
 		fusion: { hello: "Je suis Jaden Yuki ! Deux héros n’en font qu’un : Homme-Oiseau de Feu, HÉROS Élémentaire. C’est parti !", done: "Génial ! Homme-Oiseau de Feu est dans ton classeur." },
 		synchro: { hello: "Je suis Yusei Fudo. Un Syntoniseur et ses amis additionnent leurs Niveaux. C’est ainsi que vient Dragon Poussière d’Étoile.", done: "Esprit clair, Invocation nette. Dragon Poussière d’Étoile est à toi." },
@@ -211,7 +218,9 @@ export const TRAINER_LINES: Record<Locale, TrainerLines> = {
 		pendulum: { hello: "Je suis Yuya Sakaki ! Place deux Échelles et Invoque tout ce qui est entre elles. Voici Dragon Pendule aux Yeux Impairs !", done: "Quel spectacle ! Dragon Pendule aux Yeux Impairs est dans ton classeur." },
 		words: { hello: "Je suis Zane Truesdale. Chaque mot d’une carte compte. Cyber Dragon dit « Si seul votre adversaire contrôle un monstre ».", done: "Respect. Cyber Dragon est à toi." },
 		legends: { hello: "Yugi et Kaiba sont là. Voici les légendes : Éxodia l’Interdit et Dragon Ultime aux Yeux Bleus.", done: "Tu as rencontré les légendes ! Les deux cartes rejoignent ton classeur." },
+		steps: { hello: "Encore moi, Yugi ! Une attaque a des étapes. Mon Kuriboh attend la Damage Step, comme le dit sa carte.", done: "Tu connais chaque étape maintenant. Kuriboh est à toi !" },
 		final: { hello: "Le duel final, avec ton propre Extra Deck. Nous te regardons !", done: "Tu es maintenant un vrai duelliste !" },
+		masters: { hello: "Tous les maîtres sont là, chacun avec son propre Deck. Choisis ton Deck, et bats-les tous !", done: "Tu as battu tous les maîtres. Tu es le champion de l’Académie !" },
 	},
 	he: {
 		wake: {
@@ -224,6 +233,7 @@ export const TRAINER_LINES: Record<Locale, TrainerLines> = {
 		puzzles: { hello: "זמן חידות! בכל לוח כאן אפשר לנצח בתור הזה. הסתכלו על הכול לפני שנוגעים.", done: `פתרתם את כל עשר החידות! אפילו ${L("Yugi")} היה גאה.` },
 		rival: { hello: `אני ${L("Seto Kaiba")}. היום ${L("Nox")} משחק עם המפלצות שלי. נצחו אותן, אם אתם יכולים.`, done: `הממ. ניצחתם. ${L("Blue-Eyes White Dragon")} באלבום שלכם. אל תתרגלו לזה.` },
 		reading: { hello: `היי, אני ${L("Joey")}! על ה־${L("Time Wizard")} שלי כתוב ${L("“Once per turn”")}. לקרוא כל מילה, ככה מנצחים!`, done: `אתם קוראים כמו מקצוענים! ${L("Time Wizard")} עכשיו שלכם.` },
+		icons: { hello: `שוב אני, ${L("Mai")}! סמל קטן ליד ${L("SPELL")} או ${L("TRAP")} משנה איך קלף עובד. ${L("Negate Attack")} היא ${L("Counter Trap")} האהובה עליי.`, done: `עכשיו אתם קוראים כל סמל. ${L("Negate Attack")} שלכם.` },
 		ritual: { hello: `טקס (${L("Ritual")}) צריך לחש טקס (${L("Ritual Spell")}) והקרבות (${L("Tributes")}). ${L("Black Luster Soldier")} מחכה.`, done: `הטקס (${L("Ritual")}) הושלם. ${L("Black Luster Soldier")} מצטרף אליכם.` },
 		fusion: { hello: `אני ${L("Jaden Yuki")}! שני גיבורים הופכים לאחד: ${L("Elemental HERO Flame Wingman")}. יאללה, משחקים!`, done: `מעולה! ${L("Flame Wingman")} באלבום שלכם.` },
 		synchro: { hello: `אני ${L("Yusei Fudo")}. ${L("Tuner")} והחברים שלו מחברים את הרמות (${L("Levels")}) שלהם. ככה מגיע ${L("Stardust Dragon")}.`, done: `ראש צלול, זימון (${L("Summon")}) נקי. ${L("Stardust Dragon")} שלכם.` },
@@ -232,7 +242,9 @@ export const TRAINER_LINES: Record<Locale, TrainerLines> = {
 		pendulum: { hello: `אני ${L("Yuya Sakaki")}! מציבים שני סולמות (${L("Scales")}) ומזמנים את כל מה שביניהם. הנה מגיע ${L("Odd-Eyes Pendulum Dragon")}!`, done: `איזו הופעה! ${L("Odd-Eyes Pendulum Dragon")} באלבום שלכם.` },
 		words: { hello: `אני ${L("Zane Truesdale")}. כל מילה על קלף חשובה. על ${L("Cyber Dragon")} כתוב ${L("“If only your opponent controls a monster”")}.`, done: `כבוד. ${L("Cyber Dragon")} שלכם.` },
 		legends: { hello: `${L("Yugi")} ו־${L("Kaiba")} כאן. הכירו את האגדות: ${L("Exodia the Forbidden One")} ו־${L("Blue-Eyes Ultimate Dragon")}.`, done: "פגשתם את האגדות! שני הקלפים מצטרפים לאלבום שלכם." },
+		steps: { hello: `שוב אני, ${L("Yugi")}! להתקפה יש שלבים. ה־${L("Kuriboh")} שלי מחכה ל־${L("Damage Step")}, בדיוק כמו שכתוב על הקלף.`, done: `עכשיו אתם מכירים כל שלב. ${L("Kuriboh")} שלכם!` },
 		final: { hello: `הדו־קרב האחרון, עם ה־${L("Extra Deck")} שלכם. אנחנו צופים!`, done: "עכשיו אתם דואליסטים אמיתיים!" },
+		masters: { hello: "כל המאסטרים כאן, כל אחד עם החפיסה שלו. בחרו חפיסה, ונצחו את כולם!", done: "ניצחתם את כל המאסטרים. אתם האלופים של האקדמיה!" },
 	},
 };
 

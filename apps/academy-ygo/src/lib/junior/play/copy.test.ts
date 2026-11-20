@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "@/lib/i18n/locales";
 import { CARD_IDS, hasRulesText } from "./cards";
-import { PLAY_COPY, VOICE_LOCALE, narrateAll, type PlayCopy } from "./copy";
+import { PLAY_COPY, VOICE_LOCALE, narrateAll, phasesStarted, type PlayCopy } from "./copy";
 import type { GameEvent, Move, Board } from "./engine";
 import { DEMOS, LEVELS, RULE_IDS } from "./levels";
 import { demoFrames, next, play, start } from "./session";
@@ -114,7 +114,7 @@ function pairs(en: PlayCopy, he: PlayCopy): [string, string, string][] {
 		const b = he[key];
 		if (typeof a === "string" && typeof b === "string") add(key, a, b);
 	}
-	const records = ["kinds", "rules", "reasons", "fails", "mastery", "types", "frames", "icons"] as const;
+	const records = ["kinds", "rules", "reasons", "fails", "mastery", "types", "frames", "spellTypes", "trapTypes"] as const;
 	for (const name of records) for (const [key, a] of Object.entries(en[name])) add(`${name}.${key}`, a as string, (he[name] as Record<string, string>)[key] ?? "");
 	for (const [key, a] of Object.entries(en.worlds)) {
 		add(`worlds.${key}.title`, a.title, he.worlds[key as keyof typeof he.worlds].title);
@@ -171,12 +171,22 @@ describe("Hebrew keeps the English card words", () => {
 describe("card text in the words printed on real cards", () => {
 	it("puts a cost before the semicolon, says Target only for targeting cards, and marks Quick Effects", () => {
 		const text = (card: (typeof CARD_IDS)[number]) => PLAY_COPY.en.cards[card].text ?? "";
-		expect(text("spark-trade")).toBe("Discard 1 card; destroy all monsters your opponent controls.");
-		expect(text("thunder-clap")).toBe("Target 1 face-up monster your opponent controls; destroy it.");
-		expect(text("spark-dash")).toBe("Target 1 face-up monster you control; it gains 500 ATK until the end of this turn.");
+		expect(text("spark-trade")).toBe("Discard 1 card, then target 1 monster on the field; destroy it.");
+		expect(text("thunder-clap")).toBe("Target 1 face-up monster on the field; destroy that target, also skip your next Draw Phase.");
+		expect(text("spark-dash")).toBe("Target 1 face-up monster on the field; it gains 700 ATK until the end of this turn.");
 		expect(text("glint-lynx")).toMatch(/^\(Quick Effect\): You can target 1 face-up monster your opponent controls; .* once per turn\.$/);
 		expect(text("cinder-hedgehog")).not.toMatch(/Quick Effect/);
 		expect(text("dozy-moth")).toBe("When this card is sent to the GY: You can inflict 500 damage to your opponent.");
 		expect(text("busy-bee")).toBe("If this card is sent to the GY: You can inflict 500 damage to your opponent.");
+	});
+});
+
+describe("the six phases, explained", () => {
+	it("has one sentence per phase in every language, starting with the phase's name", () => {
+		for (const words of Object.values(PLAY_COPY)) for (const phase of ["draw", "standby", "main1", "battle", "main2", "end"] as const) expect(words.phaseHelp[phase]).toContain(PLAY_COPY.en.phases[phase]);
+	});
+	it("finds the child's phases that start, a new turn starting in the Draw Phase", () => {
+		expect(phasesStarted([{ type: "phase", side: "you", phase: "battle" }, { type: "phase", side: "you", phase: "end" }, { type: "turn", side: "rival" }])).toEqual(["battle", "end"]);
+		expect(phasesStarted([{ type: "turn", side: "you" }, { type: "drew", side: "you", card: "pocket-cub" }, { type: "phase", side: "you", phase: "standby" }])).toEqual(["draw", "standby"]);
 	});
 });

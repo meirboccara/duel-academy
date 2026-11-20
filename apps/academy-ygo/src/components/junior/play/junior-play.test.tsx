@@ -3,7 +3,9 @@ import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LanguageProvider, LanguageSwitcher } from "@/lib/i18n/provider";
-import { LEVELS } from "@/lib/junior/play/levels";
+import { PLAY_COPY } from "@/lib/junior/play/copy";
+import { LEVELS, WORLD_IDS } from "@/lib/junior/play/levels";
+import { masterLevelId } from "@/lib/junior/play/masters";
 import { PLAY_PROGRESS_KEY, emptyPlayProgress } from "@/lib/junior/play/progress";
 import { starsEarned } from "@/lib/junior/world/shop";
 import { useEffect } from "react";
@@ -151,7 +153,7 @@ describe("the Junior map", () => {
 		expect(within(dialog).getByRole("button", { name: "Ra Yellow cap" }).getAttribute("aria-pressed")).toBe("true");
 		await user.click(within(dialog).getByRole("button", { name: "Next page: Your card album" }));
 		await user.click(within(dialog).getByRole("button", { name: "Next page: Quest" }));
-		expect(within(dialog).getByText("Islands finished: 1 of 18")).toBeTruthy();
+		expect(within(dialog).getByText(`Islands finished: 1 of ${WORLD_IDS.length}`)).toBeTruthy();
 	});
 	it("opens the card album from a button at any time, and closes it again", async () => {
 		const user = setup("w2-wall");
@@ -175,12 +177,12 @@ describe("playing a level", () => {
 		await user.click(button(/Silver Fang/));
 		await user.click(zone(/^Your Monster Zone 2: empty/));
 		expect(zone(/^Your Monster Zone 2: Silver Fang, ATK 1200, DEF 800/)).toBeTruthy();
-		await user.click(button(/Glow Charm/));
+		await user.click(button(/Red Medicine/));
 		await user.click(zone(/^Your Spell & Trap Zone 1: empty/));
 		expect(status().textContent).toMatch(/You gain 500 Life Points: 4500 now/);
-		await user.click(button(/Sticky Vine/));
+		await user.click(button(/Draining Shield/));
 		await user.click(zone(/^Your Spell & Trap Zone 3: empty/));
-		expect(zone(/^Your Spell & Trap Zone 3: Sticky Vine, face-down/)).toBeTruthy();
+		expect(zone(/^Your Spell & Trap Zone 3: Draining Shield, face-down/)).toBeTruthy();
 		expect(status().textContent).toMatch(/You did it!/);
 		expect(document.activeElement).toBe(button("Next level"));
 		expect(saved().levels["w1-field"]).toEqual({ clean: true, firstTry: false });
@@ -227,7 +229,7 @@ describe("playing a level", () => {
 		expect(zone(/^Your Monster Zone 1: Ally of Justice Clausolas, ATK 2300/)).toBeTruthy();
 		expect(screen.getByText("Your Graveyard: 1")).toBeTruthy();
 	});
-	it("walks the phases of a turn with the phase bar, and refuses a Spell in the Battle Phase", async () => {
+	it("walks the phases of a turn with the phase bar, and lets a Quick-Play Spell be used in the Battle Phase", async () => {
 		const user = setup("w4-spell");
 		await openLevel(user, "Spell now!");
 		await skipDemo(user);
@@ -235,19 +237,14 @@ describe("playing a level", () => {
 		await user.click(bar.getByRole("button", { name: "Main Phase 1" }));
 		expect(status().textContent).toMatch(/Draw your card first/);
 		await user.click(bar.getByRole("button", { name: "Draw Phase: Draw" }));
-		expect(status().textContent).toMatch(/You draw Thunder Clap/);
+		expect(status().textContent).toMatch(/You draw Offerings to the Doomed/);
 		await user.click(bar.getByRole("button", { name: "Main Phase 1" }));
 		await user.click(bar.getByRole("button", { name: "Battle Phase" }));
 		expect(bar.getByRole("button", { name: "Battle Phase" }).getAttribute("aria-current")).toBe("step");
-		await user.click(button(/Thunder Clap/));
+		await user.click(button(/Offerings to the Doomed/));
 		await user.click(zone(/^Your Spell & Trap Zone 1: empty/));
 		await user.click(zone(/Monster Zone 1: Battle Ox/));
-		expect(status().textContent).toMatch(/That is for your Main Phase/);
-		await user.click(button("Go back one step"));
-		await user.click(button(/Thunder Clap/));
-		await user.click(zone(/Monster Zone 1: Battle Ox/));
-		expect(status().textContent).toMatch(/You activate the Spell Thunder Clap and target Battle Ox\. Battle Ox is destroyed/);
-		await user.click(bar.getByRole("button", { name: "Battle Phase" }));
+		expect(status().textContent).toMatch(/You activate the Spell Offerings to the Doomed and target Battle Ox\. Battle Ox is destroyed/);
 		await user.click(zone(/^Your Monster Zone 1: Destroyer Golem/));
 		await user.click(button("Attack directly"));
 		expect(status().textContent).toMatch(/You win the duel!\s*You did it!/);
@@ -259,16 +256,16 @@ describe("playing a level", () => {
 		const bar = within(screen.getByRole("list", { name: "Phases of the turn" }));
 		await user.click(bar.getByRole("button", { name: "Draw Phase: Draw" }));
 		await user.click(bar.getByRole("button", { name: "Main Phase 1" }));
-		await user.click(button(/Sticky Vine/));
+		await user.click(button(/Draining Shield/));
 		await user.click(zone(/^Your Spell & Trap Zone 1: empty/));
-		await user.click(zone(/^Your Spell & Trap Zone 1: Sticky Vine/));
+		await user.click(zone(/^Your Spell & Trap Zone 1: Draining Shield/));
 		expect(status().textContent).toMatch(/Not yet! A Trap cannot be activated the turn it was Set/);
 		await user.click(bar.getByRole("button", { name: "End Phase" }));
 		await user.click(button("Nox's turn: next"));
 		expect(status().textContent).toMatch(/Battle Ox attacks Silver Fang! Freeze!/);
 		expect(button("Let it happen")).toBeTruthy();
-		await user.click(zone(/^Your Spell & Trap Zone 1: Sticky Vine/));
-		expect(status().textContent).toMatch(/You flip a Trap: Sticky Vine! The attack of Battle Ox is stopped/);
+		await user.click(zone(/^Your Spell & Trap Zone 1: Draining Shield/));
+		expect(status().textContent).toMatch(/You flip a Trap: Draining Shield! The attack of Battle Ox is stopped/);
 		await user.click(button("Nox's turn: next"));
 		expect(status().textContent).toMatch(/You did it!/);
 	});
@@ -277,11 +274,11 @@ describe("playing a level", () => {
 		await openLevel(user, "Turtle tower");
 		await skipDemo(user);
 		await user.click(button("Nox's turn: next"));
-		expect(status().textContent).toMatch(/Nox activates the Spell Thunder Clap and targets Silver Fang\. Thunder Clap starts a Chain: Chain Link 1/);
-		expect(document.querySelector("[data-chain]")?.textContent).toContain("Thunder Clap");
-		await user.click(zone(/^Your Spell & Trap Zone 1: Quick Burrow/));
+		expect(status().textContent).toMatch(/Nox activates the Spell Offerings to the Doomed and targets Silver Fang\. Offerings to the Doomed starts a Chain: Chain Link 1/);
+		expect(document.querySelector("[data-chain]")?.textContent).toContain("Offerings to the Doomed");
+		await user.click(zone(/^Your Spell & Trap Zone 1: Compulsory Evacuation Device/));
 		await user.click(zone(/^Your Monster Zone 1: Silver Fang/));
-		expect(status().textContent).toMatch(/Quick Burrow goes on top: Chain Link 2\. Chain Link 2 resolves: Quick Burrow\. Silver Fang returns to your hand\. Chain Link 1 resolves: Thunder Clap\. Thunder Clap resolves, but there is nothing left for it to do/);
+		expect(status().textContent).toMatch(/Compulsory Evacuation Device goes on top: Chain Link 2\. Chain Link 2 resolves: Compulsory Evacuation Device\. Silver Fang returns to your hand\. Chain Link 1 resolves: Offerings to the Doomed\. Offerings to the Doomed resolves, but there is nothing left for it to do/);
 		await user.click(button("Nox's turn: next"));
 		expect(status().textContent).toMatch(/You did it!/);
 	});
@@ -307,7 +304,7 @@ describe("playing a level", () => {
 		const rival = async () => {
 			while (screen.queryByRole("button", { name: "Nox's turn: next" })) await user.click(button("Nox's turn: next"));
 		};
-		const names: Record<string, RegExp> = { "river-otter": /Destroyer Golem/, "fog-snare": /Fog Snare/, "pocket-cub": /Silver Fang/, "thunder-clap": /Thunder Clap/ };
+		const names: Record<string, RegExp> = { "river-otter": /Destroyer Golem/, "fog-snare": /Reinforcements/, "pocket-cub": /Silver Fang/, "thunder-clap": /Offerings to the Doomed/ };
 		const phaseNames = { draw: "Draw Phase", standby: "Standby Phase", main1: "Main Phase 1", battle: "Battle Phase", main2: "Main Phase 2", end: "End Phase" } as const;
 		for (const move of level?.solution ?? []) {
 			await rival();
@@ -317,8 +314,10 @@ describe("playing a level", () => {
 				await user.click(button(names[move.card] ?? /none/));
 				if (move.target !== undefined) await user.click(zone(new RegExp(`^Nox's Monster Zone ${move.target + 1}: `)));
 				else await user.click(zone(new RegExp(`^Your ${move.row === "monsters" ? "Monster" : "Spell & Trap"} Zone ${move.zone + 1}: `)));
-			} else if (move.type === "spring") await user.click(zone(new RegExp(`^Your Spell & Trap Zone ${move.zone + 1}: `)));
-			else if (move.type === "attack") {
+			} else if (move.type === "spring") {
+				await user.click(zone(new RegExp(`^Your Spell & Trap Zone ${move.zone + 1}: `)));
+				if (move.target !== undefined) await user.click(zone(new RegExp(`^Your Monster Zone ${move.target + 1}: `)));
+			} else if (move.type === "attack") {
 				await user.click(zone(new RegExp(`^Your Monster Zone ${move.attacker + 1}: `)));
 				await user.click(button("Attack directly"));
 			}
@@ -335,12 +334,13 @@ describe("reading the card", () => {
 		const user = setup("r-cost");
 		await openLevel(user, "Pay first");
 		await skipDemo(user);
-		await user.click(button(/Spark Trade/));
-		expect(within(document.querySelector("[data-card-text]") as HTMLElement).getByText("Discard 1 card; destroy all monsters your opponent controls.")).toBeTruthy();
+		await user.click(button(/Tribute to the Doomed/));
+		expect(within(document.querySelector("[data-card-text]") as HTMLElement).getByText("Discard 1 card, then target 1 monster on the field; destroy it.")).toBeTruthy();
 		await user.click(zone(/^Your Spell & Trap Zone 1: empty/));
+		await user.click(zone(/^Nox's Monster Zone 1: /));
 		expect(status().textContent).toMatch(/Pay the cost: tap another card in your hand to discard it/);
 		await user.click(button(/Happy Lover/));
-		expect(status().textContent).toMatch(/You activate the Spell Spark Trade\. You discard Happy Lover to pay the cost\. Judge Man is destroyed/);
+		expect(status().textContent).toMatch(/You activate the Spell Tribute to the Doomed and target Judge Man\. You discard Happy Lover to pay the cost\. Judge Man is destroyed/);
 		expect(screen.getByText("Your Graveyard: 2")).toBeTruthy();
 		const bar = within(screen.getByRole("list", { name: "Phases of the turn" }));
 		await user.click(bar.getByRole("button", { name: "Battle Phase" }));
@@ -354,8 +354,9 @@ describe("reading the card", () => {
 		await skipDemo(user);
 		await user.click(button(/Happy Lover/));
 		await user.click(zone(/^Your Monster Zone 2: empty/));
-		await user.click(button(/Spark Trade/));
+		await user.click(button(/Tribute to the Doomed/));
 		await user.click(zone(/^Your Spell & Trap Zone 1: empty/));
+		await user.click(zone(/^Nox's Monster Zone 1: /));
 		expect(status().textContent).toMatch(/Pay the cost first: discard 1 other card from your hand\. No card to discard, no activation\./);
 		expect(saved().levels["r-cost"]).toBeUndefined();
 	});
@@ -364,14 +365,16 @@ describe("reading the card", () => {
 		await openLevel(user, "When or If?");
 		expect(screen.getByRole("heading", { level: 3, name: /Watch first: "When… you can" or "If… you can"/ })).toBeTruthy();
 		await skipDemo(user);
-		await user.click(button(/Spark Trade/));
+		await user.click(button(/Tribute to the Doomed/));
 		await user.click(zone(/^Your Spell & Trap Zone 1: empty/));
+		await user.click(zone(/^Nox's Monster Zone 1: /));
 		await user.click(button(/Dozy Moth/));
 		expect(status().textContent).toMatch(/Dozy Moth missed its chance! Its card says "When…": it only gets its chance if going to the Graveyard happens last\. Here, activating the Spell came last\./);
 		expect(screen.getByText("Nox's Life Points: 900")).toBeTruthy();
 		await user.click(button("Go back one step"));
-		await user.click(button(/Spark Trade/));
+		await user.click(button(/Tribute to the Doomed/));
 		await user.click(zone(/^Your Spell & Trap Zone 1: empty/));
+		await user.click(zone(/^Nox's Monster Zone 1: /));
 		await user.click(button(/Busy Bee/));
 		expect(status().textContent).toMatch(/Busy Bee says "If…": it gets its chance! You deal 500 damage\. Nox loses 500 Life Points: 400 left\./);
 		await user.click(button(/Dozy Moth/));
@@ -426,13 +429,14 @@ describe("Hebrew", () => {
 		await inHebrew(user);
 		await user.click(screen.getByRole("button", { name: "קודם משלמים" }));
 		await user.click(screen.getByRole("button", { name: "עכשיו אני!" }));
-		await user.click(screen.getByRole("button", { name: /Spark Trade/ }));
+		await user.click(screen.getByRole("button", { name: /Tribute to the Doomed/ }));
 		const reader = document.querySelector("[data-card-text]") as HTMLElement;
-		const printed = within(reader).getByText("Discard 1 card; destroy all monsters your opponent controls.");
+		const printed = within(reader).getByText("Discard 1 card, then target 1 monster on the field; destroy it.");
 		expect(printed.getAttribute("lang")).toBe("en");
 		expect(printed.getAttribute("dir")).toBe("ltr");
 		expect(reader.textContent).toContain("המחיר: משליכים קלף אחד מהיד.");
 		await user.click(screen.getAllByRole("button", { name: /Spell & Trap Zone/ })[0]!);
+		await user.click(screen.getByRole("button", { name: (label) => label.startsWith(PLAY_COPY.he.monsterZone("rival", 1)) }));
 		expect(status().textContent).toMatch(/\(\u2066cost\u2069\).*\(\u2066discard\u2069\)/);
 	});
 	it("speaks English, with an English voice, when Hebrew is chosen", async () => {
@@ -576,3 +580,18 @@ describe("full screen", () => {
 		expect(document.documentElement.dataset.immersive).toBeUndefined();
 	});
 });
+
+describe("the masters' island", () => {
+	it("asks for a starter Deck first, then deals a whole duel against the trainer at 8000 Life Points", async () => {
+		const user = setup(masterLevelId("rex-raptor"));
+		await openLevel(user, "Duel: Rex Raptor");
+		expect(screen.getByText("To challenge the masters, you need a Deck of 40 cards.")).toBeTruthy();
+		await user.click(button("Choose your starter Deck"));
+		await user.click(screen.getByRole("button", { name: /^Choose: Dragons\./ }));
+		expect(JSON.parse(window.localStorage.getItem(`${PLAY_PROGRESS_KEY}:deck`) ?? "null")).toMatchObject({ starter: "dragon" });
+		expect(screen.getByRole("heading", { level: 2, name: "Duel: Rex Raptor" })).toBeTruthy();
+		expect(screen.getAllByText(/Your Life Points: 8000/).length).toBeGreaterThan(0);
+		expect(screen.getAllByText(/Rex Raptor's Life Points: 8000/).length).toBeGreaterThan(0);
+	});
+});
+

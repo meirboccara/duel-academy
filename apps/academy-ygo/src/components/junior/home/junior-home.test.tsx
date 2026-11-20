@@ -5,7 +5,7 @@ import { renderToString } from "react-dom/server";
 import { useEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LanguageProvider } from "@/lib/i18n/provider";
-import { LEVELS } from "@/lib/junior/play/levels";
+import { LEVELS, WORLD_IDS } from "@/lib/junior/play/levels";
 import { PLAY_PROGRESS_KEY, emptyPlayProgress } from "@/lib/junior/play/progress";
 import { PROFILES_KEY, slotKey } from "@/lib/junior/profiles";
 import { encodeSave } from "@/lib/junior/save-code";
@@ -90,7 +90,7 @@ describe("the title screen", () => {
 		cleanup();
 		setup();
 		const tile = await screen.findByRole("button", { name: /Play as Noa/ });
-		expect(tile.textContent).toMatch(/0 of 18 islands/);
+		expect(tile.textContent).toContain(`0 of ${WORLD_IDS.length} islands`);
 		expect(tile.textContent).toMatch(/today/);
 		expect((button("Continue") as HTMLButtonElement).disabled).toBe(false);
 	});

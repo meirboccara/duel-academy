@@ -84,7 +84,10 @@ const lines = Object.entries(list).map(([id, entry]) => {
 	if (!en) throw new Error(`no card facts for ${id} (${entry.card})`);
 	const kind = /Spell/.test(en.type) ? "spell" : /Trap/.test(en.type) ? "trap" : "monster";
 	const numbers = kind === "monster" ? `, level: ${en.level ?? en.linkval ?? 0}, atk: ${en.atk ?? 0}, def: ${en.def ?? 0}` : "";
-	return `\t${JSON.stringify(id)}: { image: ${entry.image}, name: ${JSON.stringify(en.name)}, nameFr: ${JSON.stringify(fr?.name ?? en.name)}, kind: "${kind}"${numbers} },`;
+	/* The printed words: the Type (a Monster's Type, or the icon of a Spell or Trap), the frame, and the card text. A Normal Monster's text is a story, not rules: left out. */
+	const frame = String(en.frameType ?? "").replace(/_pendulum$/, "");
+	const words = frame === "normal" ? "" : `, text: ${JSON.stringify(en.desc ?? "")}, textFr: ${JSON.stringify(fr?.desc ?? en.desc ?? "")}`;
+	return `\t${JSON.stringify(id)}: { image: ${entry.image}, name: ${JSON.stringify(en.name)}, nameFr: ${JSON.stringify(fr?.name ?? en.name)}, kind: "${kind}"${numbers}${en.attribute ? `, attribute: ${JSON.stringify(en.attribute)}` : ""}, race: ${JSON.stringify(en.race ?? "")}, frame: ${JSON.stringify(frame)}${words} },`;
 });
 await writeFile(
 	MODULE,
@@ -100,6 +103,15 @@ export interface CardArtEntry {
 	level?: number;
 	atk?: number;
 	def?: number;
+	/** A Monster's Attribute: "LIGHT", "DARK", "EARTH", "WATER", "FIRE", "WIND" or "DIVINE". */
+	attribute?: string;
+	/** A Monster's Type ("Warrior"), or the icon of a Spell or Trap ("Quick-Play", "Normal"), as YGOPRODeck spells it. */
+	race: string;
+	/** The card frame: "normal", "effect", "fusion", "ritual", "synchro", "xyz", "link", "spell", "trap". */
+	frame: string;
+	/** The printed text in English and French, except for a Normal Monster (its text is a story). */
+	text?: string;
+	textFr?: string;
 }
 export const CARD_ART: Readonly<Record<string, CardArtEntry>> = {
 ${lines.join("\n")}

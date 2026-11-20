@@ -36,6 +36,14 @@ const SOURCES = {
 	/* The heads of the dorms that are not on an island already: Ra Yellow and Obelisk Blue (Jaden is Slifer Red's). */
 	"bastion-misawa": "https://uploads4.yugioh.com/character/20/detail/detail/bastion-l.png",
 	"alexis-rhodes": "https://uploads1.yugioh.com/character/19/detail/detail/alexis-l.png",
+	/* The trainers of the masters' island who stand on no other island. */
+	"rex-raptor": "https://uploads4.yugioh.com/character/149/detail/detail/rex-lrgs.png",
+	"weevil-underwood": "https://uploads3.yugioh.com/character/155/detail/detail/weevil-lg.png",
+	"yami-bakura": "https://uploads4.yugioh.com/character/14/detail/detail/y-bakura-l.png",
+	"mako-tsunami": "https://uploads4.yugioh.com/character/111/detail/detail/mako-lgx.png",
+	arkana: "https://uploads3.yugioh.com/character/108/detail/detail/arkana-lg.png",
+	"maximillion-pegasus": "https://uploads2.yugioh.com/character/13/detail/detail/pagasus.png",
+	"yami-marik": "https://uploads3.yugioh.com/character/12/detail/detail/ymarik-l.png",
 };
 
 async function exists(path) {

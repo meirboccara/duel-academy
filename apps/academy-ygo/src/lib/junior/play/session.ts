@@ -1,6 +1,8 @@
+import { HINT_PERSONA, botMove, seeded } from "./bot";
 import { cardOf, spellTarget, type CardId } from "./cards";
 import { actor, apply, atkOf, board as makeBoard, defOf, legalMoves, mainZones, type Board, type GameEvent, type Material, type Move, type Reason } from "./engine";
 import type { Demo, Level, RivalStep } from "./levels";
+import { PERSONAS } from "./masters";
 
 /**
  * One try at a level: the board, whose turn it is to act, and what the child did on the way.
@@ -53,7 +55,7 @@ export function start(level: Level): Session {
 }
 
 function lostMonster(events: readonly GameEvent[]): boolean {
-	return events.some((event) => (event.type === "battle" && event.destroyed.some((lost) => lost.side === "you")) || (event.type === "destroyed" && event.side === "you"));
+	return events.some((event) => (event.type === "battle" && event.destroyed.some((lost) => lost.side === "you")) || (event.type === "destroyed" && event.side === "you" && cardOf(event.card).kind === "monster"));
 }
 /** Is there anything left to do this turn besides moving through the phases? */
 function canStillAct(state: Board): boolean {
@@ -163,16 +165,49 @@ function rivalMove(state: Board, step: RivalStep): Move | null {
  */
 function rivalAnswer(state: Board): Move {
 	const answers = legalMoves(state).filter((move) => move.type !== "pass");
-	/* Only a Spell that targets one of Nox's Monsters says which one is in danger. */
-	const aimed = state.pending?.kind === "spell" && spellTarget(state.pending.card) === "foe" ? state.pending.target : undefined;
+	/* A Spell that targets one of Nox's Monsters, or an attack on one, says which one is in danger. */
+	const pending = state.pending;
+	const aimed = pending?.kind === "spell" && spellTarget(pending.card) === "foe" ? pending.target : pending?.kind === "attack" && pending.target !== "direct" ? pending.target : undefined;
 	const strongest = state.rival.monsters.reduce<number>((best, slot, zone) => (slot && (best < 0 || atkOf(slot, state) > atkOf(state.rival.monsters[best]!, state)) ? zone : best), -1);
 	const wanted = aimed ?? strongest;
-	return answers.find((move) => move.type === "spring" && move.target === wanted) ?? answers.find((move) => move.type === "spring") ?? { type: "pass" };
+	/* A card that destroys aims at the child's attacker; one that helps aims at Nox's monster in danger. */
+	const destroys = (move: Move) => {
+		const slot = move.type === "spring" ? state.rival.backrow[move.zone] : null;
+		const info = slot ? cardOf(slot.card) : null;
+		return info?.kind !== "monster" && info?.effect.type === "destroy";
+	};
+	const attacker = pending?.kind === "attack" ? pending.attacker : undefined;
+	return (
+		answers.find((move) => move.type === "spring" && destroys(move) && move.target === attacker) ??
+		answers.find((move) => move.type === "spring" && !destroys(move) && move.target === wanted) ??
+		answers.find((move) => move.type === "spring" && !destroys(move)) ?? { type: "pass" }
+	);
+}
+
+/** The most moves a trainer makes in one turn: a safety net, never reached in play. */
+const MOST_BOT_MOVES = 80;
+/** The same duel gives the same trainer moves: the random numbers come from the duel's seed and how far it has gone. */
+const botRandom = (session: Session) => seeded((session.level.duel?.seed ?? 1) * 7919 + session.board.turnNumber * 131 + session.rivalStep);
+
+/** A trainer of the masters' island: one move at a time, chosen by the bot; the turn ends once nothing helps any more. */
+function botNext(session: Session): Session {
+	const master = session.level.duel?.master;
+	if (!master) return session;
+	const persona = PERSONAS[master];
+	const tired = !session.board.pending && session.rivalStep >= MOST_BOT_MOVES;
+	const move: Move = tired ? { type: "phase", to: "end" } : botMove(session.board, persona, botRandom(session));
+	let result = apply(session.board, move);
+	if (!result.ok) result = apply(session.board, session.board.pending ? { type: "pass" } : { type: "phase", to: "end" });
+	/* Nothing at all can be done: the try ends rather than waiting for ever. */
+	if (!result.ok) return { ...session, status: "failed", fail: "out-of-moves" };
+	const turnOver = result.board.turn !== session.board.turn;
+	return settle({ ...session, board: result.board, events: result.events, rejected: null, rivalTurn: session.rivalTurn + (turnOver ? 1 : 0), rivalStep: turnOver ? 0 : session.rivalStep + 1 });
 }
 
 /** The rival's next step: an answer to the child, one move of its turn, or the end of its turn once its steps are used up. */
 export function next(session: Session): Session {
 	if (session.status !== "rival") return session;
+	if (session.level.duel) return botNext(session);
 	if (session.board.pending) {
 		const answered = apply(session.board, rivalAnswer(session.board));
 		return answered.ok ? settle({ ...session, board: answered.board, events: answered.events, rejected: null }) : session;
@@ -238,6 +273,8 @@ function search(from: Session, cap: number): Move | null {
 export function hint(session: Session): { move: Move | null; session: Session } {
 	const counted: Session = { ...session, stats: { ...session.stats, hints: session.stats.hints + 1 } };
 	if (session.status !== "playing" && session.status !== "answer") return { move: null, session: counted };
+	/* Against a trainer there is no recorded line: the hint is the move the best bot would make in the child's place. */
+	if (session.level.duel) return { move: botMove(session.board, HINT_PERSONA, seeded(session.moves.length + 1)), session: counted };
 	const { solution } = session.level;
 	const onPath = sameMoves(session.moves, solution.slice(0, session.moves.length)) ? solution[session.moves.length] : undefined;
 	return { move: onPath ?? search(session, session.level.open ? 1500 : 6000), session: counted };

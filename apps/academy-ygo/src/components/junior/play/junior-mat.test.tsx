@@ -228,11 +228,16 @@ describe("every word counts", () => {
 		await user.click(button("Special Summon it"));
 		expect(status().textContent).toMatch(/You Special Summon Cyber Dragon from the hand, as its card says\. The Normal Summon is still free\./);
 	});
-	it("uses Kuriboh's Quick Effect from the hand in answer to an attack", async () => {
+	it("uses Kuriboh's Quick Effect from the hand in the Damage Step, as its card says", async () => {
 		const user = await open("A surprise in your hand");
 		await rivalNext(user);
 		await user.click(hand("Kuriboh"));
 		expect(document.querySelector("[data-card-text]")?.textContent).toContain("(Quick Effect): You can discard this card;");
+		await user.click(button("Discard it: Quick Effect"));
+		expect(status().textContent).toMatch(/Not yet: the card says "During damage calculation"\. Wait for the Damage Step\./);
+		await user.click(button("Let it happen"));
+		expect(status().textContent).toMatch(/Damage Step: just before damage is calculated\. Stop! Kuriboh and cards that change ATK can still act\./);
+		await user.click(hand("Kuriboh"));
 		await user.click(button("Discard it: Quick Effect"));
 		expect(status().textContent).toMatch(/You discard Kuriboh from the hand to pay the cost of its Quick Effect: no battle damage from this battle\./);
 		expect(screen.getByText("Your Life Points: 2000")).toBeTruthy();

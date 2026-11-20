@@ -1,4 +1,4 @@
-import { FORBIDDEN_ONE, cardOf, inExtraDeck, monsterOf, spellTarget, tributesFor, type CardId, type Effect } from "./cards";
+import { FORBIDDEN_ONE, attributeOf, cardOf, inExtraDeck, isQuickPlay, monsterOf, spellTarget, staysOnField, tributesFor, type CardId, type Effect, type MonsterCard } from "./cards";
 
 /**
  * The Junior duel board. The small board has three Monster Zones and three Spell & Trap Zones per side; the whole
@@ -31,14 +31,30 @@ export interface MonsterSlot {
 	materials?: CardId[];
 	/** Those of the materials that belong to the opponent: they go to the opponent's Graveyard. */
 	borrowed?: CardId[];
+	/** ATK gained for good, by its own effect (Legendary Fiend, Junk Warrior). */
+	bonus?: number;
+	/** Its effects are negated (Junk Synchron's Special Summon). */
+	negated?: true;
+	/** Attacks declared this turn, for a monster that can attack twice. */
+	attackCount?: number;
 	/** Whose card it is, when it is not its controller's: it goes back to its owner's Graveyard. */
 	owner?: Side;
 }
-/** A face-down Trap, or (`up`) a Pendulum Monster face-up in a Pendulum Zone. */
+/**
+ * A face-down Spell or Trap, or (`up`) a Pendulum Monster face-up in a Pendulum Zone, or (`open`) a Spell or Trap
+ * that stays face-up once it has resolved: a Continuous or Equip card.
+ */
 export interface BackSlot {
 	card: CardId;
 	setThisTurn: boolean;
 	up?: true;
+	open?: true;
+	/** An Equip Spell: the Monster Zone, on the same side, of the monster it is equipped to. */
+	equip?: number;
+	/** A Continuous Trap that Special Summoned a monster: that monster's Monster Zone, on the same side. */
+	haunt?: number;
+	/** Swords of Revealing Light: the opponent's End Phases since it was activated. */
+	turns?: number;
 }
 export interface SideState {
 	lp: number;
@@ -56,13 +72,19 @@ export interface SideState {
 	extra: CardId[];
 	/** Pendulum Monsters that left the field: face-up on the Extra Deck. */
 	extraUp: CardId[];
+	/** "Skip your next Draw Phase": this player's next turn starts without a draw. */
+	skipDraw?: true;
 }
 /** A card used to Summon another: from the hand (by name) or from a Monster Zone. */
 export type Material = { from: "hand"; card: CardId } | { from: "field"; zone: number };
 /** A moment where the other player may answer, with a Set Trap or a Quick Effect, before things go on. */
 export type Pending =
-	| { kind: "attack"; attacker: number; target: number | "direct"; noDamage?: true }
-	| { kind: "spell"; card: CardId; target?: number; grave?: { side: Side; index: number }; summon?: CardId; materials?: Material[] };
+	/**
+	 * An attack, in its step: the Battle Step, right after it is declared ("When an opponent's monster declares an
+	 * attack"), then the Damage Step, before damage is calculated (Kuriboh, ATK boosts). Rulebook v10 pp. 37-39.
+	 */
+	| { kind: "attack"; attacker: number; target: number | "direct"; noDamage?: true; step?: "damage" }
+	| { kind: "spell"; card: CardId; target?: number; grave?: { side: Side; index: number }; summon?: CardId; materials?: Material[]; zone?: number };
 export interface Board {
 	you: SideState;
 	rival: SideState;
@@ -85,6 +107,10 @@ export interface Board {
 	proper: string[];
 	/** Monsters that went to the Graveyard with an "If/When… sent to the GY" effect, waiting for the Chain to resolve. */
 	triggers: { side: Side; card: CardId; after: After | null }[];
+	/** The turn player's Standby Phase effects have happened this turn. */
+	standbyDone: boolean;
+	/** A monster just Normal Summoned whose "When this card is Normal Summoned: You can…" may be used now, and only now. */
+	summonTrigger: { side: Side; zone: number } | null;
 }
 
 export type Move =
@@ -95,13 +121,16 @@ export type Move =
 	 * own text), a Spell is activated, a Trap is Set, a Pendulum Monster placed in a Pendulum Zone becomes a Scale.
 	 * `grave` is the Graveyard card a Spell targets; `summon` and `materials` are the choices of a Ritual or Fusion Summon.
 	 */
-	| { type: "place"; card: CardId; row: Row; zone: number; tributes?: number[]; target?: number; discard?: CardId; grave?: { side: Side; index: number }; summon?: CardId; materials?: Material[]; special?: true }
+	| { type: "place"; card: CardId; row: Row; zone: number; tributes?: number[]; target?: number; discard?: CardId; grave?: { side: Side; index: number }; summon?: CardId; materials?: Material[]; special?: true; set?: true }
 	| { type: "position"; zone: number }
 	| { type: "attack"; attacker: number; target: number | "direct" }
-	/** Flip a Set Trap in answer to the opponent. */
-	| { type: "spring"; zone: number; target?: number }
-	/** Use the effect of one of your Monsters, on a face-up monster your opponent controls when it targets. */
-	| { type: "ability"; zone: number; target?: number }
+	/**
+	 * Flip a Set card: a Trap or a Quick-Play Spell in answer to the opponent, a Set Quick-Play Spell on your own turn,
+	 * or a Continuous Trap that targets a monster in your Graveyard (`grave`) in your own Main Phase.
+	 */
+	| { type: "spring"; zone: number; target?: number; grave?: { side: Side; index: number } }
+	/** Use the effect of one of your Monsters: on a face-up monster your opponent controls when it targets, or on a monster in your Graveyard (`grave`, Junk Synchron). */
+	| { type: "ability"; zone: number; target?: number; grave?: { side: Side; index: number } }
 	/** Synchro, Xyz or Link Summon a monster from the Extra Deck with monsters in these zones. */
 	| { type: "extra"; card: CardId; materials: number[]; zone?: number }
 	/** Pendulum Summon these monsters from the hand, all at once. */
@@ -163,12 +192,20 @@ export type Reason =
 	| "level-not-between"
 	| "condition-not-met"
 	| "special-only"
-	| "not-properly-summoned";
+	| "not-properly-summoned"
+	| "equip-only"
+	| "cannot-set"
+	| "not-damage-step"
+	| "damage-step-closed"
+	| "swords-lock"
+	| "jinzo-lock";
 
 /** How a monster was Special Summoned. */
 export type SummonWay = "revive" | "ritual" | "fusion" | "synchro" | "xyz" | "link" | "own";
 export type GameEvent =
 	| { type: "drew"; side: Side; card: CardId }
+	/** A Draw Phase skipped, as a card said. */
+	| { type: "skip-draw"; side: Side }
 	| { type: "phase"; side: Side; phase: Phase }
 	| { type: "turn"; side: Side }
 	| { type: "summoned"; side: Side; card: CardId; zone: number; tributes: CardId[] }
@@ -182,6 +219,12 @@ export type GameEvent =
 	/** A "When…" effect missed its chance: going to the GY was not the last thing; `last` is what came after it. */
 	| { type: "missed"; side: Side; card: CardId; last: After }
 	| { type: "set"; side: Side; card: CardId; zone: number }
+	/** A Continuous Spell resolved and stays face-up in its zone. */
+	| { type: "stays"; side: Side; card: CardId }
+	/** An Equip Spell is now equipped to this monster. */
+	| { type: "equipped"; side: Side; card: CardId; target: CardId }
+	/** The Battle Phase ended at once, as a card said. */
+	| { type: "battle-ended"; side: Side }
 	/** A Field Spell is face-up in the Field Zone and stays. */
 	| { type: "field"; side: Side; card: CardId }
 	| { type: "banished"; side: Side; cards: CardId[]; faceDown: boolean }
@@ -195,12 +238,18 @@ export type GameEvent =
 	/** A Quick Effect used from the hand by discarding the card. */
 	| { type: "hand-effect"; side: Side; card: CardId }
 	| { type: "gained"; side: Side; amount: number; lp: number }
+	/** A card's effect inflicts damage (not battle damage): `side` is the player who inflicts it. */
+	| { type: "burned"; side: Side; card: CardId; amount: number }
+	/** A card goes to its owner's hand from the Deck or the Graveyard. */
+	| { type: "added"; side: Side; card: CardId; from: "deck" | "graveyard" }
 	| { type: "boosted"; side: Side; card: CardId; amount: number; atk: number }
 	| { type: "destroyed"; side: Side; card: CardId }
 	| { type: "no-effect"; card: CardId }
 	| { type: "position"; side: Side; card: CardId; position: Position }
 	| { type: "attack-declared"; side: Side; attacker: CardId; target: CardId | null }
-	| { type: "window"; side: Side; kind: Pending["kind"] }
+	| { type: "window"; side: Side; kind: Pending["kind"]; step?: "damage" }
+	/** The attack goes on to the Damage Step, and the defending player may act there. */
+	| { type: "damage-step"; side: Side }
 	| { type: "sprung"; side: Side; card: CardId }
 	| { type: "attack-stopped"; attacker: CardId }
 	| { type: "returned"; side: Side; card: CardId }
@@ -284,10 +333,14 @@ function side(setup: SideSetup = {}, full: boolean): SideState {
 export function board(setup: Setup = {}): Board {
 	const phase = setup.phase ?? "main1";
 	const full = setup.full ?? false;
-	return { you: side(setup.you, full), rival: side(setup.rival, full), full, turn: setup.turn ?? "you", turnNumber: setup.turnNumber ?? 3, phase, strict: setup.strict ?? false, drawn: phase !== "draw", summonUsed: false, pendulumUsed: false, pending: null, winner: null, used: [], proper: [], triggers: [] };
+	return { you: side(setup.you, full), rival: side(setup.rival, full), full, turn: setup.turn ?? "you", turnNumber: setup.turnNumber ?? 3, phase, strict: setup.strict ?? false, drawn: phase !== "draw", summonUsed: false, pendulumUsed: false, pending: null, winner: null, used: [], proper: [], triggers: [], standbyDone: phase !== "draw", summonTrigger: null };
 }
 
 export const other = (who: Side): Side => (who === "you" ? "rival" : "you");
+/** What a monster on the field can do now: its card, or nothing while its effects are negated. */
+export const live = (slot: MonsterSlot): MonsterCard | null => (slot.negated ? null : monsterOf(slot.card));
+/** Jinzo: "Trap Cards, and their effects on the field, cannot be activated." */
+export const trapsLocked = (state: Board): boolean => [state.you, state.rival].some((who) => who.monsters.some((slot) => !!slot && !!live(slot)?.noTraps));
 /** How many Main Monster Zones (and Spell & Trap Zones) each player has on this board. */
 export const mainZones = (state: Board): number => (state.full ? FULL_ZONES : ZONES);
 /** What the Field Spells on the field add to this monster's ATK and DEF. "On the field" means both players' monsters. */
@@ -297,12 +350,51 @@ function fieldBonus(card: CardId, state: Board): number {
 	let bonus = 0;
 	for (const who of [state.you, state.rival]) {
 		const effect = who.field ? cardOf(who.field) : null;
-		if (effect?.kind === "spell" && effect.effect.type === "field-boost" && effect.effect.types.includes(type)) bonus += effect.effect.amount;
+		if (effect?.kind !== "spell" || effect.effect.type !== "field-boost") continue;
+		if (effect.effect.types.includes(type)) bonus += effect.effect.amount;
+		if (effect.effect.minus?.includes(type)) bonus -= effect.effect.amount;
 	}
 	return bonus;
 }
-export const atkOf = (slot: MonsterSlot, state: Board) => Math.max(0, monsterOf(slot.card).atk + slot.boost + fieldBonus(slot.card, state));
-export const defOf = (slot: MonsterSlot, state: Board) => monsterOf(slot.card).def + fieldBonus(slot.card, state);
+/** Where a monster stands: its controller and Monster Zone. */
+function placeOf(slot: MonsterSlot, state: Board): { side: Side; zone: number } | null {
+	for (const side of ["you", "rival"] as const) {
+		const zone = state[side].monsters.indexOf(slot);
+		if (zone >= 0) return { side, zone };
+	}
+	return null;
+}
+/** What face-up Equip and Continuous Spells add to this monster: its Equips, and a Banner during its controller's Battle Phase. */
+function spellBonus(slot: MonsterSlot, state: Board, stat: "atk" | "def"): number {
+	const at = placeOf(slot, state);
+	if (!at) return 0;
+	let bonus = 0;
+	for (const back of state[at.side].backrow) {
+		if (!back?.open) continue;
+		const info = cardOf(back.card);
+		if (info.kind !== "spell") continue;
+		if (info.effect.type === "equip" && back.equip === at.zone) bonus += stat === "atk" ? info.effect.atk : info.effect.def;
+		if (info.effect.type === "banner" && stat === "atk" && state.turn === at.side && state.phase === "battle") bonus += info.effect.amount;
+	}
+	return bonus;
+}
+/** "Gains [n] ATK for each…": what the monster's own effect adds now. */
+function gainsOf(slot: MonsterSlot, state: Board, stat: "atk" | "def"): number {
+	const gains = live(slot)?.gains;
+	const at = gains ? placeOf(slot, state) : null;
+	if (!gains || !at) return 0;
+	const mine = state[at.side];
+	const foe = state[other(at.side)];
+	if (gains.per === "hand") return mine.hand.length * gains.amount;
+	if (stat === "def") return 0;
+	if (gains.per === "in-graveyards") return [...state.you.graveyard, ...state.rival.graveyard].filter((card) => gains.cards.includes(card)).length * gains.amount;
+	if (gains.per === "allies") return mine.monsters.filter((other) => !!other && other !== slot && gains.cards.includes(other.card)).length * gains.amount;
+	if (gains.per === "small-hand") return mine.hand.length <= 1 ? gains.amount : 0;
+	const dragon = (card: CardId) => cardOf(card).kind === "monster" && monsterOf(card).type === "dragon";
+	return (foe.monsters.filter((other) => !!other && dragon(other.card)).length + foe.graveyard.filter(dragon).length) * gains.amount;
+}
+export const atkOf = (slot: MonsterSlot, state: Board) => Math.max(0, monsterOf(slot.card).atk + slot.boost + (slot.bonus ?? 0) + fieldBonus(slot.card, state) + spellBonus(slot, state, "atk") + gainsOf(slot, state, "atk"));
+export const defOf = (slot: MonsterSlot, state: Board) => Math.max(0, monsterOf(slot.card).def + fieldBonus(slot.card, state) + spellBonus(slot, state, "def") + gainsOf(slot, state, "def"));
 /** The two Pendulum Zones are the leftmost and rightmost Spell & Trap Zones. The Scales set there, low then high, or null. */
 export function scalesOf(state: Board, who: Side): { low: number; high: number } | null {
 	const row = state[who].backrow;
@@ -314,7 +406,11 @@ export function scalesOf(state: Board, who: Side): { low: number; high: number }
 export const actor = (state: Board): Side => (state.pending ? other(state.turn) : state.turn);
 const isMain = (phase: Phase) => phase === "main1" || phase === "main2";
 const after = (a: Phase, b: Phase) => PHASES.indexOf(a) > PHASES.indexOf(b);
-const TRAP_ANSWERS: Record<Pending["kind"], Effect["type"][]> = { attack: ["weaken-attacker", "stop-attack", "destroy-attacker", "banish-attacker"], spell: ["return-to-hand"] };
+const TRAP_ANSWERS: Record<Pending["kind"], Effect["type"][]> = { attack: ["weaken-attacker", "stop-attack", "destroy-attacker", "banish-attacker", "reinforce", "negate-attack", "mirror-force", "magic-cylinder", "just-desserts", "clear-backrow", "recharge"], spell: ["return-to-hand"] };
+/** What a Set Quick-Play Spell can do in answer: make one of its owner's monsters stronger, or destroy an opponent's monster. */
+const QUICK_ANSWERS: Effect["type"][] = ["boost", "destroy"];
+/** A Trap whose target is one of its owner's monsters needs one on the field. */
+const needsOwnMonster = (effect: Effect["type"]) => effect === "return-to-hand" || effect === "reinforce";
 
 class Rejected extends Error {
 	constructor(readonly reason: Reason) {
@@ -340,7 +436,11 @@ class Play {
 	}
 
 	run(move: Move): void {
-		this.move(move);
+		/* "When this card is Normal Summoned: You can…": only right after the Summon. */
+		const trigger = this.state.summonTrigger;
+		this.state.summonTrigger = null;
+		if (move.type === "ability" && move.grave) this.summonRevive(trigger, move.zone, move.grave);
+		else this.move(move);
 		/* Effects that wait for the Graveyard get their chance once nothing is left to resolve. */
 		if (!this.state.pending && !this.state.winner) this.fireTriggers();
 		/* "…in your hand, you win the Duel": no Life Points, no Chain. Checked once the move is done. */
@@ -375,7 +475,22 @@ class Play {
 			s[owner].extraUp.push(slot.card);
 			this.events.push({ type: "to-extra", side: owner, card: slot.card });
 		} else this.toGraveyard(owner, slot.card, followedBy);
+		/* Then what was linked to it: an Equip Spell, the Continuous Trap that Summoned it. */
+		this.unlink(who, zone);
 		return slot.card;
+	}
+	/**
+	 * A monster has left this zone: an Equip Spell equipped to it is destroyed, and so is the Continuous Trap that
+	 * Special Summoned it ("When that monster is destroyed, destroy this card").
+	 */
+	private unlink(who: Side, zone: number): void {
+		const row = this.state[who].backrow;
+		row.forEach((back, at) => {
+			if (!back?.open || (back.equip !== zone && back.haunt !== zone)) return;
+			row[at] = null;
+			this.toGraveyard(who, back.card, null);
+			this.events.push({ type: "destroyed", side: who, card: back.card });
+		});
 	}
 	/** Whose Graveyard an Xyz Material goes to: its owner's, which is the opponent's for a monster that was borrowed. */
 	private ownerOf(slot: MonsterSlot, material: CardId, holder: Side): Side {
@@ -392,9 +507,14 @@ class Play {
 			if (s.winner) return;
 			const trigger = monsterOf(card).trigger;
 			if (!trigger) continue;
-			/* "If…" always gets its chance; "When…" only when going to the GY was the last thing that happened. */
-			if (trigger.word === "when" && after) {
+			/* "If…" always gets its chance; "When… you can" only when going to the GY was the last thing that happened. */
+			if (trigger.word === "when" && after && !trigger.forced) {
 				this.events.push({ type: "missed", side, card, last: after });
+				continue;
+			}
+			if (trigger.gain) {
+				s[side].lp += trigger.gain;
+				this.events.push({ type: "gained", side, amount: trigger.gain, lp: s[side].lp });
 				continue;
 			}
 			this.events.push({ type: "trigger", side, card, word: trigger.word, amount: trigger.damage });
@@ -417,7 +537,7 @@ class Play {
 			case "attack":
 				return this.attack(move.attacker, move.target);
 			case "spring":
-				return this.spring(move.zone, move.target);
+				return this.spring(move.zone, move.target, move.grave);
 			case "ability":
 				return this.ability(move.zone, move.target);
 			case "extra":
@@ -454,12 +574,22 @@ class Play {
 		if (to === "main2" && s.phase !== "battle") reject("not-battle-phase");
 		s.phase = to;
 		this.events.push({ type: "phase", side: s.turn, phase: to });
+		this.standby();
 		if (to === "end") this.endTurn();
 	}
 	private endTurn(): void {
 		const s = this.state;
+		/* Swords of Revealing Light: "destroy it during the End Phase of your opponent's 3rd turn". */
+		const foe = other(s.turn);
+		s[foe].backrow.forEach((slot, zone) => {
+			if (!slot?.open || cardOf(slot.card).kind !== "spell") return;
+			const info = cardOf(slot.card);
+			if (info.kind !== "spell" || info.effect.type !== "swords") return;
+			slot.turns = (slot.turns ?? 0) + 1;
+			if (slot.turns >= 3) this.destroyBack(foe, zone);
+		});
 		for (const who of [s.you, s.rival]) {
-			for (const slot of who.monsters) if (slot) Object.assign(slot, { attacked: false, summoned: false, moved: false, boost: 0 });
+			for (const slot of who.monsters) if (slot) Object.assign(slot, { attacked: false, summoned: false, moved: false, boost: 0, attackCount: 0 });
 			for (const slot of who.backrow) if (slot) slot.setThisTurn = false;
 		}
 		s.turn = other(s.turn);
@@ -468,8 +598,14 @@ class Play {
 		s.drawn = false;
 		s.summonUsed = false;
 		s.pendulumUsed = false;
+		s.standbyDone = false;
 		s.used = [];
 		this.events.push({ type: "turn", side: s.turn });
+		if (this.me.skipDraw) {
+			delete this.me.skipDraw;
+			s.drawn = true;
+			this.events.push({ type: "skip-draw", side: s.turn });
+		}
 	}
 	/** Main Phase is needed. Outside strict play the phase follows the move. */
 	private needMain(): void {
@@ -477,6 +613,28 @@ class Play {
 		if (isMain(s.phase)) return;
 		if (!this.auto || s.phase === "end") reject("not-main-phase");
 		s.phase = s.phase === "battle" ? "main2" : "main1";
+		this.standby();
+	}
+	/**
+	 * The Standby Phase, once a turn, as soon as the turn has gone past the Draw Phase: "Once per turn, during your
+	 * Standby Phase:" effects of the turn player's monsters happen (Bowganian, Legendary Fiend).
+	 */
+	private standby(): void {
+		const s = this.state;
+		if (s.standbyDone || s.phase === "draw") return;
+		s.standbyDone = true;
+		this.me.monsters.forEach((slot) => {
+			const standby = slot ? live(slot)?.standby : undefined;
+			if (!slot || !standby || s.winner) return;
+			if (standby.gain) {
+				slot.bonus = (slot.bonus ?? 0) + standby.gain;
+				this.events.push({ type: "boosted", side: s.turn, card: slot.card, amount: standby.gain, atk: atkOf(slot, s) });
+			}
+			if (standby.burn) {
+				this.events.push({ type: "burned", side: s.turn, card: slot.card, amount: standby.burn });
+				this.damage(other(s.turn), standby.burn);
+			}
+		});
 	}
 	/** The Main Monster Zone a Special Summoned monster lands in: a zone its materials just left, or the first empty one. -1 when there is none. */
 	private landing(freed: readonly number[] = []): number {
@@ -510,8 +668,17 @@ class Play {
 		/* A Field Spell goes in the Field Zone, and nothing else does. */
 		if ((move.row === "field") !== inField) reject("field-zone");
 		if (!inField && (!whole || move.zone >= me.backrow.length)) reject("wrong-zone");
-		this.needMain();
+		/* A Quick-Play Spell can be activated in the Battle Phase too; everything else from the hand waits for a Main Phase. */
+		if (!(isQuickPlay(move.card) && !move.set && s.phase === "battle")) this.needMain();
 		if (!inField && me.backrow[move.zone]) reject("zone-taken");
+		if (move.set) {
+			/* Of the Spells, only a Quick-Play Spell is Set here: it can then be activated on the opponent's turn. */
+			if (card.kind !== "spell" || !isQuickPlay(move.card)) reject("cannot-set");
+			me.hand.splice(at, 1);
+			me.backrow[move.zone] = { card: move.card, setThisTurn: true };
+			this.events.push({ type: "set", side: s.turn, card: move.card, zone: move.zone });
+			return;
+		}
 		if (card.kind === "trap") {
 			me.hand.splice(at, 1);
 			me.backrow[move.zone] = { card: move.card, setThisTurn: true };
@@ -526,9 +693,25 @@ class Play {
 		const target = needsTarget ? (move.target ?? -1) : effect.type === "destroy-lowest" ? move.target : undefined;
 		const targetSlot = !needsTarget || target === undefined ? null : (s[targetSide].monsters[target] ?? null);
 		if (needsTarget && !targetSlot) reject("no-target");
+		/* "Equip only to a Warrior monster." "Equip only to a FIRE monster." */
+		if (effect.type === "equip" && effect.only && targetSlot && monsterOf(targetSlot.card).type !== effect.only) reject("equip-only");
+		if (effect.type === "equip" && effect.attribute && targetSlot && attributeOf(targetSlot.card) !== effect.attribute) reject("equip-only");
+		/* "If you control [Dark Magician]:" */
+		if (effect.type === "destroy" && effect.needs && !me.monsters.some((held) => held?.card === effect.needs)) reject("condition-not-met");
+		if (effect.type === "wipe" && !s.you.monsters.some(Boolean) && !s.rival.monsters.some(Boolean)) reject("nothing-to-hit");
+		if (effect.type === "clear-backrow") {
+			const sides = effect.scope === "all" ? [s.you, s.rival] : [s[other(s.turn)]];
+			if (!sides.some((who) => who.backrow.some(Boolean) || who.field)) reject("nothing-to-hit");
+		}
+		if (effect.type === "search" && !me.deck.includes(effect.card as CardId)) reject("condition-not-met");
+		if (effect.type === "draw" && !card.cost && me.deck.length < effect.count) reject("deck-too-small");
+		if (effect.type === "recover") {
+			const found = move.grave?.side === s.turn ? me.graveyard[move.grave.index] : undefined;
+			if (!found || cardOf(found).kind !== "monster" || monsterOf(found).type !== effect.monsterType) reject("no-target");
+		}
 		if ((effect.type === "destroy-all" || effect.type === "destroy-lowest") && !s[other(s.turn)].monsters.some(Boolean)) reject("nothing-to-hit");
 		const rest = me.hand.filter((_, index) => index !== at);
-		const buried = effect.type === "revive" && move.grave ? s[move.grave.side].graveyard[move.grave.index] : undefined;
+		const buried = (effect.type === "revive" || effect.type === "recover") && move.grave ? s[move.grave.side].graveyard[move.grave.index] : undefined;
 		if (effect.type === "revive") {
 			if (!buried || cardOf(buried).kind !== "monster") return reject("no-target");
 			/* A Ritual or Extra Deck monster must first have been Summoned in its own way. */
@@ -557,7 +740,7 @@ class Play {
 			me.banished.push(...gone.map((item) => ({ card: item, faceDown: true })));
 			this.events.push({ type: "banished", side: s.turn, cards: gone, faceDown: true });
 		}
-		s.pending = { kind: "spell", card: move.card, ...(target === undefined ? {} : { target }), ...(move.grave ? { grave: move.grave } : {}), ...(move.summon ? { summon: move.summon } : {}), ...(move.materials ? { materials: move.materials } : {}) };
+		s.pending = { kind: "spell", card: move.card, ...(target === undefined ? {} : { target }), ...(move.grave ? { grave: move.grave } : {}), ...(move.summon ? { summon: move.summon } : {}), ...(move.materials ? { materials: move.materials } : {}), ...((staysOnField(move.card) && !inField) || effect.type === "swords" ? { zone: move.zone } : {}) };
 		if (this.canAnswer()) {
 			this.events.push({ type: "chain", link: 1, side: s.turn, card: move.card }, { type: "window", side: other(s.turn), kind: "spell" });
 			return;
@@ -626,6 +809,22 @@ class Play {
 		me.monsters[move.zone] = standing(move.card, { summoned: true });
 		s.summonUsed = true;
 		this.events.push({ type: "summoned", side: s.turn, card: move.card, zone: move.zone, tributes: gone });
+		if (monsterOf(move.card).summonRevive) s.summonTrigger = { side: s.turn, zone: move.zone };
+	}
+	/** Junk Synchron, right after its Normal Summon: Special Summon a low-Level monster from its owner's Graveyard in Defense Position, its effects negated. */
+	private summonRevive(trigger: Board["summonTrigger"], zone: number, grave: { side: Side; index: number }): void {
+		const s = this.state;
+		const slot = this.me.monsters[zone];
+		const revive = slot ? live(slot)?.summonRevive : undefined;
+		if (!trigger || trigger.side !== s.turn || trigger.zone !== zone || !slot || !revive) return reject("nothing-to-answer");
+		const found = grave.side === s.turn ? this.me.graveyard[grave.index] : undefined;
+		if (!found || cardOf(found).kind !== "monster" || monsterOf(found).level > revive.maxLevel || monsterOf(found).level < 1) return reject("no-target");
+		if (monsterOf(found).frame && !s.proper.includes(`${s.turn}:${found}`)) reject("not-properly-summoned");
+		const landed = this.landing();
+		if (landed < 0) return reject("no-free-zone");
+		this.me.graveyard.splice(grave.index, 1);
+		this.me.monsters[landed] = standing(found, { summoned: true, position: "defense", negated: true });
+		this.events.push({ type: "ability", side: s.turn, card: slot.card, target: found }, { type: "special", side: s.turn, card: found, zone: landed, how: "revive", materials: [], from: s.turn });
 	}
 	/** "If only your opponent controls a monster, you can Special Summon this card (from your hand)." No colon, no semicolon: no Chain. */
 	private ownSummon(move: Extract<Move, { type: "place" }>, at: number): void {
@@ -692,6 +891,8 @@ class Play {
 		if (info.frame === "synchro") {
 			/* 1 Tuner + 1 or more non-Tuner monsters, Levels exactly equal. A Rank or a Link Rating is not a Level. */
 			if (used.filter((item) => item.tuner).length !== 1 || used.length < 2) reject("needs-one-tuner");
+			/* "[Junk Synchron] + 1 or more non-Tuner monsters": that Tuner and no other. */
+			if (info.synchroTuner && !slots.some((slot) => slot?.card === info.synchroTuner)) reject("wrong-materials");
 			if (used.some((item) => item.level <= 0)) reject("wrong-materials");
 			if (used.reduce((sum, item) => sum + item.level, 0) !== info.level) reject("levels-not-equal");
 		} else if (info.frame === "xyz" && info.xyz) {
@@ -717,6 +918,7 @@ class Play {
 			if (info.frame === "xyz") {
 				/* Xyz Materials go under the Xyz Monster, not to the Graveyard. */
 				me.monsters[zone] = null;
+				this.unlink(s.turn, zone);
 				for (const under of slot.materials ?? []) this.toGraveyard(s.turn, under, null);
 			} else this.leave(s.turn, zone, "graveyard", "summon");
 		}
@@ -724,6 +926,16 @@ class Play {
 		me.monsters[wanted] = standing(move.card, { summoned: true, ...(info.frame === "xyz" ? { materials: cards, ...(borrowed.length > 0 ? { borrowed } : {}) } : {}) });
 		s.proper.push(`${s.turn}:${move.card}`);
 		this.events.push({ type: "special", side: s.turn, card: move.card, zone: wanted, how: info.frame, materials: cards });
+		const gain = info.synchroGain;
+		const summoned = me.monsters[wanted];
+		if (gain && summoned) {
+			/* "If this card is Synchro Summoned: It gains ATK equal to the total ATK of all Level 2 or lower monsters you currently control." */
+			const total = me.monsters.reduce((sum, slot) => (slot && slot !== summoned && monsterOf(slot.card).level > 0 && monsterOf(slot.card).level <= gain.maxLevel ? sum + atkOf(slot, s) : sum), 0);
+			if (total > 0) {
+				summoned.bonus = (summoned.bonus ?? 0) + total;
+				this.events.push({ type: "boosted", side: s.turn, card: summoned.card, amount: total, atk: atkOf(summoned, s) });
+			}
+		}
 	}
 
 	private position(zone: number): void {
@@ -733,7 +945,7 @@ class Play {
 		if (monsterOf(slot.card).link) reject("link-no-defense");
 		this.needMain();
 		if (slot.summoned) reject("just-summoned");
-		if (slot.attacked) reject("already-attacked");
+		if (slot.attacked || (slot.attackCount ?? 0) > 0) reject("already-attacked");
 		if (slot.moved) reject("position-used");
 		slot.position = slot.position === "attack" ? "defense" : "attack";
 		slot.moved = true;
@@ -749,11 +961,16 @@ class Play {
 		if (!slot) return reject("no-monster");
 		if (slot.position === "defense") reject("defense-cannot-attack");
 		if (slot.attacked) reject("already-attacked");
+		/* Swords of Revealing Light: "your opponent's monsters cannot declare an attack". */
+		if (them.backrow.some((back) => !!back?.open && cardOf(back.card).kind === "spell" && (cardOf(back.card) as { effect: Effect }).effect.type === "swords")) reject("swords-lock");
 		const defender = target === "direct" ? null : (them.monsters[target] ?? null);
-		if (target === "direct" && them.monsters.some(Boolean)) reject("monster-in-the-way");
+		if (target === "direct" && them.monsters.some(Boolean) && !this.attacksDirectly(slot, them)) reject("monster-in-the-way");
 		if (target !== "direct" && !defender) reject("no-target");
 		s.phase = "battle";
-		slot.attacked = true;
+		this.standby();
+		/* "This card can make a second attack during each Battle Phase." */
+		slot.attackCount = (slot.attackCount ?? 0) + 1;
+		slot.attacked = slot.attackCount >= (live(slot)?.attacks ?? 1);
 		this.events.push({ type: "attack-declared", side: s.turn, attacker: slot.card, target: defender?.card ?? null });
 		let aimed = target;
 		if (defender && aimed !== "direct" && monsterOf(defender.card).detach && (defender.materials?.length ?? 0) === 0) {
@@ -771,6 +988,45 @@ class Play {
 		this.resolvePending();
 	}
 
+	/** "This monster may attack your opponent's Life Points directly": always, or while the opponent's face-up monsters all have one of these Attributes. */
+	private attacksDirectly(slot: MonsterSlot, them: SideState): boolean {
+		const direct = live(slot)?.direct;
+		if (direct === true) return true;
+		if (!direct) return false;
+		return them.monsters.every((other) => !other || direct.includes(attributeOf(other.card) ?? "DIVINE"));
+	}
+	/** A Spell or Trap is destroyed: to the Graveyard (a Pendulum Scale to the Extra Deck), and a Continuous Trap takes its monster with it. */
+	private destroyBack(who: Side, zone: number): void {
+		const row = this.state[who].backrow;
+		const slot = row[zone];
+		if (!slot) return;
+		row[zone] = null;
+		if (slot.up) {
+			this.state[who].extraUp.push(slot.card);
+			this.events.push({ type: "destroyed", side: who, card: slot.card }, { type: "to-extra", side: who, card: slot.card });
+		} else {
+			this.toGraveyard(who, slot.card, null);
+			this.events.push({ type: "destroyed", side: who, card: slot.card });
+		}
+		/* Call of the Haunted: "When this card leaves the field, destroy that monster." */
+		if (slot.haunt !== undefined && this.state[who].monsters[slot.haunt]) {
+			const monster = this.state[who].monsters[slot.haunt];
+			if (monster) this.events.push({ type: "destroyed", side: who, card: monster.card });
+			this.leave(who, slot.haunt, "graveyard");
+		}
+	}
+	/** Destroy every Spell and Trap of these players, Field Spells too. */
+	private clearBackrow(sides: readonly Side[]): void {
+		for (const who of sides) {
+			this.state[who].backrow.forEach((_, zone) => this.destroyBack(who, zone));
+			const field = this.state[who].field;
+			if (field) {
+				this.state[who].field = null;
+				this.toGraveyard(who, field, null);
+				this.events.push({ type: "destroyed", side: who, card: field });
+			}
+		}
+	}
 	/** Does the other player have a Set Trap, a ready Quick Effect or a material to detach that may answer what is pending? */
 	private canAnswer(): boolean {
 		const s = this.state;
@@ -778,14 +1034,21 @@ class Play {
 		if (!pending) return false;
 		const who = other(s.turn);
 		const mine = s[who];
+		/* In the Damage Step only cards that change ATK, and cards that say so (Kuriboh), can be used. */
+		const damageStep = pending.kind === "attack" && pending.step === "damage";
 		const trap = mine.backrow.some((slot) => {
-			if (!slot || slot.setThisTurn) return false;
+			if (!slot || slot.setThisTurn || slot.open || slot.up) return false;
 			const card = cardOf(slot.card);
-			return card.kind === "trap" && TRAP_ANSWERS[pending.kind].includes(card.effect.type) && (card.effect.type !== "return-to-hand" || mine.monsters.some(Boolean));
+			if (card.kind === "spell") {
+				if (!isQuickPlay(slot.card) || !QUICK_ANSWERS.includes(card.effect.type) || (damageStep && card.effect.type !== "boost")) return false;
+				return card.effect.type === "boost" ? mine.monsters.some(Boolean) : s[s.turn].monsters.some(Boolean);
+			}
+			if (damageStep || trapsLocked(s)) return false;
+			return card.kind === "trap" && TRAP_ANSWERS[pending.kind].includes(card.effect.type) && (!needsOwnMonster(card.effect.type) || mine.monsters.some(Boolean));
 		});
-		const quick = s[s.turn].monsters.some(Boolean) && mine.monsters.some((slot) => !!slot && monsterOf(slot.card).ability?.quick === true && !this.spent(who, slot.card));
-		const detach = pending.kind === "attack" && mine.monsters.some((slot) => !!slot && !!monsterOf(slot.card).detach && (slot.materials?.length ?? 0) > 0);
-		const hand = pending.kind === "attack" && mine.hand.some((card) => {
+		const quick = !damageStep && s[s.turn].monsters.some(Boolean) && mine.monsters.some((slot) => !!slot && live(slot)?.ability?.quick === true && !this.spent(who, slot.card));
+		const detach = !damageStep && pending.kind === "attack" && mine.monsters.some((slot) => !!slot && !!live(slot)?.detach && (slot.materials?.length ?? 0) > 0);
+		const hand = damageStep && mine.hand.some((card) => {
 			const info = cardOf(card);
 			return info.kind === "monster" && !!info.hand;
 		});
@@ -804,8 +1067,9 @@ class Play {
 		const who = s.pending ? other(s.turn) : s.turn;
 		const slot = s[who].monsters[zone];
 		if (!slot) return reject("no-monster");
-		if (monsterOf(slot.card).detach) return this.detach(who, slot);
-		const ability = monsterOf(slot.card).ability;
+		if (s.pending?.kind === "attack" && s.pending.step === "damage") return reject("damage-step-closed");
+		if (live(slot)?.detach) return this.detach(who, slot);
+		const ability = live(slot)?.ability;
 		if (!ability) return reject("no-ability");
 		if (!ability.quick) {
 			if (who !== s.turn) reject("not-quick");
@@ -849,6 +1113,8 @@ class Play {
 		const s = this.state;
 		const pending = s.pending;
 		if (pending?.kind !== "attack") return reject("nothing-to-answer");
+		/* "During damage calculation": not yet in the Battle Step. */
+		if (pending.step !== "damage") return reject("not-damage-step");
 		const who = other(s.turn);
 		const at = s[who].hand.indexOf(card);
 		if (at < 0) reject("not-in-hand");
@@ -861,29 +1127,100 @@ class Play {
 		this.resolvePending();
 	}
 
-	private spring(zone: number, target?: number): void {
+	private spring(zone: number, target?: number, grave?: { side: Side; index: number }): void {
 		const s = this.state;
 		const owner = s.pending ? other(s.turn) : s.turn;
 		const mine = s[owner];
 		const slot = mine.backrow[zone];
-		if (!slot) return reject("nothing-to-answer");
+		/* A face-up card (a Pendulum Scale, a Continuous or Equip card) has nothing left to flip. */
+		if (!slot || slot.up || slot.open) return reject("nothing-to-answer");
 		if (slot.setThisTurn) reject("trap-just-set");
 		const pending = s.pending;
-		if (!pending) return reject("nothing-to-answer");
 		const card = cardOf(slot.card);
+		if (card.kind === "spell") return this.springSpell(owner, zone, target);
+		if (trapsLocked(s)) return reject("jinzo-lock");
+		if (!pending) {
+			/* Call of the Haunted, in your own Main Phase. Every other Trap here waits for the opponent to do something. */
+			if (card.kind === "trap" && card.effect.type === "haunt") return this.haunt(zone, grave);
+			return reject("nothing-to-answer");
+		}
 		if (card.kind !== "trap" || !TRAP_ANSWERS[pending.kind].includes(card.effect.type)) return reject("cannot-answer-that");
-		const saved = card.effect.type === "return-to-hand" && target !== undefined ? (mine.monsters[target] ?? null) : null;
-		if (card.effect.type === "return-to-hand" && !saved) reject("no-target");
+		if (pending.kind === "attack" && pending.step === "damage") return reject("damage-step-closed");
+		const saved = needsOwnMonster(card.effect.type) && target !== undefined ? (mine.monsters[target] ?? null) : null;
+		if (needsOwnMonster(card.effect.type) && !saved) reject("no-target");
 		mine.backrow[zone] = null;
 		this.toGraveyard(owner, slot.card, null);
 		this.events.push({ type: "sprung", side: owner, card: slot.card });
 		if (pending.kind === "attack") {
 			const attacker = this.me.monsters[pending.attacker];
 			if (!attacker) return;
+			const needs = card.effect.type === "stop-attack" ? card.effect.needs : undefined;
+			if (needs && !mine.monsters.some((held) => !!held && held.card.startsWith(needs))) {
+				/* "You must control a face-up [Elemental HERO] monster to resolve this effect." */
+				this.events.push({ type: "no-effect", card: slot.card });
+				return this.resolvePending();
+			}
 			if (card.effect.type === "stop-attack") {
 				s.pending = null;
 				this.events.push({ type: "attack-stopped", attacker: attacker.card });
+				/* "…negate that attack, and if you do, gain LP equal to that target's ATK." */
+				if (card.effect.gain) {
+					const amount = atkOf(attacker, s);
+					mine.lp += amount;
+					this.events.push({ type: "gained", side: owner, amount, lp: mine.lp });
+				}
 				return;
+			}
+			const effect = card.effect;
+			if (effect.type === "mirror-force") {
+				/* "Destroy all your opponent's Attack Position monsters": the attacker too, so its attack never happens. */
+				s.pending = null;
+				this.me.monsters.forEach((slot, zone) => {
+					if (!slot || slot.position !== "attack") return;
+					this.events.push({ type: "destroyed", side: s.turn, card: slot.card });
+					this.leave(s.turn, zone, "graveyard");
+				});
+				return;
+			}
+			if (effect.type === "magic-cylinder") {
+				s.pending = null;
+				this.events.push({ type: "attack-stopped", attacker: attacker.card });
+				const amount = atkOf(attacker, s);
+				this.events.push({ type: "burned", side: owner, card: slot.card, amount });
+				return this.damage(s.turn, amount);
+			}
+			if (effect.type === "just-desserts") {
+				const amount = effect.amount * this.me.monsters.filter(Boolean).length;
+				this.events.push({ type: "burned", side: owner, card: slot.card, amount });
+				this.damage(s.turn, amount);
+				if (s.winner) return;
+				return this.resolvePending();
+			}
+			if (effect.type === "clear-backrow") {
+				this.clearBackrow([s.turn, owner]);
+				return this.resolvePending();
+			}
+			if (effect.type === "recharge") {
+				const amount = effect.amount * mine.monsters.filter((held) => !!held && held.card.startsWith(effect.prefix)).length;
+				if (amount > 0) {
+					mine.lp += amount;
+					this.events.push({ type: "gained", side: owner, amount, lp: mine.lp });
+				} else this.events.push({ type: "no-effect", card: slot.card });
+				return this.resolvePending();
+			}
+			if (card.effect.type === "negate-attack") {
+				/* A Counter Trap: "negate the attack, then end the Battle Phase." */
+				s.pending = null;
+				this.events.push({ type: "attack-stopped", attacker: attacker.card });
+				if (s.phase === "battle") {
+					s.phase = "main2";
+					this.events.push({ type: "battle-ended", side: s.turn }, { type: "phase", side: s.turn, phase: "main2" });
+				}
+				return;
+			}
+			if (card.effect.type === "reinforce" && saved) {
+				saved.boost += card.effect.amount;
+				this.events.push({ type: "boosted", side: owner, card: saved.card, amount: card.effect.amount, atk: atkOf(saved, s) });
 			}
 			if (card.effect.type === "destroy-attacker" || card.effect.type === "banish-attacker") {
 				/* The attacking monster leaves the field, so its attack never happens. Banished is not the Graveyard. */
@@ -913,12 +1250,83 @@ class Play {
 		this.resolvePending();
 	}
 
+	/**
+	 * A Set Quick-Play Spell. On your own turn, with nothing pending, it is activated as from the hand. In answer to the
+	 * opponent it resolves at once, on top of what it answers: a boost lands before the battle, a destroyed attacker
+	 * never attacks.
+	 */
+	private springSpell(owner: Side, zone: number, target?: number): void {
+		const s = this.state;
+		const mine = s[owner];
+		const slot = mine.backrow[zone];
+		const card = slot ? cardOf(slot.card) : null;
+		if (!slot || card?.kind !== "spell") return reject("nothing-to-answer");
+		if (!s.pending) {
+			mine.backrow[zone] = null;
+			mine.hand.push(slot.card);
+			return this.place({ type: "place", card: slot.card, row: "backrow", zone, ...(target === undefined ? {} : { target }) });
+		}
+		const effect = card.effect;
+		if (!QUICK_ANSWERS.includes(effect.type)) return reject("cannot-answer-that");
+		if (s.pending.kind === "attack" && s.pending.step === "damage" && effect.type !== "boost") return reject("damage-step-closed");
+		const aimed = effect.type === "boost" ? owner : other(owner);
+		const victim = target === undefined ? null : (s[aimed].monsters[target] ?? null);
+		if (!victim || target === undefined) return reject("no-target");
+		const pending = s.pending;
+		mine.backrow[zone] = null;
+		this.events.push({ type: "activated", side: owner, card: slot.card, target: victim.card });
+		if (pending.kind === "spell") this.events.push({ type: "chain", link: 2, side: owner, card: slot.card }, { type: "resolve", link: 2, card: slot.card });
+		this.toGraveyard(owner, slot.card, null);
+		if (effect.type === "boost") {
+			victim.boost += effect.amount;
+			this.events.push({ type: "boosted", side: aimed, card: victim.card, amount: effect.amount, atk: atkOf(victim, s) });
+		} else if (effect.type === "destroy") {
+			this.leave(aimed, target, "graveyard");
+			this.events.push({ type: "destroyed", side: aimed, card: victim.card });
+			if (effect.skipDraw) mine.skipDraw = true;
+		}
+		if (pending.kind === "spell") this.events.push({ type: "resolve", link: 1, card: pending.card });
+		/* The attacking monster is gone: its attack never happens. */
+		if (pending.kind === "attack" && !s[s.turn].monsters[pending.attacker]) {
+			s.pending = null;
+			return;
+		}
+		this.resolvePending();
+	}
+	/** Call of the Haunted: "Activate this card by targeting 1 monster in your GY; Special Summon that target in Attack Position." It stays, linked to the monster. */
+	private haunt(zone: number, grave?: { side: Side; index: number }): void {
+		const s = this.state;
+		const me = this.me;
+		this.needMain();
+		const found = grave && grave.side === s.turn ? me.graveyard[grave.index] : undefined;
+		if (!grave || !found || cardOf(found).kind !== "monster") return reject("no-target");
+		if (monsterOf(found).frame && !s.proper.includes(`${s.turn}:${found}`)) reject("not-properly-summoned");
+		const landed = this.landing();
+		if (landed < 0) return reject("no-free-zone");
+		const slot = me.backrow[zone];
+		if (!slot) return reject("nothing-to-answer");
+		me.graveyard.splice(grave.index, 1);
+		me.backrow[zone] = { card: slot.card, setThisTurn: false, open: true, haunt: landed };
+		this.events.push({ type: "sprung", side: s.turn, card: slot.card });
+		me.monsters[landed] = standing(found, { summoned: true });
+		this.events.push({ type: "special", side: s.turn, card: found, zone: landed, how: "revive", materials: [], from: s.turn });
+	}
+
 	private resolvePending(): void {
 		const s = this.state;
 		const pending = s.pending;
 		s.pending = null;
 		if (!pending) return;
 		if (pending.kind === "spell") return this.resolveSpell(pending);
+		if (pending.step !== "damage" && this.me.monsters[pending.attacker]) {
+			/* The Battle Step is over: on to the Damage Step, where the defender may still act before damage is calculated. */
+			s.pending = { ...pending, step: "damage" };
+			if (this.canAnswer()) {
+				this.events.push({ type: "damage-step", side: s.turn }, { type: "window", side: other(s.turn), kind: "attack", step: "damage" });
+				return;
+			}
+			s.pending = null;
+		}
 		const me = this.me;
 		const them = s[other(s.turn)];
 		const attacker = me.monsters[pending.attacker];
@@ -926,17 +1334,30 @@ class Play {
 		const atk = atkOf(attacker, s);
 		if (pending.target === "direct") {
 			if (pending.noDamage) return;
-			this.events.push({ type: "direct", side: s.turn, attacker: attacker.card, amount: atk });
-			return this.damage(other(s.turn), atk);
+			const bonus = live(attacker)?.attackBonus;
+			const amount = atk + (bonus && !bonus.vs ? bonus.amount : 0);
+			this.events.push({ type: "direct", side: s.turn, attacker: attacker.card, amount });
+			return this.damage(other(s.turn), amount);
 		}
 		const defender = them.monsters[pending.target];
 		if (!defender) return;
+		/* "If this card attacks [a WIND monster], it gains [n] ATK during the Damage Step only." */
+		const bonus = live(attacker)?.attackBonus;
+		const fought = atk + (bonus && (!bonus.vs || attributeOf(defender.card) === bonus.vs) ? bonus.amount : 0);
+		return this.fight(pending, attacker, defender, fought);
+	}
+	/** Damage calculation between two monsters, then what the battle destroyed, last of all. */
+	private fight(pending: Extract<Pending, { kind: "attack" }>, attacker: MonsterSlot, defender: MonsterSlot, atk: number): void {
+		const s = this.state;
+		if (pending.target === "direct") return;
 		const value = defender.position === "attack" ? atkOf(defender, s) : defOf(defender, s);
-		const destroyed: { side: Side; card: CardId }[] = [];
+		let destroyed: { side: Side; card: CardId }[] = [];
 		let damage: { side: Side; amount: number } | null = null;
 		if (atk > value) {
 			destroyed.push({ side: other(s.turn), card: defender.card });
 			if (defender.position === "attack") damage = { side: other(s.turn), amount: atk - value };
+			/* "If this card attacks a Defense Position monster, inflict piercing battle damage." */
+			else if (live(attacker)?.pierce) damage = { side: other(s.turn), amount: atk - value };
 		} else if (atk < value) {
 			damage = { side: s.turn, amount: value - atk };
 			if (defender.position === "attack") destroyed.push({ side: s.turn, card: attacker.card });
@@ -945,10 +1366,42 @@ class Play {
 		}
 		/* "You take no battle damage from that battle": the battle still happens, the monsters are still destroyed. */
 		if (pending.noDamage && damage?.side === other(s.turn)) damage = null;
+		/* "You take no battle damage from attacks involving this card." */
+		/* Which of the two fighters a destroyed entry is: by side, since both may be the same card. */
+		const isAttacker = (lost: { side: Side }) => lost.side === s.turn;
+		const guarded = (who: Side) => [attacker, defender].some((slot) => !!live(slot)?.noBattleDamage && (who === s.turn) === (slot === attacker));
+		if (damage && guarded(damage.side)) damage = null;
+		/* "Cannot be destroyed by battle with a monster that has 1900 or more ATK." "Once per turn, this card cannot be destroyed by battle." */
+		destroyed = destroyed.filter((lost) => {
+			const slot = lost.side === s.turn ? attacker : defender;
+			const immune = live(slot)?.battleImmune;
+			if (!immune) return true;
+			const foeAtk = lost.side === s.turn ? value : atk;
+			if (immune.fromAtk !== undefined && foeAtk >= immune.fromAtk) return false;
+			if (immune.perTurn !== undefined) {
+				const zone = lost.side === s.turn ? pending.attacker : pending.target;
+				const key = `${lost.side}:${zone}:${slot.card}:battle`;
+				if (s.used.filter((used) => used === key).length < immune.perTurn) {
+					s.used.push(key);
+					return false;
+				}
+			}
+			return true;
+		});
 		this.events.push({ type: "battle", side: s.turn, attacker: attacker.card, attackerValue: atk, defender: defender.card, defenderValue: value, defenderPosition: defender.position, damage, destroyed });
 		/* Damage is calculated first; destroyed monsters go to the Graveyard after, as the last thing of the battle. */
 		if (damage) this.damage(damage.side, damage.amount);
 		for (const lost of destroyed) this.leave(lost.side, lost.side === s.turn ? pending.attacker : pending.target, "graveyard");
+		/* Flame Wingman: "When this card destroys a monster by battle and sends it to the GY: inflict damage equal to the ATK of the destroyed monster in the GY." */
+		for (const [winner, loser, side] of [[attacker, defender, s.turn], [defender, attacker, other(s.turn)]] as const) {
+			if (s.winner || !live(winner)?.battleBurn) continue;
+			const beaten = destroyed.some((lost) => isAttacker(lost) === (loser === attacker));
+			const standing = destroyed.some((lost) => isAttacker(lost) === (winner === attacker));
+			if (!beaten || standing || !s[other(side)].graveyard.includes(loser.card)) continue;
+			const amount = monsterOf(loser.card).atk;
+			this.events.push({ type: "burned", side, card: winner.card, amount });
+			this.damage(other(side), amount);
+		}
 	}
 	private resolveSpell(pending: Extract<Pending, { kind: "spell" }>): void {
 		const s = this.state;
@@ -962,10 +1415,55 @@ class Play {
 			this.events.push({ type: "field", side: s.turn, card: pending.card });
 			return;
 		}
-		this.toGraveyard(s.turn, pending.card, null);
 		const nothing = () => {
 			this.events.push({ type: "no-effect", card: pending.card });
 		};
+		if ((effect.type === "banner" || effect.type === "equip" || effect.type === "swords") && pending.zone !== undefined && !this.me.backrow[pending.zone]) {
+			const target = effect.type === "equip" ? pending.target : undefined;
+			const wearer = target === undefined ? null : this.me.monsters[target];
+			if (effect.type === "equip" && (!wearer || target === undefined)) {
+				/* The monster to equip left the field before the Spell resolved: the Spell goes to the Graveyard. */
+				this.toGraveyard(s.turn, pending.card, null);
+				return nothing();
+			}
+			this.me.backrow[pending.zone] = { card: pending.card, setThisTurn: false, open: true, ...(target === undefined ? {} : { equip: target }), ...(effect.type === "swords" ? { turns: 0 } : {}) };
+			this.events.push(wearer ? { type: "equipped", side: s.turn, card: pending.card, target: wearer.card } : { type: "stays", side: s.turn, card: pending.card });
+			return;
+		}
+		this.toGraveyard(s.turn, pending.card, null);
+		if (effect.type === "burn") {
+			this.events.push({ type: "burned", side: s.turn, card: pending.card, amount: effect.amount });
+			return this.damage(other(s.turn), effect.amount);
+		}
+		if (effect.type === "wipe") {
+			for (const who of [s.turn, other(s.turn)] as const) {
+				s[who].monsters.forEach((slot, zone) => {
+					if (!slot) return;
+					this.events.push({ type: "destroyed", side: who, card: slot.card });
+					this.leave(who, zone, "graveyard");
+				});
+			}
+			return;
+		}
+		if (effect.type === "clear-backrow") return this.clearBackrow(effect.scope === "all" ? [s.turn, other(s.turn)] : [other(s.turn)]);
+		if (effect.type === "search") {
+			const at = this.me.deck.indexOf(effect.card as CardId);
+			if (at < 0) return nothing();
+			const [found] = this.me.deck.splice(at, 1);
+			if (!found) return nothing();
+			this.me.hand.push(found);
+			this.events.push({ type: "added", side: s.turn, card: found, from: "deck" });
+			return;
+		}
+		if (effect.type === "recover") {
+			const from = pending.grave;
+			const found = from && from.side === s.turn ? this.me.graveyard[from.index] : undefined;
+			if (!from || !found || cardOf(found).kind !== "monster") return nothing();
+			this.me.graveyard.splice(from.index, 1);
+			this.me.hand.push(found);
+			this.events.push({ type: "added", side: s.turn, card: found, from: "graveyard" });
+			return;
+		}
 		if (effect.type === "gain-lp") {
 			this.me.lp += effect.amount;
 			this.events.push({ type: "gained", side: s.turn, amount: effect.amount, lp: this.me.lp });
@@ -1066,6 +1564,13 @@ class Play {
 		} else if (effect.type === "destroy") {
 			this.leave(owner, pending.target, "graveyard");
 			this.events.push({ type: "destroyed", side: owner, card: slot.card });
+			if (effect.skipDraw) this.me.skipDraw = true;
+			if (effect.foeGains) {
+				/* "…then your opponent gains 1000 LP." */
+				const foe = s[other(s.turn)];
+				foe.lp += effect.foeGains;
+				this.events.push({ type: "gained", side: other(s.turn), amount: effect.foeGains, lp: foe.lp });
+			}
 		}
 	}
 
@@ -1114,6 +1619,10 @@ function picks<T>(items: readonly T[], min: number, max: number): T[][] {
  * On the whole mat a card is offered in the first empty zone only: which empty zone it takes changes nothing.
  */
 export function legalMoves(state: Board): Move[] {
+	return legalPlays(state).map((play) => play.move);
+}
+/** Every move the acting player may make now, each with the board it leads to and what happens on the way. */
+export function legalPlays(state: Board): { move: Move; board: Board; events: GameEvent[] }[] {
 	if (state.winner) return [];
 	const who = state[actor(state)];
 	const main = mainZones(state);
@@ -1152,27 +1661,38 @@ export function legalMoves(state: Board): Move[] {
 				const base: Extract<Move, { type: "place" }> = { type: "place", card, row: "backrow", zone };
 				const ways: Extract<Move, { type: "place" }>[] = [base, ...monsterZones.map((target) => ({ ...base, target }))];
 				if (info.effect.type === "revive") for (const side of ["you", "rival"] as const) state[side].graveyard.forEach((_, index) => ways.push({ ...base, grave: { side, index } }));
+				if (info.effect.type === "recover") who.graveyard.forEach((_, index) => ways.push({ ...base, grave: { side: actor(state), index } }));
 				if (info.effect.type === "ritual") for (const materials of picks(fodder, 1, MOST_MATERIALS)) ways.push({ ...base, materials });
 				if (info.effect.type === "fusion") for (const summon of new Set(who.extra)) for (const materials of picks(fodder, 2, MOST_MATERIALS)) ways.push({ ...base, summon, materials });
+				if (isQuickPlay(card)) ways.push({ ...base, set: true });
 				const discards = info.cost?.type === "discard" ? [...new Set(others)] : [];
 				candidates.push(...(info.cost?.type === "discard" ? ways.flatMap((move) => discards.map((discard): Move => ({ ...move, discard }))) : ways));
 			}
+		}
+		for (const zone of backZones.filter((at) => who.backrow[at] && !who.backrow[at]?.up && !who.backrow[at]?.open)) {
+			candidates.push({ type: "spring", zone }, ...monsterZones.map((target): Move => ({ type: "spring", zone, target })));
+			who.graveyard.forEach((_, index) => candidates.push({ type: "spring", zone, grave: { side: actor(state), index } }));
 		}
 		for (const card of new Set(who.extra)) for (const materials of picks(held, 1, MOST_MATERIALS)) candidates.push({ type: "extra", card, materials });
 		if (scalesOf(state, actor(state)) && !state.pendulumUsed) {
 			const monsters = who.hand.filter((card) => cardOf(card).kind === "monster");
 			for (const cards of picks(monsters, 1, main)) candidates.push({ type: "pendulum", cards });
 		}
+		const trigger = state.summonTrigger;
+		if (trigger && trigger.side === actor(state)) who.graveyard.forEach((_, index) => candidates.push({ type: "ability", zone: trigger.zone, grave: { side: trigger.side, index } }));
 		for (const zone of held) {
 			candidates.push({ type: "ability", zone }, ...monsterZones.map((target): Move => ({ type: "ability", zone, target })));
 			candidates.push({ type: "position", zone }, { type: "attack", attacker: zone, target: "direct" }, ...monsterZones.map((target): Move => ({ type: "attack", attacker: zone, target })));
 		}
 	}
 	const seen = new Set<string>();
-	return candidates.filter((move) => {
+	const plays: { move: Move; board: Board; events: GameEvent[] }[] = [];
+	for (const move of candidates) {
 		const key = JSON.stringify(move);
-		if (seen.has(key)) return false;
+		if (seen.has(key)) continue;
 		seen.add(key);
-		return apply(state, move).ok;
-	});
+		const result = apply(state, move);
+		if (result.ok) plays.push({ move, board: result.board, events: result.events });
+	}
+	return plays;
 }
