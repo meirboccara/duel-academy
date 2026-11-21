@@ -591,7 +591,7 @@ describe("the masters' island", () => {
 		await openLevel(user, "Duel: Rex Raptor · beginner");
 		expect(screen.getByText("To challenge the masters, you need a Deck of 40 cards.")).toBeTruthy();
 		await user.click(button("Choose your starter Deck"));
-		await user.click(screen.getByRole("button", { name: /^Choose: Dragons\./ }));
+		await user.click(screen.getByRole("button", { name: /^Choose: Blue-Eyes./ }));
 		expect(JSON.parse(window.localStorage.getItem(`${PLAY_PROGRESS_KEY}:deck`) ?? "null")).toMatchObject({ starter: "dragon" });
 		expect(screen.getByRole("heading", { level: 2, name: "Duel: Rex Raptor · beginner" })).toBeTruthy();
 		expect(screen.getAllByText(/Your Life Points: 8000/).length).toBeGreaterThan(0);

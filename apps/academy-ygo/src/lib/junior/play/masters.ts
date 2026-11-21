@@ -1,4 +1,5 @@
 import type { Persona } from "./bot";
+import { CARD_ART } from "./card-art";
 import { inExtraDeck, type CardId } from "./cards";
 import type { Setup } from "./engine";
 import { MASTER_DECKS } from "./master-decks";
@@ -96,7 +97,15 @@ export const masterPicture = (master: MasterId, height: 256 | 512 = 256) => `/tr
 export const masterOfLevel = (levelId: string): MasterId | null => MASTERS.find((master) => masterLevelId(master) === levelId) ?? null;
 
 /** What is wrong with a deck, if anything: the size of each part, copies, and cards in the wrong part. */
-export type DeckProblem = "main-size" | "extra-size" | "too-many-copies" | "extra-in-main" | "main-in-extra" | "not-owned";
+export type DeckProblem = "main-size" | "extra-size" | "too-many-copies" | "extra-in-main" | "main-in-extra" | "not-owned" | "banlist";
+/**
+ * How many copies of a card a Deck may hold under the current TCG Forbidden & Limited List (YGOPRODeck's copy of
+ * Konami's list, fetched with the card facts into card-art.ts): 0 Forbidden, 1 Limited, 2 Semi-Limited, else 3.
+ */
+export function copiesAllowed(card: CardId): number {
+	const ban = CARD_ART[card]?.ban;
+	return ban === "Forbidden" ? 0 : ban === "Limited" ? 1 : ban === "Semi-Limited" ? 2 : MOST_COPIES;
+}
 export function deckProblems(deck: Deck, owned?: ReadonlySet<string>): DeckProblem[] {
 	const problems = new Set<DeckProblem>();
 	if (deck.main.length !== MAIN_DECK) problems.add("main-size");
@@ -104,6 +113,7 @@ export function deckProblems(deck: Deck, owned?: ReadonlySet<string>): DeckProbl
 	const counts = new Map<CardId, number>();
 	for (const card of [...deck.main, ...deck.extra]) counts.set(card, (counts.get(card) ?? 0) + 1);
 	if ([...counts.values()].some((count) => count > MOST_COPIES)) problems.add("too-many-copies");
+	if ([...counts.entries()].some(([card, count]) => count > copiesAllowed(card) && copiesAllowed(card) < MOST_COPIES)) problems.add("banlist");
 	if (deck.main.some(inExtraDeck)) problems.add("extra-in-main");
 	if (deck.extra.some((card) => !inExtraDeck(card))) problems.add("main-in-extra");
 	if (owned && [...counts.keys()].some((card) => !owned.has(card))) problems.add("not-owned");

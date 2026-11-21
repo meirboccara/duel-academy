@@ -410,6 +410,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 			"damage-step-closed": `זה ה־${L("Damage Step")}: רק קלפים שמשנים ATK, או שכתוב עליהם, אפשר עוד להפעיל.`,
 			"swords-lock": `${L("Swords of Revealing Light")} ${UP}: ה${MONSTERS} שלכם לא יכולות להכריז על התקפה.`,
 			"jinzo-lock": `${L("Jinzo")} בשדה: אי אפשר ${w("להפעיל", "activate")} אף ${w("קלף מלכודת", "Trap Card")}.`,
+			"one-at-a-time": `${L("Blue-Eyes Spirit Dragon")} בשדה: אף אחד לא יכול ${w("לזמן בזימון מיוחד", "Special Summon")} 2 מפלצות או יותר בבת אחת.`,
 		},
 		rulesTitle: "הכללים שפגשתם",
 		albumTitle: "אלבום הקלפים שלכם",
@@ -479,6 +480,8 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 					return `על ${name(event.card)} כתוב ${L(event.word === "when" ? '"When…"' : '"If…"')}: הוא מקבל את ההזדמנות! ${mine ? "גרמתם" : `${RIVAL} גורם`} ${event.amount} נזק.`;
 				case "missed":
 					return `${name(event.card)} פספס את ההזדמנות! על הקלף כתוב ${L('"When…"')}, והוא מקבל הזדמנות רק אם ההליכה ל${w("בית הקברות", "Graveyard")} קורית אחרונה. כאן ${event.last === "activation" ? `${w("הפעלת", "activation")} ה${w("לחש", "Spell")}` : w("הזימון", "Summon")} קרה אחרון.`;
+				case "negated":
+					return `${name(event.by)} מבטל את ${name(event.card)}: האפקט שלו לא קורה.`;
 				case "burned":
 					return `${name(event.card)}: ${mine ? "אתם גורמים" : `${RIVAL} גורם`} ${event.amount} נזק.`;
 				case "added":

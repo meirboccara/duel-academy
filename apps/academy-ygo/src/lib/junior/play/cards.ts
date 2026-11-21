@@ -104,6 +104,18 @@ export interface Trigger {
 	/** No "you can": it always happens, even when going to the GY was not the last thing (it cannot miss its timing). */
 	forced?: true;
 }
+/** A Fusion Material described, not named: of this Type, of this Attribute, or whose id starts with `prefix` (an archetype). */
+export interface FusionMaterial {
+	type?: MonsterType;
+	attribute?: Attribute;
+	prefix?: string;
+}
+/**
+ * A monster's own effect with a cost of "send 1 card from your hand to the GY" (or discard): destroy a face-up monster
+ * of the opponent (`quick`: either player's turn; `weaker`: whose original ATK is lower than this card's ATK), negate
+ * a Spell, or Tribute this Synchro Summoned card to Special Summon a LIGHT Dragon Synchro Monster (no cost).
+ */
+export type Act = { kind: "destroy"; quick: boolean; oncePerTurn: boolean; weaker?: true } | { kind: "negate-spell" } | { kind: "tribute-synchro" };
 /** "Gains [n] ATK for each…": what is counted. */
 export type Gains =
 	/** each of these cards in either Graveyard (Dark Magician Girl) */
@@ -115,7 +127,11 @@ export type Gains =
 	/** each of these cards its controller controls (the Battleguards) */
 	| { per: "allies"; cards: readonly string[]; amount: number }
 	/** while its controller has 1 or fewer cards in hand (Blade Knight) */
-	| { per: "small-hand"; amount: number };
+	| { per: "small-hand"; amount: number }
+	/** each Dragon monster on the field and in the Graveyards, of both players (Dark Paladin) */
+	| { per: "all-dragons"; amount: number }
+	/** each card of this archetype in its owner's Graveyard (Shining Flare Wingman) */
+	| { per: "graveyard-prefix"; prefix: string; amount: number };
 export interface MonsterCard {
 	kind: "monster";
 	level: number;
@@ -136,8 +152,8 @@ export interface MonsterCard {
 	link?: number;
 	/** A Pendulum Monster: its Pendulum Scale. */
 	scale?: number;
-	/** Fusion Monster: the monsters its first line names. */
-	fusion?: readonly string[];
+	/** Fusion Monster: its materials, by name, or described ("1 Dragon monster", "1 WIND monster", "1 Elemental HERO monster"). */
+	fusion?: readonly (string | FusionMaterial)[];
 	/** Xyz Monster: "2 Level 4 monsters". */
 	xyz?: { level: number; count: number };
 	/** "If only your opponent controls a monster, you can Special Summon this card (from your hand)." No Chain. */
@@ -159,7 +175,7 @@ export interface MonsterCard {
 	/** Jinzo: "Trap Cards, and their effects on the field, cannot be activated." */
 	noTraps?: true;
 	/** Cannot be destroyed by battle: by a monster with this much ATK or more (`fromAtk`), or this many times a turn (`perTurn`). */
-	battleImmune?: { fromAtk?: number; perTurn?: number };
+	battleImmune?: { fromAtk?: number; perTurn?: number; always?: true };
 	/** "You take no battle damage from attacks involving this card." */
 	noBattleDamage?: true;
 	/** "If this card attacks, it gains [n] ATK during the Damage Step only" (against a monster of `vs`, with it). */
@@ -174,6 +190,28 @@ export interface MonsterCard {
 	synchroTuner?: string;
 	/** Junk Warrior: "If this card is Synchro Summoned: It gains ATK equal to the total ATK of all Level [n] or lower monsters you currently control." */
 	synchroGain?: { maxLevel: number };
+	/** A Synchro Monster whose non-Tuners must be of an archetype (id prefix): "1 or more non-Tuner [Blue-Eyes] monsters". */
+	synchroNonTuner?: string;
+	/** "This card's name becomes [card] while on the field or in the GY." */
+	nameAs?: string;
+	/** Dark Magician the Dragon Knight: the opponent cannot destroy the Spells and Traps its controller controls. */
+	guardsBackrow?: true;
+	/** Its own effect, paid with a card from the hand, or by Tributing it. */
+	act?: Act;
+	/** Twin Burst: "This card can make up to 2 attacks on monsters": a second attack is never a direct one. */
+	monstersOnly?: true;
+	/** Twin Burst: "At the end of the Damage Step, when this card attacks an opponent's monster, but the opponent's monster was not destroyed: banish it." */
+	banishSurvivor?: true;
+	/** Nova Master: "If this card destroys an opponent's monster by battle: Draw 1 card." */
+	battleDraw?: true;
+	/** Great Tornado: "If this card is Fusion Summoned: Halve the ATK and DEF of all face-up monsters your opponent currently controls." */
+	onFusion?: "halve-foes";
+	/** Rampart Blaster: "can attack while in face-up Defense Position, but only if your opponent controls no monsters", its ATK halved. */
+	defenseAttack?: true;
+	/** Blue-Eyes Spirit Dragon: "Neither player can Special Summon 2 or more monsters at the same time." */
+	oneAtATime?: true;
+	/** Blue-Eyes Spirit Dragon: "Once per turn, when an effect of a card in the Graveyard is activated: You can negate the activation" (the opponent's). */
+	negatesGraveyard?: true;
 }
 export type Cost =
 	/** "Discard 1 card;": paid when the card is activated, before anything else happens. */
@@ -208,6 +246,8 @@ function real(id: string, rest: Partial<MonsterCard> = {}): MonsterCard {
 	const type = asType(entry.race);
 	return { kind: "monster", level: entry.level ?? 0, atk: entry.atk ?? 0, def: entry.def ?? 0, art: "🃏", ...(type ? { type } : {}), ...(frame ? { frame } : {}), ...rest };
 }
+/** Is this card, by name, the one named: itself, or a card whose name becomes it (Dark Magician the Dragon Knight). */
+export const named = (card: string, name: string): boolean => card === name || (card in CARDS && cardOf(card as CardId).kind === "monster" && monsterOf(card as CardId).nameAs === name);
 /** A monster's Attribute, as printed; the original cards have none. */
 export const attributeOf = (id: CardId): Attribute | undefined => CARD_ART[id]?.attribute as Attribute | undefined;
 /** The six icons of Spell and Trap Cards (Rulebook v10 p. 27). A card without an icon is a Normal Spell or Normal Trap. */
@@ -417,6 +457,19 @@ export const CARDS = {
 	"elemental-hero-flame-wingman": real("elemental-hero-flame-wingman", { fusion: ["elemental-hero-avian", "elemental-hero-burstinatrix"], battleBurn: true }),
 	"rabid-horseman": real("rabid-horseman", { fusion: ["iron-boar", "mystic-horseman"] }),
 	"junk-warrior": real("junk-warrior", { synchroTuner: "junk-synchron", synchroGain: { maxLevel: 2 } }),
+	/* The starter Decks' Extra Decks. */
+	"dark-paladin": real("dark-paladin", { fusion: ["dark-magician", "buster-blader"], gains: { per: "all-dragons", amount: 500 }, act: { kind: "negate-spell" } }),
+	"dark-magician-the-dragon-knight": real("dark-magician-the-dragon-knight", { fusion: ["dark-magician", { type: "dragon" }], nameAs: "dark-magician", guardsBackrow: true }),
+	"dark-magician-girl-the-dragon-knight": real("dark-magician-girl-the-dragon-knight", { fusion: ["dark-magician-girl", { type: "dragon" }], act: { kind: "destroy", quick: true, oncePerTurn: true } }),
+	"black-skull-dragon": real("black-skull-dragon", { fusion: ["summoned-skull", "red-eyes-black-dragon"] }),
+	"gaia-dragon-the-thunder-charger": real("gaia-dragon-the-thunder-charger", { level: 0, rank: 7, xyz: { level: 7, count: 2 }, pierce: true }),
+	"blue-eyes-twin-burst-dragon": real("blue-eyes-twin-burst-dragon", { fusion: ["blue-eyes-white-dragon", "blue-eyes-white-dragon"], battleImmune: { always: true }, attacks: 2, monstersOnly: true, banishSurvivor: true }),
+	"blue-eyes-spirit-dragon": real("blue-eyes-spirit-dragon", { synchroNonTuner: "blue-eyes-", oneAtATime: true, negatesGraveyard: true, act: { kind: "tribute-synchro" } }),
+	"elemental-hero-shining-flare-wingman": real("elemental-hero-shining-flare-wingman", { fusion: ["elemental-hero-flame-wingman", "elemental-hero-sparkman"], gains: { per: "graveyard-prefix", prefix: "elemental-hero-", amount: 300 }, battleBurn: true }),
+	"elemental-hero-thunder-giant": real("elemental-hero-thunder-giant", { fusion: ["elemental-hero-sparkman", "elemental-hero-clayman"], act: { kind: "destroy", quick: false, oncePerTurn: true, weaker: true } }),
+	"elemental-hero-great-tornado": real("elemental-hero-great-tornado", { fusion: [{ prefix: "elemental-hero-" }, { attribute: "WIND" }], onFusion: "halve-foes" }),
+	"elemental-hero-nova-master": real("elemental-hero-nova-master", { fusion: [{ prefix: "elemental-hero-" }, { attribute: "FIRE" }], battleDraw: true }),
+	"elemental-hero-rampart-blaster": real("elemental-hero-rampart-blaster", { fusion: ["elemental-hero-clayman", "elemental-hero-burstinatrix"], defenseAttack: true }),
 	/* Spells. */
 	"pot-of-greed": { kind: "spell", effect: { type: "draw", count: 2 }, art: "🏺" },
 	raigeki: { kind: "spell", effect: { type: "destroy-all" }, art: "⚡" },
@@ -482,7 +535,7 @@ export function trapTargetsOwn(id: CardId): boolean {
 /** Does the card carry rules text? A Normal Monster only carries a description that does not affect the game. */
 export function hasRulesText(id: CardId): boolean {
 	const card = cardOf(id);
-	return card.kind !== "monster" || !!(card.ability || card.trigger || card.frame || card.special || card.hand || card.wins || card.detach || card.gains || card.direct || card.pierce || card.attacks || card.noTraps || card.battleImmune || card.noBattleDamage || card.attackBonus || card.standby || card.battleBurn || card.summonRevive);
+	return card.kind !== "monster" || !!(card.ability || card.trigger || card.frame || card.special || card.hand || card.wins || card.detach || card.gains || card.direct || card.pierce || card.attacks || card.noTraps || card.battleImmune || card.noBattleDamage || card.attackBonus || card.standby || card.battleBurn || card.summonRevive || card.act || card.nameAs || card.defenseAttack);
 }
 /** The four limbs of the Forbidden One. */
 export const FORBIDDEN_LIMBS: readonly CardId[] = ["right-arm-of-the-forbidden-one", "left-arm-of-the-forbidden-one", "right-leg-of-the-forbidden-one", "left-leg-of-the-forbidden-one"];

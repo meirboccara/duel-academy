@@ -6,7 +6,7 @@ import type { Locale } from "@/lib/i18n/locales";
 import { cardOf, hasRulesText, isQuickPlay, monsterOf, spellTarget, tributesFor, type CardId } from "@/lib/junior/play/cards";
 import { PLAY_COPY, VOICE_LOCALE, narrateAll, phasesStarted, playCopyFor, stepsStarted, type PlayCopy } from "@/lib/junior/play/copy";
 import { MASTER_NAMES, masterPicture } from "@/lib/junior/play/masters";
-import { mainZones, scalesOf, type Board, type GameEvent, type Move, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
+import { fusionFits, mainZones, scalesOf, type Board, type GameEvent, type Move, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
 import { WORLD_IDS, type Level } from "@/lib/junior/play/levels";
 import { hint as askHint, botTurn, forceWin, next, outcome, play, playOut, restart, start, undo, type Outcome, type Session } from "@/lib/junior/play/session";
 import { DevLevelBarSlot } from "../dev/dev-slot";
@@ -31,6 +31,8 @@ type Holding =
 	| { kind: "haunt"; zone: number }
 	/** Junk Synchron's effect right after its Normal Summon, waiting for the monster in the child's Graveyard. */
 	| { kind: "revive"; zone: number }
+	/** A monster's effect paid with a card from the hand (Dark Paladin, a Dragon Knight, Thunder Giant), waiting for that card. */
+	| { kind: "act-cost"; zone: number; target?: number }
 	/** A Monster whose effect is being used, waiting for its target. */
 	| { kind: "ability"; zone: number }
 	/** A Spell with a cost, waiting for the card to discard. */
@@ -173,6 +175,13 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 		setNoHint(false);
 	};
 	const act = (move: Move) => update(play(session, move));
+	/** A monster's effect: one paid with a card from the hand waits for that card; any other is used at once. */
+	const useAbility = (zone: number, target?: number) => {
+		const slot = session.board[session.board.pending ? (session.board.turn === "you" ? "rival" : "you") : "you"].monsters[zone];
+		const paid = slot ? monsterOf(slot.card).act : undefined;
+		if (paid && paid.kind !== "tribute-synchro") return setPick({ kind: "act-cost", zone, ...(target === undefined ? {} : { target }) });
+		act({ type: "ability", zone, ...(target === undefined ? {} : { target }) });
+	};
 	/* Against a trainer of the masters' island, the trainer plays its turn by itself, one move at a time. */
 	useEffect(() => {
 		if (!level.duel || session.status !== "rival") return;
@@ -203,6 +212,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	};
 	const onHand = (card: CardId, index: number) => {
 		/* In answer to an attack, a card with a Quick Effect in the hand can be picked to read it, then used. */
+		if (pick?.kind === "act-cost") return act({ type: "ability", zone: pick.zone, ...(pick.target === undefined ? {} : { target: pick.target }), discard: card });
 		if (status === "answer") return handEffect(card) ? setPick(pick?.kind === "hand" && pick.card === card ? null : { kind: "hand", card }) : undefined;
 		if (!free) return;
 		if (pick?.kind === "pendulum") return setPick({ ...pick, chosen: pick.chosen.includes(index) ? pick.chosen.filter((at) => at !== index) : [...pick.chosen, index] });
@@ -240,7 +250,10 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	const confirm = () => {
 		if (pick?.kind === "materials") {
 			const materials = pick.chosen.map((item) => (item.from === "hand" ? ({ from: "hand", card: item.card } as const) : ({ from: "field", zone: item.zone } as const)));
-			return act({ type: "place", card: pick.card, row: "backrow", zone: pick.zone, ...(pick.summon ? { summon: pick.summon } : {}), materials });
+			/* The Fusion Monster these materials make: the first one of the Extra Deck whose materials they are. */
+			const used = pick.chosen.flatMap((item) => (item.from === "hand" ? [item.card] : board.you.monsters[item.zone] ? [board.you.monsters[item.zone]!.card] : []));
+			const fused = pick.mode === "fusion" ? (board.you.extra.find((card) => fusionFits(used, monsterOf(card).fusion ?? [])) ?? pick.summon) : pick.summon;
+			return act({ type: "place", card: pick.card, row: "backrow", zone: pick.zone, ...(fused ? { summon: fused } : {}), materials });
 		}
 		if (pick?.kind === "extra") return act({ type: "extra", card: pick.card, materials: pick.chosen });
 		if (pick?.kind === "pendulum") return act({ type: "pendulum", cards: pick.chosen.flatMap((at) => board.you.hand[at] ?? []) });
@@ -249,11 +262,11 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 		/* A Set card that targets: the Monster tapped on the side it aims at. */
 		if ((status === "answer" || free) && pick?.kind === "trap" && row === "monsters") return side === pick.aim ? act({ type: "spring", zone: pick.zone, target: zone }) : undefined;
 		if (status === "answer") {
-			if (pick?.kind === "ability" && side === "rival" && row === "monsters") return act({ type: "ability", zone: pick.zone, target: zone });
+			if (pick?.kind === "ability" && side === "rival" && row === "monsters") return useAbility(pick.zone, zone);
 			if (side !== "you") return;
 			if (row === "monsters") {
 				const slot = board.you.monsters[zone];
-				if (slot && (monsterOf(slot.card).ability || monsterOf(slot.card).detach)) setPick(pick?.kind === "ability" && pick.zone === zone ? null : { kind: "ability", zone });
+				if (slot && (monsterOf(slot.card).ability || monsterOf(slot.card).detach || monsterOf(slot.card).act)) setPick(pick?.kind === "ability" && pick.zone === zone ? null : { kind: "ability", zone });
 				return;
 			}
 			if (row !== "backrow") return;
@@ -277,7 +290,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 		if (row === "field") return side === "you" && pick?.kind === "hand" ? act({ type: "place", card: pick.card, row, zone: 0 }) : undefined;
 		if (side === "rival") {
 			if (row !== "monsters") return;
-			if (pick?.kind === "ability") return act({ type: "ability", zone: pick.zone, target: zone });
+			if (pick?.kind === "ability") return useAbility(pick.zone, zone);
 			if (pick?.kind === "monster") return act({ type: "attack", attacker: pick.zone, target: zone });
 			if (pick?.kind === "aim") return placeSpell(pick.card, pick.zone, aimsAt(pick.card) === "rival" ? zone : undefined);
 			if (pick?.kind === "hand" && needsTarget(pick.card)) return placeSpell(pick.card, firstFree(board), aimsAt(pick.card) === "rival" ? zone : undefined);
@@ -365,6 +378,9 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	} else if (pick?.kind === "ability") {
 		chosen.add(zoneKey("you", "monsters", pick.zone));
 		for (const zone of every) if (board.rival.monsters[zone]) glow.add(zoneKey("rival", "monsters", zone));
+	} else if (pick?.kind === "act-cost") {
+		chosen.add(zoneKey("you", "monsters", pick.zone));
+		if (pick.target !== undefined) chosen.add(zoneKey("rival", "monsters", pick.target));
 	} else if (pick?.kind === "cost") {
 		chosen.add(zoneKey("you", "backrow", pick.zone));
 	} else if (status === "answer") {
@@ -391,9 +407,13 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	const scales = scalesOf(board, "you");
 	const pickedAbility = pick?.kind === "ability" ? board.you.monsters[pick.zone] : null;
 	const detaching = !!pickedAbility && !!monsterOf(pickedAbility.card).detach;
+	/* An effect with no target to tap: Dark Paladin negating a Spell, Blue-Eyes Spirit Dragon Tributing itself. */
+	const pickedAct = pickedAbility ? monsterOf(pickedAbility.card).act : undefined;
+	const untargeted = !!pickedAct && pickedAct.kind !== "destroy";
 	/** The words for the choice being made: what to tap, and the sum so far. */
 	const choosing = (): string => {
 		if (pick?.kind === "grave" || pick?.kind === "haunt" || pick?.kind === "revive") return copy.chooseGrave;
+		if (pick?.kind === "act-cost") return copy.chooseDiscard;
 		if (pick?.kind === "pendulum") return scales ? copy.choosePendulum(scales.low, scales.high) : "";
 		if (pick?.kind === "materials") {
 			if (pick.mode === "fusion") return copy.chooseFusion;
@@ -419,7 +439,9 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 					? ""
 					: pick?.kind === "trap" || pick?.kind === "ability"
 						? copy.chooseTarget
-						: copy.answerNow
+						: pick?.kind === "act-cost"
+							? copy.chooseDiscard
+							: copy.answerNow
 				: status !== "playing"
 					? ""
 					: pick?.kind === "grave" || pick?.kind === "materials" || pick?.kind === "extra" || pick?.kind === "pendulum"
@@ -428,7 +450,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 						? `${copy.selected(copy.cards[pick.card].name)} ${copy.chooseZone}`
 						: pick?.kind === "aim" || pick?.kind === "ability"
 							? copy.chooseTarget
-							: pick?.kind === "cost"
+							: pick?.kind === "cost" || pick?.kind === "act-cost"
 								? copy.chooseDiscard
 								: pick?.kind === "tributes"
 								? `${copy.selected(copy.cards[pick.card].name)} ${copy.chooseTributes(Math.max(1, tributesLeft))}`
@@ -455,7 +477,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	/* A card of the hand: picked (or chosen as a material), or the one to play now. The HTML button and the 3D card show the same. */
 	const handPicked = (card: CardId, index: number) => (picked === card && pick?.kind !== "extra") || handChosen.includes(index);
 	const handGold = (card: CardId) => (status === "answer" && handEffect(card)) || (hinted?.type === "place" && (hinted.card === card || hinted.discard === card)) || (pick?.kind === "cost" && pick.card !== card);
-	const handEnabled = (card: CardId) => free || (status === "answer" && handEffect(card));
+	const handEnabled = (card: CardId) => free || pick?.kind === "act-cost" || (status === "answer" && handEffect(card));
 	const handItems: HandItem[] | undefined = solid ? board.you.hand.map((card, index) => ({ card, state: handPicked(card, index) ? "picked" : handGold(card) ? "hint" : "plain", enabled: handEnabled(card), onTap: () => onHand(card, index) })) : undefined;
 	const focusHand = (event: FocusEvent<HTMLButtonElement>, index: number) => {
 		let shows = true;
@@ -545,6 +567,11 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 									{copy.useFromHand}
 								</button>
 							)}
+							{(status === "answer" || free) && pick?.kind === "ability" && untargeted && (
+								<button type="button" onClick={() => useAbility(pick.zone)} className={primary}>
+									{copy.useEffect}
+								</button>
+							)}
 							{status === "answer" && pick?.kind === "ability" && detaching && (
 								<button type="button" onClick={() => act({ type: "ability", zone: pick.zone })} className={primary}>
 									{copy.detach}
@@ -595,7 +622,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 									<button type="button" onClick={() => act({ type: "position", zone: pick.zone })} className={quiet}>
 										{copy.turnCard(copy.cards[pickedMonster.card].name)}
 									</button>
-									{monsterOf(pickedMonster.card).ability && (
+									{(monsterOf(pickedMonster.card).ability || monsterOf(pickedMonster.card).act) && (
 										<button type="button" onClick={() => setPick({ kind: "ability", zone: pick.zone })} className={quiet}>
 											{copy.useEffect}
 										</button>

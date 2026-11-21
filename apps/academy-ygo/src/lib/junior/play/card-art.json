@@ -220,5 +220,17 @@
 	"gyakutenno-megami": { "card": 31122090, "image": 31122090 },
 	"heavy-storm": { "card": 19613556, "image": 19613556 },
 	"rabid-horseman": { "card": 94905343, "image": 94905343 },
-	"soul-taker": { "card": 81510157, "image": 81510157 }
+	"soul-taker": { "card": 81510157, "image": 81510157 },
+	"dark-paladin": { "card": 98502115, "image": 98502115 },
+	"dark-magician-the-dragon-knight": { "card": 41721210, "image": 41721210 },
+	"dark-magician-girl-the-dragon-knight": { "card": 43892408, "image": 43892408 },
+	"black-skull-dragon": { "card": 11901678, "image": 11901678 },
+	"gaia-dragon-the-thunder-charger": { "card": 91949988, "image": 91949988 },
+	"blue-eyes-twin-burst-dragon": { "card": 2129638, "image": 2129638 },
+	"blue-eyes-spirit-dragon": { "card": 59822133, "image": 59822133 },
+	"elemental-hero-shining-flare-wingman": { "card": 25366484, "image": 25366484 },
+	"elemental-hero-thunder-giant": { "card": 61204971, "image": 61204971 },
+	"elemental-hero-great-tornado": { "card": 3642509, "image": 3642509 },
+	"elemental-hero-nova-master": { "card": 1945387, "image": 1945387 },
+	"elemental-hero-rampart-blaster": { "card": 47737087, "image": 47737087 }
 }

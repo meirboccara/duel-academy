@@ -417,6 +417,7 @@ export function englishCopy(RIVAL: string): PlayCopy {
 			"damage-step-closed": "This is the Damage Step: only cards that change ATK, or that say so, can still be used.",
 			"swords-lock": "Swords of Revealing Light is face-up: your Monsters cannot declare an attack.",
 			"jinzo-lock": "Jinzo is on the field: no Trap Card can be activated.",
+			"one-at-a-time": "Blue-Eyes Spirit Dragon is on the field: nobody can Special Summon 2 or more monsters at the same time.",
 			"special-only": "This Monster cannot be Normal Summoned. Read its card: it is Summoned in its own way.",
 			"not-properly-summoned": "This Monster was never Summoned in its own way, so it cannot come back from the Graveyard.",
 		},
@@ -486,6 +487,8 @@ export function englishCopy(RIVAL: string): PlayCopy {
 					return `${name(event.card)} says "${event.word === "when" ? "When" : "If"}…": it gets its chance! ${who} deal${mine ? "" : "s"} ${event.amount} damage.`;
 				case "missed":
 					return `${name(event.card)} missed its chance! Its card says "When…": it only gets its chance if going to the Graveyard happens last. Here, ${event.last === "activation" ? "activating the Spell" : "the Summon"} came last.`;
+				case "negated":
+					return `${name(event.by)} negates ${name(event.card)}: its effect does not happen.`;
 				case "burned":
 					return `${name(event.card)}: ${mine ? "you inflict" : `${RIVAL} inflicts`} ${event.amount} damage.`;
 				case "added":

@@ -68,3 +68,23 @@ All five steps are built and tested (918 tests, typecheck, production build). Wh
   look one move further (Summon, then attack), medium still making mistakes; an expert looks two moves further and
   always plays its best. Simulated with the same deck (20 duels each): medium beats basic 16 times, strong beats medium
   14, expert beats strong 12 and basic 18 (`MASTER_TIER`, `TIER_PLAY` in `masters.ts`).
+
+## Starter Extra Decks and the TCG banlist (2026-11-21)
+
+- Every Deck (the 13 trainers' and the 3 starters') follows the current TCG Forbidden & Limited List: the status of
+  each card is fetched with its facts (`ban` in `card-art.ts`), `copiesAllowed` / `deckProblems` enforce it, the Deck
+  editor too, and `masters.test.ts` checks every Deck. Pot of Greed and Heavy Storm are Forbidden: the trainers who
+  used them in the anime get Upstart Goblin / Harpie's Feather Duster instead (listed as filler). Red-Eyes Dark Dragoon
+  and Crystal Wing Synchro Dragon were considered and left out: Forbidden.
+- Starters, each around a legend, with an Extra Deck it can Summon:
+  - Dark Magician: Dark Paladin, Dark Magician the Dragon Knight, Dark Magician Girl the Dragon Knight, Black Skull
+    Dragon, Gaia the Dragon Champion, Gaia Dragon the Thunder Charger, plus a Synchro, two Xyz and a Link.
+  - Blue-Eyes: Blue-Eyes Ultimate Dragon, Twin Burst Dragon, Spirit Dragon (Flamvell Guard is its Level 1 Tuner).
+  - Elemental HEROes: Flame Wingman, Shining Flare Wingman, Thunder Giant, Great Tornado, Nova Master, Rampart Blaster.
+- Left out as too complex to play exactly: The Dark Magicians, Master of Chaos, Dark Cavalry, Neo Blue-Eyes Ultimate
+  Dragon, Blue-Eyes Tyrant Dragon, Azure-Eyes Silver Dragon. Optional "you can" effects are always used (Twin Burst
+  banishes, Spirit Dragon negates the opponent's Graveyard effects); Spirit Dragon's Tribute calls a LIGHT Dragon
+  Synchro the starter does not have yet.
+- Simulated against the 13 trainers (expert bot on the child's side, 52 duels): Dark Magician 41, Blue-Eyes 44,
+  Elemental HEROes 30 wins: the HERO Deck is the hardest to win with. A Deck saved with cards a starter no longer
+  has, or breaking the banlist, becomes the starter's new Deck when the game opens (`refreshDeck`).

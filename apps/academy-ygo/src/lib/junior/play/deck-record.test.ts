@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buy, onSale, SHOP_CARDS, starsEarned } from "../world/shop";
-import { addCard, deckReady, deckable, loadDeck, parseDeck, removeCard, saveDeck, startWith, starterCards } from "./deck-record";
+import { addCard, deckReady, deckable, loadDeck, parseDeck, refreshDeck, removeCard, saveDeck, startWith, starterCards } from "./deck-record";
 import { MASTER_STARS, masterLevelId } from "./masters";
 import { emptyPlayProgress, type PlayProgress } from "./progress";
 
@@ -30,6 +30,14 @@ describe("the child's Deck", () => {
 		expect(lighter.main).toHaveLength(39);
 		expect(addCard(lighter, "elemental-hero-avian").main).toHaveLength(40);
 		expect(addCard(removeCard(deck, "elemental-hero-flame-wingman"), "elemental-hero-flame-wingman").extra).toHaveLength(deck.extra.length);
+	});
+	it("becomes the starter's new Deck when it was saved with cards the binder no longer has or a Forbidden card", () => {
+		const fresh = startWith("dragon");
+		const owned = new Set(deckable(starterCards(fresh)));
+		const old = { ...fresh, main: [...fresh.main.slice(1), "pot-of-greed" as const] };
+		expect(refreshDeck(old, owned)).toEqual(fresh);
+		const edited = addCard(removeCard(fresh, "vorse-raider"), "lesser-dragon");
+		expect(refreshDeck(edited, owned)).toBe(edited);
 	});
 	it("is ready to duel only with a legal deck of cards the child owns", () => {
 		const deck = startWith("warrior");

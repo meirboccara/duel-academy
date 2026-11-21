@@ -15,42 +15,38 @@ export interface Starter {
 }
 
 /**
- * Each starter Deck plays its own way and brings a real Extra Deck, every monster of it Summonable from the cards
- * of the same Deck: Fusion with Polymerization, a Synchro with Tune Warrior (Level 3) and a Level 3 monster, an Xyz
- * with two Level 4 monsters, a Link with any two monsters.
+ * Each starter Deck is built around one legend and brings a real Extra Deck, every monster of it Summonable from the
+ * cards of the same Deck. All of it follows the current TCG Forbidden & Limited List (checked by masters.test.ts).
  */
 const TRAPS = [
 	["mirror-force", 1],
 	["sakuretsu-armor", 2],
 	["sticky-vine", 2],
 ] as const;
-const EXTRA_FOR_ALL = [
-	["gem-knight-pearl", 2],
-	["utopia", 1],
-	["gaia-knight", 2],
-	["lanphorhynchus", 1],
-] as const;
 
 export const STARTERS: Record<StarterId, Starter> = {
+	/* Dark Magician: Dark Paladin (with Buster Blader), the two Dragon Knights, Black Skull Dragon, a Rank 7. */
 	warrior: {
 		cover: "dark-magician",
 		deck: {
-			main: build(["celtic-guardian", 3], ["queens-knight", 2], ["beta-the-magnet-warrior", 3], ["gamma-the-magnet-warrior", 2], ["giant-soldier-of-stone", 3], ["tune-warrior", 3], ["flame-manipulator", 1], ["masaki", 1], ["curse-of-dragon", 2], ["gaia-the-fierce-knight", 1], ["summoned-skull", 2], ["dark-magician", 1], ["dark-magician-girl", 1], ["polymerization", 2], ["pot-of-greed", 1], ["monster-reborn", 1], ["swords-of-revealing-light", 1], ["dark-hole", 1], ["spark-dash", 2], ["magic-cylinder", 1], ["negate-attack", 1], ...TRAPS),
-			extra: build(["gaia-the-dragon-champion", 2], ["flame-swordsman", 1], ...EXTRA_FOR_ALL),
+			main: build(["dark-magician", 3], ["dark-magician-girl", 2], ["buster-blader", 2], ["curse-of-dragon", 2], ["gaia-the-fierce-knight", 1], ["summoned-skull", 1], ["red-eyes-black-dragon", 1], ["celtic-guardian", 3], ["giant-soldier-of-stone", 3], ["tune-warrior", 2], ["beta-the-magnet-warrior", 2], ["polymerization", 3], ["thousand-knives", 2], ["monster-reborn", 1], ["dark-hole", 1], ["swords-of-revealing-light", 1], ["upstart-goblin", 1], ["spark-dash", 2], ["magic-cylinder", 1], ["negate-attack", 1], ...TRAPS),
+			extra: build(["dark-paladin", 2], ["dark-magician-the-dragon-knight", 2], ["dark-magician-girl-the-dragon-knight", 2], ["gaia-the-dragon-champion", 1], ["black-skull-dragon", 1], ["gaia-dragon-the-thunder-charger", 1], ["gaia-knight", 1], ["gem-knight-pearl", 1], ["utopia", 1], ["lanphorhynchus", 1]),
 		},
 	},
+	/* Blue-Eyes White Dragon: Blue-Eyes Ultimate Dragon, Twin Burst Dragon, Spirit Dragon (with Flamvell Guard, a Level 1 Tuner). */
 	dragon: {
 		cover: "blue-eyes-white-dragon",
 		deck: {
-			main: build(["lesser-dragon", 3], ["fairy-dragon", 2], ["vorse-raider", 3], ["la-jinn-the-mystical-genie-of-the-lamp", 3], ["x-head-cannon", 2], ["luster-dragon-2", 2], ["curse-of-dragon", 2], ["tune-warrior", 3], ["blue-eyes-white-dragon", 1], ["red-eyes-black-dragon", 1], ["baby-dragon", 2], ["mountain", 2], ["pot-of-greed", 1], ["monster-reborn", 1], ["raigeki", 1], ["thunder-clap", 2], ["spark-dash", 2], ["negate-attack", 2], ...TRAPS),
-			extra: build(...EXTRA_FOR_ALL, ["utopia", 1]),
+			main: build(["blue-eyes-white-dragon", 3], ["flamvell-guard", 2], ["vorse-raider", 3], ["la-jinn-the-mystical-genie-of-the-lamp", 3], ["x-head-cannon", 3], ["luster-dragon-2", 2], ["lesser-dragon", 2], ["tune-warrior", 2], ["polymerization", 2], ["monster-reborn", 1], ["raigeki", 1], ["dark-hole", 1], ["mountain", 1], ["upstart-goblin", 1], ["spark-dash", 2], ["thunder-clap", 2], ["negate-attack", 2], ["magic-cylinder", 1], ["fog-snare", 1], ...TRAPS),
+			extra: build(["blue-eyes-ultimate-dragon", 2], ["blue-eyes-twin-burst-dragon", 2], ["blue-eyes-spirit-dragon", 2], ["gaia-knight", 2], ["gem-knight-pearl", 2], ["utopia", 1], ["lanphorhynchus", 1]),
 		},
 	},
+	/* Elemental HEROes: Flame Wingman and Shining Flare Wingman, Thunder Giant, Great Tornado, Nova Master, Rampart Blaster. */
 	hero: {
 		cover: "elemental-hero-flame-wingman",
 		deck: {
-			main: build(["elemental-hero-avian", 3], ["elemental-hero-burstinatrix", 3], ["elemental-hero-clayman", 2], ["elemental-hero-sparkman", 3], ["elemental-hero-bladedge", 1], ["elemental-hero-neos", 1], ["beaver-warrior", 1], ["tune-warrior", 3], ["polymerization", 3], ["fusion-sage", 2], ["dark-hole", 1], ["raigeki", 1], ["pot-of-greed", 1], ["monster-reborn", 1], ["the-warrior-returning-alive", 1], ["spark-dash", 2], ["thunder-clap", 2], ["hero-barrier", 2], ["elemental-recharge", 1], ["magic-cylinder", 1], ...TRAPS),
-			extra: build(["elemental-hero-flame-wingman", 3], ...EXTRA_FOR_ALL),
+			main: build(["elemental-hero-avian", 3], ["elemental-hero-burstinatrix", 3], ["elemental-hero-clayman", 2], ["elemental-hero-sparkman", 3], ["elemental-hero-bladedge", 1], ["elemental-hero-neos", 1], ["tune-warrior", 2], ["polymerization", 3], ["fusion-sage", 2], ["monster-reborn", 1], ["dark-hole", 1], ["raigeki", 1], ["the-warrior-returning-alive", 2], ["upstart-goblin", 1], ["spark-dash", 2], ["thunder-clap", 2], ["swords-of-revealing-light", 1], ["hero-barrier", 2], ["magic-cylinder", 1], ["negate-attack", 1], ...TRAPS),
+			extra: build(["elemental-hero-flame-wingman", 3], ["elemental-hero-shining-flare-wingman", 2], ["elemental-hero-thunder-giant", 2], ["elemental-hero-great-tornado", 2], ["elemental-hero-nova-master", 2], ["elemental-hero-rampart-blaster", 1], ["gem-knight-pearl", 1], ["utopia", 1], ["lanphorhynchus", 1]),
 		},
 	},
 };

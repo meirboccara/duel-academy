@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { seeded } from "./bot";
 import { cardOf, inExtraDeck } from "./cards";
 import { levelById } from "./levels";
-import { MASTERS, MASTER_LP, MASTER_TIER, PERSONAS, TIERS, deckProblems, duelSetup, masterDeck, masterLevelId, shuffled, type MasterId } from "./masters";
+import { MASTERS, MASTER_LP, MASTER_TIER, PERSONAS, TIERS, copiesAllowed, deckProblems, duelSetup, masterDeck, masterLevelId, shuffled, type MasterId } from "./masters";
 import { STARTERS } from "./starters";
 import { hint, next, play, start, type Session } from "./session";
 
@@ -76,7 +76,7 @@ describe("the trainers' levels", () => {
 	async function botDuel(you: (typeof PERSONAS)[MasterId], rival: (typeof PERSONAS)[MasterId], seed: number) {
 		const { botMove } = await import("./bot");
 		const { apply, board, other } = await import("./engine");
-		const deal = (offset: number) => duelSetup("rex-raptor", STARTERS.warrior.deck, seeded(seed + offset));
+		const deal = (offset: number) => duelSetup("rex-raptor", STARTERS.dragon.deck, seeded(seed + offset));
 		let state = board({ ...deal(0), strict: false, rival: { ...deal(99).you } });
 		const random = seeded(seed * 7);
 		for (let step = 0; step < 3000 && !state.winner; step++) {
@@ -88,14 +88,31 @@ describe("the trainers' levels", () => {
 	}
 	it("an expert beats a basic trainer most of the time, with the same deck", async () => {
 		let wins = 0;
-		for (let seed = 1; seed <= 6; seed++) {
+		for (let seed = 1; seed <= 12; seed++) {
 			const expertFirst = seed % 2 === 0;
 			const winner = expertFirst ? await botDuel(PERSONAS["seto-kaiba"], PERSONAS["rex-raptor"], seed) : await botDuel(PERSONAS["rex-raptor"], PERSONAS["seto-kaiba"], seed);
 			if ((winner === "you") === expertFirst && winner) wins++;
 		}
-		expect(wins).toBeGreaterThanOrEqual(5);
-	}, 120000);
+		/* About 3 in 4 in longer simulations; 12 fixed duels keep the test quick and steady. */
+		expect(wins).toBeGreaterThanOrEqual(8);
+	}, 240000);
 	it("each level looks further ahead than the one before", () => {
 		expect(TIERS.map((tier) => PERSONAS[MASTERS.find((master) => MASTER_TIER[master] === tier)!].plans ?? 0)).toEqual([0, 1, 1, 2]);
 	});
 });
+
+describe("the TCG Forbidden & Limited List", () => {
+	const decks = [...MASTERS.map((master) => [master, masterDeck(master)] as const), ...Object.entries(STARTERS).map(([starter, info]) => [starter, info.deck] as const)];
+	it.each(decks)("%s follows it: no Forbidden card, 1 copy of a Limited card, 2 of a Semi-Limited card", (_name, deck) => {
+		expect(deckProblems(deck)).not.toContain("banlist");
+	});
+	it("refuses a Forbidden card, and a second copy of a Limited one", () => {
+		const forty = STARTERS.dragon.deck.main;
+		expect(deckProblems({ main: [...forty.slice(1), "pot-of-greed"], extra: [] })).toContain("banlist");
+		expect(deckProblems({ main: [...forty.slice(2), "monster-reborn", "monster-reborn"], extra: [] })).toContain("banlist");
+		expect(copiesAllowed("pot-of-greed")).toBe(0);
+		expect(copiesAllowed("monster-reborn")).toBe(1);
+		expect(copiesAllowed("celtic-guardian")).toBe(3);
+	});
+});
+

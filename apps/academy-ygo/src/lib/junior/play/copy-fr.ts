@@ -424,6 +424,7 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 			"damage-step-closed": "C’est la Damage Step : seules les cartes qui changent l’ATK, ou qui le disent, peuvent encore servir.",
 			"swords-lock": "Les Épées de Lumière Révélatrice sont face recto : tes Monstres ne peuvent pas déclarer d’attaque.",
 			"jinzo-lock": "Jinzo est sur le Terrain : aucune Carte Piège ne peut être activée.",
+			"one-at-a-time": "Dragon Esprit aux Yeux Bleus est sur le Terrain : personne ne peut Invoquer Spécialement 2 monstres ou plus à la fois.",
 		},
 		rulesTitle: "Les règles que tu as vues",
 		albumTitle: "Ton album de cartes",
@@ -492,6 +493,8 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 					return `${name(event.card)} dit « ${event.word === "when" ? "Lorsque" : "Si"}… » : son effet a sa chance ! ${mine ? "Tu infliges" : `${RIVAL} inflige`} ${event.amount} dommages.`;
 				case "missed":
 					return `${name(event.card)} a raté sa chance ! Sa carte dit « Lorsque… » : elle n’a sa chance que si l’envoi au Cimetière arrive en dernier. Ici, ${event.last === "activation" ? "l’activation de la Magie" : "l’Invocation"} est arrivée en dernier.`;
+				case "negated":
+					return `${name(event.by)} annule ${name(event.card)} : son effet n’a pas lieu.`;
 				case "burned":
 					return `${name(event.card)} : ${mine ? "tu infliges" : `${RIVAL} inflige`} ${event.amount} dommages.`;
 				case "added":

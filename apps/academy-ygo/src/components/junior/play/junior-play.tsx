@@ -11,7 +11,7 @@ import { requestPersist } from "@/lib/junior/persist";
 import { PLAY_COPY, playCopyFor } from "@/lib/junior/play/copy";
 import { seeded } from "@/lib/junior/play/bot";
 import { DECK_COPY } from "@/lib/junior/play/deck-copy";
-import { NO_DECK, deckKeyFor, deckReady, deckable, loadDeck, saveDeck, startWith, starterCards, type DeckRecord } from "@/lib/junior/play/deck-record";
+import { NO_DECK, deckKeyFor, deckReady, deckable, loadDeck, refreshDeck, saveDeck, startWith, starterCards, type DeckRecord } from "@/lib/junior/play/deck-record";
 import { MASTER_NAMES, duelSetup } from "@/lib/junior/play/masters";
 import { LEVELS, RULE_IDS, WORLD_IDS, levelById, levelsOf, type WorldId } from "@/lib/junior/play/levels";
 import { PLAY_PROGRESS_KEY, emptyPlayProgress, isSolved, isUnlocked, loadPlayProgress, mergePlayProgress, nextLevel, recordSolve, ruleMastery, savePlayProgress, type PlayProgress, type PlayStorage } from "@/lib/junior/play/progress";
@@ -236,6 +236,15 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 	const owned = useMemo(() => deckable(dev && devSettings.allCards ? [...cards, ...CARD_IDS] : cards), [cards, dev, devSettings.allCards]);
 	const ownedSet = useMemo(() => new Set<string>(owned), [owned]);
 	const deckWords = DECK_COPY[locale];
+	/* A Deck saved before the starters or the banlist changed: the chosen starter's new Deck, saved once. */
+	useEffect(() => {
+		if (!hydrated) return;
+		const fresh = refreshDeck(deck, ownedSet);
+		if (fresh === deck) return;
+		const storage = getStorage();
+		if (storage && (!playerRef.current || playerRef.current.stillMine())) saveDeck(storage, deckKey, fresh);
+		setDeck(fresh);
+	}, [hydrated, deck, ownedSet, deckKey]);
 	const keepDeck = (record: DeckRecord) => {
 		const storage = shopStorage();
 		if (!storage || !saveDeck(storage, deckKey, record)) return;
