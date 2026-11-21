@@ -196,6 +196,8 @@ export function englishCopy(RIVAL: string): PlayCopy {
 			"lg-exodia-2": { title: "One card away", goal: "One piece is still in your Deck. Which card can draw it? Win this turn." },
 			"st-battle": { title: "The Battle Step", goal: "Battle Ox attacks Silver Fang. Keep Silver Fang: which card acts at the right moment?" },
 			"st-damage": { title: "The Damage Step", goal: "Two attacks are coming. Let the Battle Step pass, then act in the Damage Step. Keep your 1000 Life Points." },
+			"st-set": { title: "Face-down", goal: "Judge Man will attack your weak Monster. Set it face-down: you will not lose a Life Point." },
+			"st-flip": { title: "Flip Summon", goal: "Your Set Monster has waited a turn. Flip it to Attack Position, then win." },
 			"x-duel": { title: "The Extra Deck duel", goal: "A whole duel on the whole mat. Use your Extra Deck. Bring Nox's Life Points to 0!" },
 			...Object.fromEntries(MASTERS.map((master) => [masterLevelId(master), { title: `Duel: ${MASTER_NAMES[master]} · ${TIER_WORDS[MASTER_TIER[master]]}`, goal: `A whole duel against ${MASTER_NAMES[master]}: 40 shuffled cards, 8000 Life Points. Bring them down to 0!` }])),
 		},
@@ -245,6 +247,7 @@ export function englishCopy(RIVAL: string): PlayCopy {
 			condition: "A condition with no colon",
 			exodia: "The Forbidden One: five pieces in the hand win",
 			steps: "Battle Step, then Damage Step",
+			set: "Setting a Monster face-down, then the Flip Summon",
 		},
 		mastery: { new: "not met yet", met: "met", mastered: "used again without help" },
 		phases,
@@ -345,6 +348,7 @@ export function englishCopy(RIVAL: string): PlayCopy {
 		confirmSummon: "Summon!",
 		specialSummon: "Special Summon it",
 		setFaceDown: "Set it face-down",
+		setMonster: "Set it face-down (Defense)",
 		pendulumSummon: "Pendulum Summon",
 		detach: "Detach a material",
 		useFromHand: "Discard it: Quick Effect",
@@ -418,6 +422,8 @@ export function englishCopy(RIVAL: string): PlayCopy {
 			"swords-lock": "Swords of Revealing Light is face-up: your Monsters cannot declare an attack.",
 			"jinzo-lock": "Jinzo is on the field: no Trap Card can be activated.",
 			"one-at-a-time": "Blue-Eyes Spirit Dragon is on the field: nobody can Special Summon 2 or more monsters at the same time.",
+			"summon-locked": "This turn a card stops you from Summoning other monsters. You can still Set one face-down.",
+			"cannot-attack-that": "Magician's Valkyria is there: the other face-up Spellcasters cannot be attacked.",
 			"special-only": "This Monster cannot be Normal Summoned. Read its card: it is Summoned in its own way.",
 			"not-properly-summoned": "This Monster was never Summoned in its own way, so it cannot come back from the Graveyard.",
 		},
@@ -499,6 +505,14 @@ export function englishCopy(RIVAL: string): PlayCopy {
 					return `${name(event.card)} is equipped to ${name(event.target)}. If ${name(event.target)} leaves the field, it goes too.`;
 				case "battle-ended":
 					return mine ? "Your Battle Phase is over." : `${RIVAL}'s Battle Phase is over.`;
+				case "set-monster":
+					return mine ? `You Set ${name(event.card)} face-down, in Defense Position.` : `${RIVAL} Sets a Monster face-down, in Defense Position.`;
+				case "flipped":
+					return event.how === "summon" ? `Flip Summon: ${name(event.card)} is flipped face-up, in Attack Position.` : `${name(event.card)} is flipped face-up.`;
+				case "turned-down":
+					return `${name(event.card)} is turned face-down, in Defense Position.`;
+				case "coin":
+					return `${name(event.card)}: ${mine ? "you toss" : `${RIVAL} tosses`} a coin… ${event.right ? "Called right!" : "Called wrong!"}`;
 				case "set":
 					return `You Set ${name(event.card)} face-down. It has to wait for the next turn.`;
 				case "gained":
@@ -512,7 +526,7 @@ export function englishCopy(RIVAL: string): PlayCopy {
 				case "position":
 					return event.position === "defense" ? `${name(event.card)} turns to Defense Position. Its DEF counts now.` : `${name(event.card)} turns to Attack Position.`;
 				case "attack-declared":
-					return event.target ? `${name(event.attacker)} attacks ${name(event.target)}!` : `${name(event.attacker)} attacks directly!`;
+					return event.target ? `${name(event.attacker)} attacks ${name(event.target)}!` : event.hidden ? `${name(event.attacker)} attacks a face-down Monster!` : `${name(event.attacker)} attacks directly!`;
 				case "damage-step":
 					return "Damage Step: just before damage is calculated.";
 				case "window":
@@ -566,6 +580,7 @@ export function englishCopy(RIVAL: string): PlayCopy {
 					if (buried) return `Activate ${name(move.card)} and target ${name(buried)} in ${move.grave?.side === "you" ? "your" : `${RIVAL}'s`} Graveyard.`;
 					if (move.summon) return `Activate ${name(move.card)}: Fusion Summon ${name(move.summon)} with ${using}.`;
 					if (move.materials) return `Activate ${name(move.card)} and Tribute ${using}.`;
+					if (move.set && cardOf(move.card).kind === "monster") return `Set ${name(move.card)} face-down, in Defense Position.`;
 					if (move.special) return `Special Summon ${name(move.card)} from your hand, as its card says.`;
 					if (move.row === "field") return `Play ${name(move.card)} in your Field Zone.`;
 					if (move.row === "backrow" && cardOf(move.card).kind === "monster") return `Place ${name(move.card)} in a Pendulum Zone.`;

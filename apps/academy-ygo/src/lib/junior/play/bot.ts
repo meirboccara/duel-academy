@@ -15,6 +15,11 @@ export interface Persona {
 	caution: number;
 	/** How often (0 to 1) the bot answers when an answer would help: a basic trainer forgets its Traps. */
 	answers: number;
+	/**
+	 * How good a mistake still has to be, as a share of the best move's gain (0 to 1): a basic trainer may play any
+	 * move that helps a little, a medium one only a move nearly as good as the best. Missing: any move that helps.
+	 */
+	slack?: number;
 	/** How many more moves of its own turn it looks at, after each move (Summon then attack, destroy the blocker then attack directly). */
 	plans?: number;
 }
@@ -50,24 +55,47 @@ export function evaluate(state: Board, me: Side, persona: Persona): number {
 	if (state.winner) return state.winner === me ? WIN : -WIN;
 	const mine = state[me];
 	const theirs = state[other(me)];
-	const strength = (who: Side) =>
-		state[who].monsters.reduce((sum, slot) => {
-			if (!slot) return sum;
-			const value = slot.position === "attack" ? atkOf(slot, state) : defOf(slot, state) * 0.8;
-			return sum + value / 100 + 4;
-		}, 0);
+	const strength = (who: Side) => state[who].monsters.reduce((sum, slot) => (slot ? sum + worthOf(slot, state, who === me) : sum), 0);
 	const setCards = (who: Side) => state[who].backrow.filter((slot) => slot && !slot.up && !slot.open).length;
 	let score = mine.lp / 100 - (theirs.lp / 100) * persona.aggression;
 	score += strength(me) - strength(other(me));
 	score += (mine.hand.length - theirs.hand.length) * 3;
 	score += (setCards(me) - setCards(other(me))) * 3;
 	score += (mine.field ? 2 : 0) - (theirs.field ? 2 : 0);
-	/* A monster left in Attack Position weaker than the opponent's strongest attacker is at risk on the next turn. */
-	const threat = Math.max(0, ...theirs.monsters.map((slot) => (slot && slot.position === "attack" ? atkOf(slot, state) : 0)));
-	for (const slot of mine.monsters) {
-		if (slot?.position === "attack" && atkOf(slot, state) < threat) score -= ((threat - atkOf(slot, state)) / 100) * 0.5 * persona.caution;
+	return score - foreseen(state, me) * persona.caution;
+}
+
+/** What a face-down monster of the other player is taken to be: the bot never looks at it. */
+const UNKNOWN_DEF = 1500;
+/** What a monster on the field is worth to its controller. The other player's face-down monsters are unknown. */
+function worthOf(slot: NonNullable<Board["you"]["monsters"][number]>, state: Board, own: boolean): number {
+	if (slot.faceDown && !own) return (UNKNOWN_DEF * 0.8) / 100 + 4;
+	return (slot.position === "attack" ? atkOf(slot, state) : defOf(slot, state) * 0.8) / 100 + 4;
+}
+/**
+ * What the opponent's next Battle Phase would cost `me`, on the board as both players see it: each of their face-up
+ * Attack Position monsters, strongest first, destroys the most valuable of my monsters it beats, or attacks directly
+ * once I have none. A monster in Defense Position costs no Life Points. Losing the Duel that way counts most.
+ */
+function foreseen(state: Board, me: Side): number {
+	const attackers = state[other(me)].monsters.flatMap((slot) => (slot && !slot.faceDown && slot.position === "attack" ? [atkOf(slot, state)] : [])).sort((a, b) => b - a);
+	const mine = state[me].monsters.flatMap((slot) => (slot ? [{ value: slot.position === "attack" ? atkOf(slot, state) : defOf(slot, state), attack: slot.position === "attack", worth: worthOf(slot, state, true) }] : []));
+	let lp = 0;
+	let lost = 0;
+	for (const atk of attackers) {
+		const standing = mine.filter((item) => item.worth > 0);
+		if (standing.length === 0) {
+			lp += atk;
+			continue;
+		}
+		const beaten = standing.filter((item) => item.value < atk).sort((a, b) => b.worth - a.worth)[0];
+		if (!beaten) continue;
+		lost += beaten.worth;
+		if (beaten.attack) lp += atk - beaten.value;
+		beaten.worth = 0;
 	}
-	return score;
+	if (lp >= state[me].lp) return WIN / 10;
+	return lost + lp / 100;
 }
 
 /** The smallest gain that makes a move worth playing: moves that change nothing are not played. */
@@ -84,13 +112,35 @@ export function botMove(state: Board, persona: Persona, random: () => number = M
 	const me = actor(state);
 	const plays = legalPlays(state);
 	const score = (board: Board) => evaluate(settled(board), me, persona);
+	/**
+	 * What a move is worth, by the board it leads to, without knowing what a player cannot know: an attack on a
+	 * face-down monster is weighed as an attack on an unknown one, and a coin toss as the average of both results.
+	 */
+	const worth = (from: Board, play: ReturnType<typeof legalPlays>[number]): number => {
+		const move = play.move;
+		if (move.type === "attack" && move.target !== "direct") {
+			const hidden = from[other(from.turn)].monsters[move.target];
+			const attacker = from[from.turn].monsters[move.attacker];
+			if (hidden?.faceDown && attacker) {
+				const atk = atkOf(attacker, from);
+				return score(from) + (atk > UNKNOWN_DEF ? worthOf(hidden, from, false) : -(UNKNOWN_DEF - atk) / 100 - 0.5);
+			}
+		}
+		if (play.events.some((event) => event.type === "coin")) {
+			const right = apply(from, move, { coin: true });
+			const wrong = apply(from, move, { coin: false });
+			if (right.ok && wrong.ok) return (score(right.board) + score(wrong.board)) / 2;
+		}
+		return score(play.board);
+	};
+	const unsure = (play: ReturnType<typeof legalPlays>[number]) => play.events.some((event) => event.type === "coin" || (event.type === "flipped" && event.how === "attack"));
 	if (state.pending) {
 		/* An answer: the move that leaves the best board, letting it happen when nothing does better. */
 		const pass = plays.find((play) => play.move.type === "pass");
 		let best = pass ?? plays[0];
-		let bestScore = best ? score(best.board) : -Infinity;
+		let bestScore = best ? worth(state, best) : -Infinity;
 		for (const play of plays) {
-			const value = score(play.board);
+			const value = worth(state, play);
 			if (value > bestScore + WORTH) [best, bestScore] = [play, value];
 		}
 		if (best && best !== pass && pass && random() > persona.answers) return pass.move;
@@ -104,29 +154,31 @@ export function botMove(state: Board, persona: Persona, random: () => number = M
 		if (depth <= 0 || board.pending || board.winner || board.turn !== state.turn) return here;
 		const next = legalPlays(board)
 			.filter((play) => play.move.type !== "phase" && play.move.type !== "draw")
-			.map((play) => ({ board: play.board, value: score(play.board) }))
+			.map((play) => ({ board: play.board, value: worth(board, play), sure: !unsure(play) }))
 			.sort((a, b) => b.value - a.value)
 			.slice(0, PLANNED);
-		return Math.max(here, ...next.map((item) => (depth > 1 ? follow(item.board, depth - 1) : item.value)));
+		/* Nothing is planned past a coin toss or a monster it has not seen. */
+		return Math.max(here, ...next.map((item) => (depth > 1 && item.sure ? follow(item.board, depth - 1) : item.value)));
 	};
 	/** The best move of one kind on a board, by how much it improves this turn's board. */
 	const pick = (board: Board, options: ReturnType<typeof legalPlays>, kind: "attack" | "other") => {
 		let ranked = options
 			.filter((play) => play.move.type !== "phase" && play.move.type !== "draw" && (kind === "attack") === (play.move.type === "attack"))
-			.map((play) => ({ move: play.move, board: play.board, gain: score(play.board) - now }))
+			.map((play) => ({ move: play.move, board: play.board, gain: worth(board, play) - now, sure: !unsure(play) }))
 			.sort((a, b) => b.gain - a.gain);
 		if (persona.plans && !board.strict) {
 			/* An expert also counts the best move each one opens up this turn: a move that sets up a winning attack comes first. */
 			ranked = ranked
 				.slice(0, PLANNED)
-				.map((option) => ({ ...option, gain: Math.max(option.gain, follow(option.board, persona.plans ?? 0) - now - WORTH) }))
+				.map((option) => ({ ...option, gain: option.sure ? Math.max(option.gain, follow(option.board, persona.plans ?? 0) - now - WORTH) : option.gain }))
 				.concat(ranked.slice(PLANNED))
 				.sort((a, b) => b.gain - a.gain);
 		}
 		ranked = ranked.filter((option) => option.gain > WORTH);
 		if (ranked.length === 0) return null;
 		/* A gentle trainer sometimes plays a good move that is not the best one. */
-		if (ranked.length > 1 && random() > persona.skill) return ranked[1 + Math.floor(random() * (ranked.length - 1))]?.move ?? null;
+		const close = ranked.filter((option) => option.gain >= (ranked[0]?.gain ?? 0) * (persona.slack ?? 0));
+		if (close.length > 1 && random() > persona.skill) return close[1 + Math.floor(random() * (close.length - 1))]?.move ?? null;
 		return ranked[0]?.move ?? null;
 	};
 	const end: Move = { type: "phase", to: "end" };

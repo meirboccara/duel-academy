@@ -57,7 +57,9 @@ const hasEffect = (card: CardId) => {
 };
 const isQuick = (card: CardId) => monsterOf(card).ability?.quick === true || !!monsterOf(card).hand;
 /** What a screen reader hears for a monster on the field. */
-function monsterLabel(copy: PlayCopy, board: Board, slot: NonNullable<Board["you"]["monsters"][number]>): string {
+function monsterLabel(copy: PlayCopy, board: Board, slot: NonNullable<Board["you"]["monsters"][number]>, own = true): string {
+	/* A face-down monster: its controller knows it, the other player sees only the back of the card. */
+	if (slot.faceDown) return own ? `${copy.cards[slot.card].name}, ${copy.faceDown}, ${copy.inDefense}, ${copy.def} ${defOf(slot, board)}` : `${copy.faceDown}, ${copy.inDefense}`;
 	const info = monsterOf(slot.card);
 	const grade = gradeOf(copy, slot.card);
 	return [
@@ -264,9 +266,21 @@ function SmallBoard({ board, copy, moving, glow, chosen, onZone, landing, counti
 		const monster = row === "monsters" ? board[side].monsters[zone] : null;
 		const back = row === "backrow" ? board[side].backrow[zone] : null;
 		const zoneName = row === "monsters" ? copy.monsterZone(side, zone + 1) : copy.backZone(side, zone + 1);
-		const content = monster ? monsterLabel(copy, board, monster) : back ? (back.open ? `${copy.cards[back.card].name}, ${copy.faceUp}` : side === "you" ? `${copy.cards[back.card].name}, ${copy.faceDown}` : copy.faceDown) : copy.empty;
+		const content = monster ? monsterLabel(copy, board, monster, side === "you") : back ? (back.open ? `${copy.cards[back.card].name}, ${copy.faceUp}` : side === "you" ? `${copy.cards[back.card].name}, ${copy.faceDown}` : copy.faceDown) : copy.empty;
 		const ring = chosen?.has(key) ? "border-arcane-400 bg-arcane-500/20" : glow?.has(key) ? "border-gold-400 bg-gold-400/15" : "border-white/20 bg-surface-raised";
-		const inside = monster ? (
+		const inside = monster?.faceDown ? (
+			<span className="relative block h-24 w-20 rotate-90">
+				{side === "you" ? (
+					<span className="block h-full w-full opacity-50">
+						<CardFace card={monster.card} copy={copy} def={defOf(monster, board)} defending />
+					</span>
+				) : (
+					<span aria-hidden className="flex h-full w-full items-center justify-center rounded-md border-2 border-white/40 bg-ink-700 text-2xl">
+						🂠
+					</span>
+				)}
+			</span>
+		) : monster ? (
 			<motion.span key={monster.card} layout={moving} initial={moving ? { scale: 0.6, opacity: 0 } : false} animate={{ scale: 1, opacity: 1, rotate: monster.position === "defense" ? 90 : 0 }} transition={{ delay: landing?.get(key) ?? 0 }} className="block h-24 w-20">
 				<HeldFace hold={holding?.get(key)} playId={playId} card={monster.card} copy={copy} atk={atkOf(monster, board)} def={defOf(monster, board)} defending={monster.position === "defense"} />
 			</motion.span>
@@ -349,7 +363,20 @@ function FullMat({ board, copy, moving, glow, chosen, onZone, onPile, landing, c
 	const monster = (side: Side, at: number) => {
 		const slot = board[side].monsters[at];
 		const label = at === EXTRA_ZONE ? copy.extraMonsterZone(side) : copy.mainZone(side, at + 1);
-		const inside = slot ? (
+		const inside = slot?.faceDown ? (
+			/* Face-down: the back of a card, sideways. Its controller sees which card it is, dimmed. */
+			<span className="relative block h-12 w-full max-w-11 rotate-90">
+				{side === "you" ? (
+					<span className="block h-full w-full opacity-50">
+						<CardFace card={slot.card} copy={copy} def={defOf(slot, board)} defending compact />
+					</span>
+				) : (
+					<span aria-hidden className="flex h-full w-full items-center justify-center rounded-md border-2 border-white/40 bg-ink-700 text-lg">
+						🂠
+					</span>
+				)}
+			</span>
+		) : slot ? (
 			<motion.span key={slot.card} layout={moving} initial={moving ? { scale: 0.6, opacity: 0 } : false} animate={{ scale: 1, opacity: 1, rotate: slot.position === "defense" ? 90 : 0 }} transition={{ delay: landing?.get(zoneKey(side, "monsters", at)) ?? 0 }} className="block h-12 w-full max-w-11">
 				<HeldFace hold={holding?.get(zoneKey(side, "monsters", at))} playId={playId} card={slot.card} copy={copy} atk={atkOf(slot, board)} def={defOf(slot, board)} defending={slot.position === "defense"} compact {...(slot.materials ? { materials: slot.materials.length } : {})} />
 			</motion.span>
@@ -358,7 +385,7 @@ function FullMat({ board, copy, moving, glow, chosen, onZone, onPile, landing, c
 				✚
 			</span>
 		) : null;
-		return zone(side, "monsters", at, label, slot ? monsterLabel(copy, board, slot) : copy.empty, inside);
+		return zone(side, "monsters", at, label, slot ? monsterLabel(copy, board, slot, side === "you") : copy.empty, inside);
 	};
 	const back = (side: Side, at: number) => {
 		const slot = board[side].backrow[at];
@@ -545,6 +572,7 @@ export function ClashBanner({ events, copy, moving }: { events: readonly GameEve
 	/* The step of the attack, as Konami names it: the Battle Step while an attack waits for an answer, the Damage Step when the monsters meet. */
 	const step = (name: string) => <span className="basis-full text-center text-xs font-semibold uppercase tracking-wider text-fg-muted">{name}</span>;
 	const declared = events.find((event) => event.type === "attack-declared");
+	const hiddenTarget = declared?.type === "attack-declared" && !!declared.hidden;
 	const waiting = events.some((event) => event.type === "window");
 	if (battle?.type === "battle") {
 		const high = Math.max(battle.attackerValue, battle.defenderValue);
@@ -586,7 +614,7 @@ export function ClashBanner({ events, copy, moving }: { events: readonly GameEve
 				{step(damage ? copy.steps.damage : copy.steps.battle)}
 				<span className="text-3xl">{cardOf(declared.attacker).art}</span>
 				<span className="text-2xl">⚔️</span>
-				<span className="text-3xl">{declared.target ? cardOf(declared.target).art : "🏮"}</span>
+				<span className="text-3xl">{declared.target ? cardOf(declared.target).art : hiddenTarget ? "🂠" : "🏮"}</span>
 			</div>
 		);
 	}

@@ -45,7 +45,7 @@ export const SHOP_CARDS: readonly ShopCard[] = [
 	...sell("common", ["kairyu-shin"], "mako-tsunami"),
 	...sell("rare", ["umi"], "mako-tsunami"),
 	...sell("common", ["axe-raider"], "joey-wheeler"),
-	...sell("super", ["jinzo"], "joey-wheeler"),
+	...sell("super", ["jinzo", "dark-time-wizard"], "joey-wheeler"),
 	...sell("common", ["book-of-secret-arts"], "arkana"),
 	...sell("rare", ["thousand-knives"], "arkana"),
 	...sell("common", ["the-earl-of-demise"], "yami-bakura"),
@@ -61,8 +61,8 @@ export const SHOP_CARDS: readonly ShopCard[] = [
 	...sell("rare", ["bowganian"], "yami-marik"),
 	...sell("super", ["legendary-fiend"], "yami-marik"),
 	...sell("rare", ["vorse-raider"], "seto-kaiba"),
-	...sell("ultra", ["luster-dragon-2"], "seto-kaiba"),
-	...sell("super", ["magic-cylinder"], "atem"),
+	...sell("ultra", ["luster-dragon-2", "blue-eyes-alternative-white-dragon"], "seto-kaiba"),
+	...sell("super", ["magic-cylinder", "dark-magical-curtain"], "atem"),
 	...sell("ultra", ["gaia-the-dragon-champion"], "atem"),
 ];
 /** Is this card on sale for this child: always, or once its trainer is beaten. */

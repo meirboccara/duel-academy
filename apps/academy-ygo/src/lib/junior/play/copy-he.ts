@@ -187,6 +187,8 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 			"lg-exodia-2": { title: "קלף אחד מהניצחון", goal: `חלק אחד עדיין ב${w("חפיסה", "Deck")}. איזה קלף יכול לשלוף אותו? נצחו בתור הזה.` },
 			"st-battle": { title: L("Battle Step"), goal: `${name("iron-boar")} תוקף את ${name("pocket-cub")}. שמרו על ${name("pocket-cub")}: איזה קלף פועל ברגע הנכון?` },
 			"st-damage": { title: L("Damage Step"), goal: `שתי התקפות מגיעות. תנו ל־${L("Battle Step")} לעבור, ופעלו ב־${L("Damage Step")}. שמרו על 1000 ${LP}.` },
+			"st-set": { title: w("עם הפנים למטה", "face-down"), goal: `${name("shadow-wolf")} יתקוף. ${w("הניחו", "Set")} את ה${MONSTER} ${DOWN}: לא תאבדו ${LP}.` },
+			"st-flip": { title: L("Flip Summon"), goal: `ה${MONSTER} שהנחתם (${L("Set")}) חיכתה תור. הפכו אותה ל${w("מצב התקפה", "Attack Position")}, ונצחו.` },
 			"x-duel": { title: `הדו־קרב של ${EXTRA}`, goal: `דו־קרב שלם על המשטח כולו. השתמשו ב${EXTRA}. הורידו את ${LP} של נוקס ל־0!` },
 			...Object.fromEntries(MASTERS.map((master) => [masterLevelId(master), { title: `דו־קרב: ${L(MASTER_NAMES[master])} · ${TIER_WORDS[MASTER_TIER[master]]}`, goal: `דו־קרב שלם מול ${L(MASTER_NAMES[master])}: 40 קלפים מעורבבים ו־8000 ${LP}. הורידו אותו ל־0!` }])),
 		},
@@ -236,6 +238,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 			condition: "תנאי בלי נקודתיים",
 			exodia: `${name("exodia-the-forbidden-one")}: חמישה חלקים ביד מנצחים`,
 			steps: `${L("Battle Step")}, ואז ${L("Damage Step")}`,
+			set: `${w("להניח", "Set")} ${MONSTER} ${DOWN}, ואז ${L("Flip Summon")}`,
 		},
 		mastery: { new: "עוד לא פגשתם", met: "פגשתם", mastered: "השתמשתם שוב בלי עזרה" },
 		phases,
@@ -336,6 +339,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 		confirmSummon: `${w("לזמן", "Summon")}!`,
 		specialSummon: w("זימון מיוחד", "Special Summon"),
 		setFaceDown: `${w("להניח", "Set")} ${DOWN}`,
+		setMonster: `${w("להניח", "Set")} ${DOWN} (${w("הגנה", "Defense")})`,
 		pendulumSummon: w("זימון מטוטלת", "Pendulum Summon"),
 		detach: `${w("לנתק", "detach")} ${w("חומר", "material")}`,
 		useFromHand: `${w("להשליך", "discard")}: ${L("Quick Effect")}`,
@@ -411,6 +415,8 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 			"swords-lock": `${L("Swords of Revealing Light")} ${UP}: ה${MONSTERS} שלכם לא יכולות להכריז על התקפה.`,
 			"jinzo-lock": `${L("Jinzo")} בשדה: אי אפשר ${w("להפעיל", "activate")} אף ${w("קלף מלכודת", "Trap Card")}.`,
 			"one-at-a-time": `${L("Blue-Eyes Spirit Dragon")} בשדה: אף אחד לא יכול ${w("לזמן בזימון מיוחד", "Special Summon")} 2 מפלצות או יותר בבת אחת.`,
+			"summon-locked": `בתור הזה קלף מונע מכם ${w("לזמן", "Summon")} מפלצות אחרות. אפשר עדיין ${w("להניח", "Set")} אחת ${DOWN}.`,
+			"cannot-attack-that": `${L("Magician's Valkyria")} כאן: אי אפשר לתקוף את שאר ה${w("מכשפים", "Spellcasters")} שעם הפנים למעלה (${L("face-up")}).`,
 		},
 		rulesTitle: "הכללים שפגשתם",
 		albumTitle: "אלבום הקלפים שלכם",
@@ -492,6 +498,14 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 					return `${name(event.card)} מוצמד ל־${name(event.target)}. אם ${name(event.target)} עוזב את השדה, גם הוא הולך.`;
 				case "battle-ended":
 					return mine ? `ה־${L("Battle Phase")} שלכם נגמר.` : `ה־${L("Battle Phase")} של ${RIVAL} נגמר.`;
+				case "set-monster":
+					return mine ? `${w("הנחתם", "Set")} את ${name(event.card)} ${DOWN}, ב${w("מצב הגנה", "Defense Position")}.` : `${RIVAL} ${w("מניח", "Sets")} ${MONSTER} ${DOWN}, ב${w("מצב הגנה", "Defense Position")}.`;
+				case "flipped":
+					return event.how === "summon" ? `${L("Flip Summon")}: ${name(event.card)} מתהפך ${UP}, ב${w("מצב התקפה", "Attack Position")}.` : `${name(event.card)} מתהפך ${UP}.`;
+				case "turned-down":
+					return `${name(event.card)} מתהפך ${DOWN}, ב${w("מצב הגנה", "Defense Position")}.`;
+				case "coin":
+					return `${name(event.card)}: ${mine ? "אתם מטילים" : `${RIVAL} מטיל`} מטבע… ${event.right ? "ניחוש נכון!" : "ניחוש שגוי!"}`;
 				case "set":
 					return `${w("הנחתם", "Set")} את ${name(event.card)} ${DOWN}. היא צריכה לחכות לתור הבא.`;
 				case "gained":
@@ -505,7 +519,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 				case "position":
 					return event.position === "defense" ? `${name(event.card)} עובר ל${w("מצב הגנה", "Defense Position")}. עכשיו ה־DEF קובע.` : `${name(event.card)} עובר ל${w("מצב התקפה", "Attack Position")}.`;
 				case "attack-declared":
-					return event.target ? `${name(event.attacker)} תוקף את ${name(event.target)}!` : `${name(event.attacker)} תוקף ישירות!`;
+					return event.target ? `${name(event.attacker)} תוקף את ${name(event.target)}!` : event.hidden ? `${name(event.attacker)} תוקף ${MONSTER} ${DOWN}!` : `${name(event.attacker)} תוקף ישירות!`;
 				case "damage-step":
 					return `${L("Damage Step")}: רגע לפני חישוב הנזק.`;
 				case "window":
@@ -561,6 +575,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 					if (buried) return `${activate} ו${w("בחרו כמטרה", "target")} את ${name(buried)} ב${GY} ${move.grave?.side === "you" ? "שלכם" : `של ${RIVAL}`}.`;
 					if (move.summon) return `${activate}: ${w("זימון מיזוג", "Fusion Summon")} של ${name(move.summon)} עם ${using}.`;
 					if (move.materials) return `${activate} ו${w("הקריבו", "Tribute")} את ${using}.`;
+					if (move.set && cardOf(move.card).kind === "monster") return `${w("הניחו", "Set")} את ${name(move.card)} ${DOWN}, ב${w("מצב הגנה", "Defense Position")}.`;
 					if (move.special) return `זמנו את ${name(move.card)} מהיד ב${w("זימון מיוחד", "Special Summon")}, כמו שכתוב על הקלף.`;
 					if (move.row === "field") return `שחקו את ${name(move.card)} ב${w("אזור השדה", "Field Zone")} שלכם.`;
 					if (move.row === "backrow" && cardOf(move.card).kind === "monster") return `שימו את ${name(move.card)} ב${w("אזור מטוטלת", "Pendulum Zone")}.`;

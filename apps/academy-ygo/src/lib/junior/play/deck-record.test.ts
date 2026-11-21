@@ -36,7 +36,7 @@ describe("the child's Deck", () => {
 		const owned = new Set(deckable(starterCards(fresh)));
 		const old = { ...fresh, main: [...fresh.main.slice(1), "pot-of-greed" as const] };
 		expect(refreshDeck(old, owned)).toEqual(fresh);
-		const edited = addCard(removeCard(fresh, "vorse-raider"), "lesser-dragon");
+		const edited = addCard(removeCard(fresh, "vorse-raider"), "x-head-cannon");
 		expect(refreshDeck(edited, owned)).toBe(edited);
 	});
 	it("is ready to duel only with a legal deck of cards the child owns", () => {

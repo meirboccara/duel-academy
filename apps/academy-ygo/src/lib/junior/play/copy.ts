@@ -138,6 +138,8 @@ export interface PlayCopy {
 	specialSummon: string;
 	/** Set a Quick-Play Spell face-down instead of activating it. */
 	setFaceDown: string;
+	/** Set a monster face-down in Defense Position instead of Summoning it. */
+	setMonster: string;
 	pendulumSummon: string;
 	detach: string;
 	useFromHand: string;

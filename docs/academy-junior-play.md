@@ -217,7 +217,7 @@ The owner's decisions and the plan: `docs/research/academy-phases-spells-traps-e
   cannot play exactly is left out of a deck. Arkana, Yami Bakura, Pegasus, Yami Marik and Yusei have too few such
   anime cards: their decks carry `filler` cards, listed apart in `master-decks.ts`.
 
-Still left out: Set Monsters and Flip effects, replays, the hand size limit, Spell Speed beyond "a Counter Trap answers
+Still left out: Flip effects (Set Monsters and Flip Summons are in since 2026-11-21, see the plan), replays, the hand size limit, Spell Speed beyond "a Counter Trap answers
 an attack", Trap Hole and other cards that answer a Summon, and the anime cards with effects the engine does not play
 yet (Stardust Dragon, Toons, Time Wizard, the Egyptian Gods among them).
 

@@ -1,14 +1,15 @@
 import type { CardId } from "./cards";
 import type { Deck, MasterId } from "./masters";
 
-/* Generated from the trainers' anime card lists (Yugipedia, read 2026-11-20; docs/academy-junior-masters-plan.md). */
+/* Generated from the trainers' card lists (anime cards from Yugipedia, read 2026-11-20; docs/academy-junior-masters-plan.md). */
 
 /** A deck from [card, copies] pairs, in that order. */
 export const build = (...parts: readonly (readonly [CardId, number])[]): CardId[] => parts.flatMap(([card, count]) => Array.from({ length: count }, () => card));
 
 /**
- * Each trainer's deck. `anime`: cards the character used in the anime. `filler`: cards that are not, where the anime
- * gives too few cards the rules engine plays exactly (a card it cannot play exactly is left out, never changed).
+ * Each trainer's deck. `anime`: cards the character used in the anime. `filler`: cards that are not (or not checked),
+ * among them newer and stronger cards, where the anime gives too few cards the rules engine plays exactly (a card it
+ * cannot play exactly is left out, never changed). Every deck follows the TCG Forbidden & Limited List.
  */
 export const MASTER_DECK_PARTS: Record<MasterId, { anime: readonly (readonly [CardId, number])[]; filler: readonly (readonly [CardId, number])[]; extra: readonly (readonly [CardId, number])[] }> = {
 	"rex-raptor": {
@@ -27,54 +28,54 @@ export const MASTER_DECK_PARTS: Record<MasterId, { anime: readonly (readonly [Ca
 		extra: [],
 	},
 	"joey-wheeler": {
-		anime: [["alligators-sword", 3], ["axe-raider", 3], ["baby-dragon", 3], ["battle-warrior", 1], ["swordsman-of-landstar", 1], ["garoozis", 2], ["red-eyes-black-dragon", 2], ["masaki", 2], ["flame-manipulator", 2], ["kojikocy", 2], ["leogun", 1], ["tiger-axe", 2], ["rude-kaiser", 1], ["hayabusa-knight", 2], ["mad-sword-beast", 2], ["jinzo", 1], ["lava-battleguard", 1], ["swamp-battleguard", 1], ["polymerization", 2], ["salamandra", 1], ["legendary-sword", 1], ["hinotama", 1], ["harpies-feather-duster", 1], ["raigeki", 1], ["monster-reborn", 1]],
-		filler: [],
-		extra: [["flame-swordsman", 2], ["alligators-sword-dragon", 2]],
+		anime: [["alligators-sword", 3], ["axe-raider", 3], ["baby-dragon", 3], ["garoozis", 2], ["red-eyes-black-dragon", 2], ["masaki", 2], ["flame-manipulator", 2], ["hayabusa-knight", 2], ["mad-sword-beast", 2], ["jinzo", 1], ["lava-battleguard", 1], ["swamp-battleguard", 1], ["time-wizard", 2], ["rocket-warrior", 2], ["polymerization", 2], ["salamandra", 1], ["legendary-sword", 1], ["hinotama", 1], ["harpies-feather-duster", 1], ["raigeki", 1], ["monster-reborn", 1]],
+		filler: [["dark-time-wizard", 2], ["meteor-dragon", 1], ["inferno-fire-blast", 1]],
+		extra: [["flame-swordsman", 2], ["alligators-sword-dragon", 2], ["thousand-dragon", 2], ["meteor-black-dragon", 1]],
 	},
 	"arkana": {
-		anime: [["dark-magician", 3], ["thousand-knives", 2], ["monster-reborn", 1]],
-		filler: [["aqua-madoor", 3], ["illusionist-faceless-mage", 3], ["night-bat", 3], ["moss-beetle", 3], ["pebble-crab", 3], ["bramble-ram", 3], ["thorn-fox", 2], ["book-of-secret-arts", 2], ["dark-hole", 1], ["swords-of-revealing-light", 1], ["mirror-force", 1], ["ookazi", 2], ["raigeki", 1], ["negate-attack", 2], ["spark-dash", 2], ["thunder-clap", 2]],
+		anime: [["dark-magician", 3], ["thousand-knives", 2], ["monster-reborn", 1], ["dark-magic-curtain", 3]],
+		filler: [["dark-magical-curtain", 2], ["dark-magic-attack", 1], ["magicians-valkyria", 1], ["aqua-madoor", 3], ["illusionist-faceless-mage", 3], ["night-bat", 3], ["moss-beetle", 3], ["pebble-crab", 3], ["book-of-secret-arts", 2], ["dark-hole", 1], ["swords-of-revealing-light", 1], ["mirror-force", 1], ["negate-attack", 2], ["spark-dash", 2], ["thunder-clap", 2], ["book-of-moon", 1]],
 		extra: [],
 	},
 	"yami-bakura": {
 		anime: [["headless-knight", 3], ["the-earl-of-demise", 3], ["doma-the-angel-of-silence", 2], ["earthbound-spirit", 3], ["mud-toad", 2], ["night-bat", 2], ["souls-of-the-forgotten", 3], ["the-gross-ghost-of-fled-dreams", 3], ["the-portraits-secret", 3], ["monster-reborn", 1], ["just-desserts", 2]],
-		filler: [["feral-imp", 3], ["ryu-kishin-powered", 3], ["gil-garth", 2], ["melchid-the-four-face-beast", 2], ["ookazi", 2], ["upstart-goblin", 1]],
+		filler: [["upstart-goblin", 1], ["feral-imp", 2], ["ryu-kishin-powered", 3], ["gil-garth", 2], ["melchid-the-four-face-beast", 2], ["widespread-ruin", 2], ["book-of-moon", 1]],
 		extra: [],
 	},
 	"maximillion-pegasus": {
 		anime: [["dark-rabbit", 3], ["illusionist-faceless-mage", 3], ["killer-needle", 3], ["parrot-dragon", 3], ["red-archery-girl", 3], ["ryu-ran", 3], ["thousand-eyes-idol", 3], ["toon-alligator", 3], ["monster-reborn", 1], ["shine-palace", 2]],
-		filler: [["mirror-force", 1], ["magic-cylinder", 1], ["hinotama", 2], ["swords-of-revealing-light", 1], ["sakuretsu-armor", 2], ["sticky-vine", 2], ["spark-dash", 2], ["dark-hole", 1], ["upstart-goblin", 1]],
+		filler: [["upstart-goblin", 1], ["mirror-force", 1], ["magic-cylinder", 1], ["swords-of-revealing-light", 1], ["storming-mirror-force", 2], ["book-of-moon", 2], ["forbidden-chalice", 2], ["smashing-ground", 2], ["dark-hole", 1]],
 		extra: [],
 	},
 	"yugi-muto": {
-		anime: [["dark-magician", 2], ["dark-magician-girl", 2], ["alpha-the-magnet-warrior", 3], ["beta-the-magnet-warrior", 3], ["gamma-the-magnet-warrior", 3], ["gazelle-the-king-of-mythical-beasts", 2], ["curse-of-dragon", 2], ["giant-soldier-of-stone", 3], ["moss-beetle", 2], ["queens-knight", 3], ["summoned-skull", 2], ["buster-blader", 1], ["obnoxious-celtic-guard", 2], ["swords-of-revealing-light", 1], ["thousand-knives", 1], ["monster-reborn", 1], ["polymerization", 2], ["black-luster-soldier", 1], ["black-luster-ritual", 1], ["gaia-the-fierce-knight", 1], ["kuriboh", 1]],
-		filler: [["upstart-goblin", 1]],
-		extra: [["gaia-the-dragon-champion", 2]],
+		anime: [["dark-magician", 2], ["dark-magician-girl", 2], ["alpha-the-magnet-warrior", 2], ["beta-the-magnet-warrior", 2], ["gamma-the-magnet-warrior", 2], ["gazelle-the-king-of-mythical-beasts", 2], ["curse-of-dragon", 2], ["giant-soldier-of-stone", 1], ["moss-beetle", 1], ["queens-knight", 3], ["summoned-skull", 2], ["buster-blader", 1], ["obnoxious-celtic-guard", 2], ["swords-of-revealing-light", 1], ["thousand-knives", 1], ["monster-reborn", 1], ["polymerization", 2], ["black-luster-soldier", 1], ["black-luster-ritual", 1], ["gaia-the-fierce-knight", 1], ["kuriboh", 1]],
+		filler: [["upstart-goblin", 1], ["sages-stone", 1], ["dark-magical-curtain", 2], ["dark-magic-attack", 1], ["dark-burning-attack", 1], ["magicians-valkyria", 1]],
+		extra: [["gaia-the-dragon-champion", 2], ["dark-paladin", 1], ["dark-magician-the-dragon-knight", 1], ["dark-magician-girl-the-dragon-knight", 1]],
 	},
 	"jaden-yuki": {
-		anime: [["elemental-hero-avian", 3], ["elemental-hero-burstinatrix", 3], ["elemental-hero-clayman", 3], ["elemental-hero-sparkman", 3], ["elemental-hero-neos", 3], ["elemental-hero-bladedge", 3], ["oscillo-hero", 3], ["beaver-warrior", 3], ["ojama-yellow", 1], ["polymerization", 3], ["fusion-sage", 2], ["monster-reborn", 1], ["the-warrior-returning-alive", 2], ["sticky-vine", 2], ["hero-barrier", 2], ["elemental-recharge", 2]],
-		filler: [["upstart-goblin", 1]],
-		extra: [["elemental-hero-flame-wingman", 3]],
+		anime: [["elemental-hero-avian", 3], ["elemental-hero-burstinatrix", 3], ["elemental-hero-clayman", 3], ["elemental-hero-sparkman", 3], ["elemental-hero-neos", 3], ["elemental-hero-bladedge", 3], ["oscillo-hero", 2], ["ojama-yellow", 1], ["polymerization", 3], ["fusion-sage", 2], ["monster-reborn", 1], ["the-warrior-returning-alive", 2], ["sticky-vine", 2], ["hero-barrier", 2], ["elemental-recharge", 2]],
+		filler: [["upstart-goblin", 1], ["forbidden-chalice", 1], ["smashing-ground", 1], ["storming-mirror-force", 1], ["dark-hole", 1]],
+		extra: [["elemental-hero-flame-wingman", 3], ["elemental-hero-thunder-giant", 2], ["elemental-hero-shining-flare-wingman", 1], ["elemental-hero-rampart-blaster", 1], ["elemental-hero-great-tornado", 1], ["elemental-hero-nova-master", 1]],
 	},
 	"yusei-fudo": {
 		anime: [["junk-synchron", 3], ["flamvell-guard", 3], ["unicycular", 3], ["sonic-chick", 3], ["shield-wing", 2], ["fortress-warrior", 2], ["dash-warrior", 2], ["muka-muka", 2], ["tri-horned-dragon", 1], ["yaranzo", 3]],
-		filler: [["tune-warrior", 3], ["giant-soldier-of-stone", 3], ["monster-reborn", 1], ["spark-dash", 2], ["sticky-vine", 2], ["fog-snare", 2], ["negate-attack", 2], ["upstart-goblin", 1]],
+		filler: [["tune-warrior", 3], ["giant-soldier-of-stone", 3], ["monster-reborn", 1], ["upstart-goblin", 1], ["spark-dash", 2], ["sticky-vine", 2], ["book-of-moon", 1], ["smashing-ground", 1], ["negate-attack", 2]],
 		extra: [["junk-warrior", 3], ["gaia-knight", 2]],
 	},
 	"yami-marik": {
 		anime: [["gil-garth", 3], ["melchid-the-four-face-beast", 3], ["bowganian", 3], ["legendary-fiend", 2], ["monster-reborn", 1], ["mirror-force", 2], ["malevolent-catastrophe", 2]],
-		filler: [["feral-imp", 3], ["ryu-kishin-powered", 3], ["earthbound-spirit", 2], ["headless-knight", 2], ["the-earl-of-demise", 2], ["souls-of-the-forgotten", 2], ["summoned-skull", 2], ["dark-hole", 1], ["raigeki", 1], ["hinotama", 2], ["just-desserts", 2], ["ookazi", 1], ["upstart-goblin", 1]],
+		filler: [["upstart-goblin", 1], ["ryu-kishin-powered", 3], ["earthbound-spirit", 1], ["headless-knight", 2], ["the-earl-of-demise", 2], ["summoned-skull", 2], ["feral-imp", 2], ["dark-hole", 1], ["raigeki", 1], ["just-desserts", 2], ["widespread-ruin", 2], ["storming-mirror-force", 1], ["book-of-moon", 2], ["smashing-ground", 1], ["forbidden-chalice", 1]],
 		extra: [],
 	},
 	"seto-kaiba": {
-		anime: [["blue-eyes-white-dragon", 3], ["vorse-raider", 3], ["la-jinn-the-mystical-genie-of-the-lamp", 3], ["x-head-cannon", 3], ["iron-boar", 2], ["swordstalker", 2], ["gadget-soldier", 2], ["hitotsu-me-giant", 2], ["hyozanryu", 2], ["shadow-wolf", 1], ["luster-dragon-2", 2], ["rude-kaiser", 1], ["ryu-kishin-powered", 2], ["pebble-crab", 1], ["mystic-horseman", 2], ["blade-knight", 1], ["aqua-madoor", 1], ["grappler", 1], ["gyakutenno-megami", 1], ["monster-reborn", 1], ["polymerization", 2]],
-		filler: [["upstart-goblin", 1], ["harpies-feather-duster", 1]],
-		extra: [["blue-eyes-ultimate-dragon", 2], ["rabid-horseman", 2]],
+		anime: [["blue-eyes-white-dragon", 3], ["blue-eyes-alternative-white-dragon", 2], ["vorse-raider", 3], ["la-jinn-the-mystical-genie-of-the-lamp", 3], ["x-head-cannon", 3], ["iron-boar", 2], ["hyozanryu", 1], ["shadow-wolf", 1], ["luster-dragon-2", 2], ["ryu-kishin-powered", 1], ["mystic-horseman", 1], ["blade-knight", 1], ["monster-reborn", 1], ["polymerization", 2], ["shrink", 2], ["enemy-controller", 2], ["burst-stream-of-destruction", 1], ["silvers-cry", 1]],
+		filler: [["upstart-goblin", 1], ["harpies-feather-duster", 1], ["ancient-rules", 2], ["trade-in", 2], ["book-of-moon", 1], ["mirror-force", 1]],
+		extra: [["blue-eyes-ultimate-dragon", 2], ["blue-eyes-twin-burst-dragon", 2], ["rabid-horseman", 1]],
 	},
 	"atem": {
-		anime: [["dark-magician", 3], ["dark-magician-girl", 1], ["celtic-guardian", 2], ["gazelle-the-king-of-mythical-beasts", 1], ["curse-of-dragon", 2], ["gaia-the-fierce-knight", 2], ["summoned-skull", 2], ["beta-the-magnet-warrior", 2], ["alpha-the-magnet-warrior", 1], ["gamma-the-magnet-warrior", 1], ["kuriboh", 2], ["feral-imp", 1], ["buster-blader", 1], ["black-luster-soldier", 1], ["black-luster-ritual", 1], ["giant-soldier-of-stone", 1], ["moss-beetle", 1], ["obnoxious-celtic-guard", 1], ["monster-reborn", 1], ["swords-of-revealing-light", 1], ["dark-hole", 1], ["polymerization", 2], ["thousand-knives", 1], ["mirror-force", 2], ["magic-cylinder", 2], ["fissure", 1], ["soul-taker", 1]],
-		filler: [["upstart-goblin", 1], ["harpies-feather-duster", 1]],
-		extra: [["gaia-the-dragon-champion", 2]],
+		anime: [["dark-magician", 3], ["dark-magician-girl", 2], ["curse-of-dragon", 2], ["gaia-the-fierce-knight", 2], ["summoned-skull", 2], ["beta-the-magnet-warrior", 1], ["kuriboh", 2], ["buster-blader", 1], ["black-luster-soldier", 1], ["black-luster-ritual", 1], ["obnoxious-celtic-guard", 1], ["monster-reborn", 1], ["swords-of-revealing-light", 1], ["dark-hole", 1], ["polymerization", 2], ["thousand-knives", 1], ["mirror-force", 2], ["magic-cylinder", 2], ["fissure", 1], ["soul-taker", 1], ["celtic-guardian", 1]],
+		filler: [["upstart-goblin", 1], ["harpies-feather-duster", 1], ["dark-magical-curtain", 2], ["dark-magic-attack", 1], ["sages-stone", 1], ["dark-burning-attack", 1], ["magicians-valkyria", 1], ["book-of-moon", 1]],
+		extra: [["gaia-the-dragon-champion", 1], ["dark-paladin", 2], ["dark-magician-the-dragon-knight", 1], ["dark-magician-girl-the-dragon-knight", 1]],
 	},
 };
 

@@ -201,6 +201,8 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 			"lg-exodia-2": { title: "À une carte près", goal: "Une pièce est encore dans ton Deck. Quelle carte peut la piocher ? Gagne ce tour." },
 			"st-battle": { title: "La Battle Step", goal: "Bœuf de Combat attaque Croc Argenté. Garde Croc Argenté : quelle carte agit au bon moment ?" },
 			"st-damage": { title: "La Damage Step", goal: "Deux attaques arrivent. Laisse passer la Battle Step, puis agis dans la Damage Step. Garde tes 1000 Points de Vie." },
+			"st-set": { title: "Face verso", goal: "Juge va attaquer ton Monstre trop faible. Pose-le face verso : tu ne perdras aucun Point de Vie." },
+			"st-flip": { title: "Invocation Flip", goal: "Ton Monstre Posé a attendu un tour. Retourne-le en Position d’Attaque, puis gagne." },
 			"x-duel": { title: "Le duel de l’Extra Deck", goal: "Un duel entier sur tout le tapis. Utilise ton Extra Deck. Fais tomber Nox à 0 Point de Vie !" },
 			...Object.fromEntries(MASTERS.map((master) => [masterLevelId(master), { title: `Duel : ${MASTER_NAMES[master]} · ${TIER_WORDS[MASTER_TIER[master]]}`, goal: `Un duel entier contre ${MASTER_NAMES[master]} : 40 cartes mélangées, 8000 Points de Vie. Fais-les tomber à 0 !` }])),
 		},
@@ -250,6 +252,7 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 			condition: "Une condition sans deux-points",
 			exodia: "L’Interdit : cinq pièces en main gagnent",
 			steps: "Battle Step, puis Damage Step",
+			set: "Poser un Monstre face verso, puis l’Invocation Flip",
 		},
 		mastery: { new: "pas encore vue", met: "vue", mastered: "réutilisée sans aide" },
 		phases,
@@ -350,6 +353,7 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 		confirmSummon: "Invoquer !",
 		specialSummon: "L’Invoquer Spécialement",
 		setFaceDown: "La Poser face verso",
+		setMonster: "Le Poser face verso (Défense)",
 		pendulumSummon: "Invocation Pendule",
 		detach: "Détacher un Matériel",
 		useFromHand: "La défausser : Effet Rapide",
@@ -425,6 +429,8 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 			"swords-lock": "Les Épées de Lumière Révélatrice sont face recto : tes Monstres ne peuvent pas déclarer d’attaque.",
 			"jinzo-lock": "Jinzo est sur le Terrain : aucune Carte Piège ne peut être activée.",
 			"one-at-a-time": "Dragon Esprit aux Yeux Bleus est sur le Terrain : personne ne peut Invoquer Spécialement 2 monstres ou plus à la fois.",
+			"summon-locked": "Ce tour, une carte t’empêche d’Invoquer d’autres monstres. Tu peux encore en Poser un face verso.",
+			"cannot-attack-that": "Valkyria du Magicien est là : les autres Magiciens face recto ne peuvent pas être attaqués.",
 		},
 		rulesTitle: "Les règles que tu as vues",
 		albumTitle: "Ton album de cartes",
@@ -505,6 +511,14 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 					return `${name(event.card)} est équipée à ${name(event.target)}. Si ${name(event.target)} quitte le Terrain, elle part aussi.`;
 				case "battle-ended":
 					return mine ? "Ta Battle Phase est terminée." : `La Battle Phase de ${RIVAL} est terminée.`;
+				case "set-monster":
+					return mine ? `Tu Poses ${name(event.card)} face verso, en Position de Défense.` : `${RIVAL} Pose un Monstre face verso, en Position de Défense.`;
+				case "flipped":
+					return event.how === "summon" ? `Invocation Flip : ${name(event.card)} se retourne face recto, en Position d’Attaque.` : `${name(event.card)} se retourne face recto.`;
+				case "turned-down":
+					return `${name(event.card)} est retourné face verso, en Position de Défense.`;
+				case "coin":
+					return `${name(event.card)} : ${mine ? "tu lances" : `${RIVAL} lance`} une pièce… ${event.right ? "Gagné !" : "Perdu !"}`;
 				case "set":
 					return `Tu Poses ${name(event.card)} face verso. Elle doit attendre le tour suivant.`;
 				case "gained":
@@ -518,7 +532,7 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 				case "position":
 					return event.position === "defense" ? `${name(event.card)} passe en Position de Défense. C’est sa DEF qui compte.` : `${name(event.card)} passe en Position d’Attaque.`;
 				case "attack-declared":
-					return event.target ? `${name(event.attacker)} attaque ${name(event.target)} !` : `${name(event.attacker)} attaque directement !`;
+					return event.target ? `${name(event.attacker)} attaque ${name(event.target)} !` : event.hidden ? `${name(event.attacker)} attaque un Monstre face verso !` : `${name(event.attacker)} attaque directement !`;
 				case "damage-step":
 					return "Damage Step : juste avant le calcul des dommages.";
 				case "window":
@@ -572,7 +586,8 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 					if (buried) return `Active ${name(move.card)} et cible ${name(buried)} dans ${move.grave?.side === "you" ? "ton Cimetière" : `le Cimetière de ${RIVAL}`}.`;
 					if (move.summon) return `Active ${name(move.card)} : Invoque par Fusion ${name(move.summon)} avec ${using}.`;
 					if (move.materials) return `Active ${name(move.card)} et Sacrifie ${using}.`;
-					if (move.special) return `Invoque Spécialement ${name(move.card)} depuis ta main, comme le dit sa carte.`;
+					if (move.set && cardOf(move.card).kind === "monster") return `Pose ${name(move.card)} face verso, en Position de Défense.`;
+				if (move.special) return `Invoque Spécialement ${name(move.card)} depuis ta main, comme le dit sa carte.`;
 					if (move.row === "field") return `Joue ${name(move.card)} dans ta Zone Terrain.`;
 					if (move.row === "backrow" && cardOf(move.card).kind === "monster") return `Place ${name(move.card)} dans une Zone Pendule.`;
 					if ((move.tributes?.length ?? 0) > 0) return `Invoque ${name(move.card)} en Sacrifiant ${list((move.tributes ?? []).map((zone) => name(mine.monsters[zone]?.card ?? move.card)))}.`;

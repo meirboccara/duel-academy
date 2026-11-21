@@ -26,7 +26,8 @@ import type { Outfit } from "@/lib/junior/world/wardrobe";
 import { type Dorm, dormCapId, dormKeyFor, dormToChoose, loadDorm, saveDorm } from "@/lib/junior/world/dorm";
 import { IslandWorld } from "../world/island-world";
 import { AlbumCards, AlbumDialog } from "./album-dialog";
-import { DeckDialog, StarterDialog } from "./deck-dialog";
+import { StarterDialog } from "./deck-dialog";
+import { DeckBuilder } from "./deck-builder";
 import { DEV_TOOLS, DevPanelSlot } from "../dev/dev-slot";
 import { DEV_DEFAULTS, devDuelLevel, loadDev, saveDev, solvedBefore, solvedThrough, type DevSettings } from "@/lib/junior/dev/dev-tools";
 import { CARD_IDS } from "@/lib/junior/play/cards";
@@ -568,7 +569,7 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 				)}
 				{!level && albumOpen && <AlbumDialog cards={cards} rewards={rewards} copy={copy} locale={locale} onClose={() => setAlbumOpen(false)} />}
 				{deckOpen && !deck.starter && <StarterDialog copy={copy} locale={locale} onChoose={(starter) => keepDeck(startWith(starter))} onClose={() => setDeckOpen(false)} />}
-				{deckOpen && deck.starter && <DeckDialog deck={deck} owned={owned} copy={copy} locale={locale} onSave={keepDeck} onClose={() => setDeckOpen(false)} />}
+				{deckOpen && deck.starter && <DeckBuilder deck={deck} owned={owned} copy={copy} locale={locale} onSave={keepDeck} onClose={() => setDeckOpen(false)} />}
 				{!level && shopOpen && <ShopDialog stars={stars} bought={bought} wardrobe={wardrobe} preview={previewOk ? preview : undefined} copy={copy} locale={locale} progress={progress} onBuy={onBuy} onClose={() => setShopOpen(false)} />}
 				{DevPanelSlot && hydrated && (
 					<DevPanelSlot

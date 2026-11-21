@@ -280,7 +280,7 @@ export function effectCues(before: Board, events: readonly GameEvent[], after: B
 				break;
 			case "attack-declared": {
 				const from = standing(event.side, event.attacker);
-				const to = event.target ? standing(other(event.side), event.target) : ({ at: "lantern", side: other(event.side) } as const);
+				const to = event.target ? standing(other(event.side), event.target) : event.zone !== undefined ? zoneSpot(other(event.side), event.zone) : ({ at: "lantern", side: other(event.side) } as const);
 				if (from && to) push({ kind: "beam", from, to, art: "⚔️" });
 				source = null;
 				break;

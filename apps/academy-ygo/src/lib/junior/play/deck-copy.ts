@@ -23,6 +23,18 @@ export interface DeckCopy {
 	needDeck: string;
 	editDeck: string;
 	duelOn: string;
+	/** The Deck builder: its two sides, its filters, the search, the sort and the card panel. */
+	yourDeck: string;
+	binder: string;
+	filters: Record<"all" | "monster" | "spell" | "trap" | "extra", string>;
+	search: string;
+	sort: string;
+	sorts: Record<"level" | "atk" | "name", string>;
+	counts: (monsters: number, spells: number, traps: number) => string;
+	noCard: string;
+	nothingFound: string;
+	limits: Record<"Forbidden" | "Limited" | "Semi-Limited", string>;
+	show: (card: string) => string;
 }
 
 const L = (text: string) => `⁦${text}⁩`;
@@ -60,6 +72,17 @@ export const DECK_COPY: Record<Locale, DeckCopy> = {
 		needDeck: "Pour défier les maîtres, il te faut un Deck de 40 cartes.",
 		editDeck: "Changer mon Deck",
 		duelOn: "Chaque maître a son propre Deck de 40 cartes, mélangé. 8000 Points de Vie chacun.",
+		yourDeck: "Ton Deck",
+		binder: "Ton classeur",
+		filters: { all: "Tout", monster: "Monstres", spell: "Magies", trap: "Pièges", extra: "Extra Deck" },
+		search: "Chercher une carte",
+		sort: "Trier par",
+		sorts: { level: "Niveau", atk: "ATK", name: "Nom" },
+		counts: (monsters, spells, traps) => `${monsters} Monstres · ${spells} Magies · ${traps} Pièges`,
+		noCard: "Touche une carte pour la lire.",
+		nothingFound: "Aucune carte ne correspond.",
+		limits: { Forbidden: "Interdite : 0 exemplaire", Limited: "Limitée : 1 exemplaire", "Semi-Limited": "Semi-Limitée : 2 exemplaires" },
+		show: (card) => `Lire ${card}`,
 	},
 	en: {
 		deckButton: "My Deck",
@@ -93,6 +116,17 @@ export const DECK_COPY: Record<Locale, DeckCopy> = {
 		needDeck: "To challenge the masters, you need a Deck of 40 cards.",
 		editDeck: "Change my Deck",
 		duelOn: "Each master has their own shuffled Deck of 40 cards. 8000 Life Points each.",
+		yourDeck: "Your Deck",
+		binder: "Your binder",
+		filters: { all: "All", monster: "Monsters", spell: "Spells", trap: "Traps", extra: "Extra Deck" },
+		search: "Search for a card",
+		sort: "Sort by",
+		sorts: { level: "Level", atk: "ATK", name: "Name" },
+		counts: (monsters, spells, traps) => `${monsters} Monsters · ${spells} Spells · ${traps} Traps`,
+		noCard: "Tap a card to read it.",
+		nothingFound: "No card matches.",
+		limits: { Forbidden: "Forbidden: 0 copies", Limited: "Limited: 1 copy", "Semi-Limited": "Semi-Limited: 2 copies" },
+		show: (card) => `Read ${card}`,
 	},
 	he: {
 		deckButton: `החפיסה שלי (${L("Deck")})`,
@@ -126,5 +160,16 @@ export const DECK_COPY: Record<Locale, DeckCopy> = {
 		needDeck: "כדי לאתגר את המאסטרים, צריך חפיסה של 40 קלפים.",
 		editDeck: "לשנות את החפיסה",
 		duelOn: `לכל מאסטר יש חפיסה משלו של 40 קלפים, מעורבבת. 8000 נקודות חיים לכל אחד.`,
+		yourDeck: "החפיסה שלכם",
+		binder: "האלבום שלכם",
+		filters: { all: "הכול", monster: "מפלצות", spell: "לחשים", trap: "מלכודות", extra: L("Extra Deck") },
+		search: "חיפוש קלף",
+		sort: "מיון לפי",
+		sorts: { level: "רמה", atk: "ATK", name: "שם" },
+		counts: (monsters, spells, traps) => `${monsters} מפלצות · ${spells} לחשים · ${traps} מלכודות`,
+		noCard: "געו בקלף כדי לקרוא אותו.",
+		nothingFound: "אין קלף מתאים.",
+		limits: { Forbidden: "אסור: 0 עותקים", Limited: "מוגבל: עותק אחד", "Semi-Limited": "מוגבל־למחצה: 2 עותקים" },
+		show: (card) => `לקרוא את ${card}`,
 	},
 };

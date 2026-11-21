@@ -4,7 +4,7 @@ import type { Persona } from "./bot";
 import { MASTERS, masterLevelId, type MasterId } from "./masters";
 
 /** The rules of the Junior course, in teaching order. Each is taught by one level and used again by later ones. */
-export const RULE_IDS = ["zones", "battle", "defense", "direct", "summon", "tribute", "phases", "spell", "trap", "chain", "cost", "target", "quick", "once", "timing", "graveyard", "field", "banish", "quickplay", "counter", "continuous", "equip", "ritual", "fusion", "synchro", "xyz", "detach", "link", "pendulum", "notarget", "then", "condition", "exodia", "steps"] as const;
+export const RULE_IDS = ["zones", "battle", "defense", "direct", "summon", "tribute", "phases", "spell", "trap", "chain", "cost", "target", "quick", "once", "timing", "graveyard", "field", "banish", "quickplay", "counter", "continuous", "equip", "ritual", "fusion", "synchro", "xyz", "detach", "link", "pendulum", "notarget", "then", "condition", "exodia", "steps", "set"] as const;
 export type RuleId = (typeof RULE_IDS)[number];
 
 export const WORLD_IDS = ["wake", "shield", "friend", "magic", "puzzles", "tower", "rival", "reading", "mat", "icons", "ritual", "fusion", "synchro", "xyz", "link", "pendulum", "words", "legends", "steps", "final", "masters"] as const;
@@ -71,6 +71,8 @@ const phase = (to: "standby" | "main1" | "battle" | "main2" | "end"): Move => ({
 const turn = (zone: number): Move => ({ type: "position", zone });
 const draw: Move = { type: "draw" };
 const spring = (zone: number, target?: number): Move => ({ type: "spring", zone, ...(target === undefined ? {} : { target }) });
+/** A monster Normal Set: face-down in Defense Position. */
+const setMonster = (card: CardId, zone = 0): Move => ({ type: "place", card, row: "monsters", zone, set: true });
 /** A Quick-Play Spell Set face-down, to be activated on a later turn. */
 const setCard = (card: CardId, zone = 0): Move => ({ type: "place", card, row: "backrow", zone, set: true });
 /** Call of the Haunted: flipped in the Main Phase, targeting a monster in the child's own Graveyard. */
@@ -246,6 +248,8 @@ const LEVELS_ALL: Level[] = [
 	/* World 18: the steps of an attack. The Battle Step, then the Damage Step, and what can be used in each. */
 	{ id: "st-battle", world: "steps", teaches: "steps", uses: ["trap", "quick"], bar: "six", goal: { type: "hold", lp: 0, keep: ["pocket-cub"] }, setup: { full: true, strict: true, turn: "rival", you: { hand: ["kuriboh"], monsters: ["pocket-cub"], backrow: ["sakuretsu-armor"] }, rival: { monsters: ["iron-boar"] } }, rival: [[{ do: "attack", attacker: "iron-boar", target: "pocket-cub" }]], solution: [spring(0)] },
 	{ id: "st-damage", world: "steps", uses: ["steps", "quickplay", "quick"], bar: "six", goal: { type: "hold", lp: 1000, keep: [] }, setup: { full: true, strict: true, turn: "rival", you: { lp: 1000, hand: ["kuriboh"], monsters: ["river-otter"], backrow: ["spark-dash"] }, rival: { monsters: ["shadow-wolf", "iron-boar"] } }, rival: [[{ do: "attack", attacker: "shadow-wolf", target: "river-otter" }, { do: "attack", attacker: "iron-boar", target: "river-otter" }]], solution: [pass, spring(0, 0), fromHand("kuriboh")] },
+	{ id: "st-set", world: "steps", teaches: "set", uses: ["defense", "phases"], bar: "six", goal: { type: "hold", lp: 4000, keep: [] }, setup: { ...mat, you: { hand: ["pebble-crab"] }, rival: { monsters: ["shadow-wolf"] } }, rival: [[{ do: "auto-attack" }]], solution: [setMonster("pebble-crab"), phase("end")] },
+	{ id: "st-flip", world: "steps", uses: ["set", "battle", "phases"], bar: "six", goal: { type: "win" }, setup: { ...mat, you: { monsters: [{ card: "lantern-owl", faceDown: true }] }, rival: { lp: 400, monsters: ["thorn-fox"] } }, solution: [turn(0), phase("battle"), attack(0, 0)] },
 
 	/* World 19: the last duel, on the whole mat. Nox uses its Extra Deck too. */
 	{
@@ -333,4 +337,5 @@ export const DEMOS: Record<RuleId, Demo> = {
 	condition: { setup: { full: true, you: { hand: ["cyber-dragon"] }, rival: { monsters: ["thorn-fox"] } }, moves: [special("cyber-dragon")] },
 	exodia: { setup: FIFTH_PIECE, moves: [draw] },
 	steps: { setup: { full: true, turn: "rival", you: { hand: ["kuriboh"] }, rival: { monsters: ["iron-boar"] } }, moves: [attack(0, "direct"), fromHand("kuriboh")] },
+	set: { setup: { full: true, you: { hand: ["pebble-crab"] }, rival: { monsters: ["shadow-wolf"] } }, moves: [setMonster("pebble-crab", 1), phase("end"), attack(0, 1)] },
 };

@@ -112,7 +112,12 @@ export function matView({ board, copy, layout, glow, chosen, landing, holding, o
 			case "monsters": {
 				const slot = mine.monsters[zone];
 				const hold = slot ? holding?.get(key) : undefined;
-				const card: CardView | undefined = slot ? { id: `${key}:${slot.card}`, face: monsterFace(copy, board, slot), turned: slot.position === "defense", under: slot.materials?.length ?? 0, delay: landing?.get(key) ?? 0, ...(hold ? { hold: { face: monsterFace(copy, board, slot, hold), delay: hold.delay } } : {}) } : undefined;
+				/* A face-down monster shows the back of a card, sideways; only its controller reads its name. */
+				const card: CardView | undefined = !slot
+					? undefined
+					: slot.faceDown
+						? { id: `${key}:down`, face: null, ...(side === "you" ? { backName: copy.cards[slot.card].name } : {}), turned: true, under: 0, delay: landing?.get(key) ?? 0 }
+						: { id: `${key}:${slot.card}`, face: monsterFace(copy, board, slot), turned: slot.position === "defense", under: slot.materials?.length ?? 0, delay: landing?.get(key) ?? 0, ...(hold ? { hold: { face: monsterFace(copy, board, slot, hold), delay: hold.delay } } : {}) };
 				return { place, state, quiet, ...zoneTap("monsters", true), ...(card ? { card } : {}) };
 			}
 			case "backrow": {

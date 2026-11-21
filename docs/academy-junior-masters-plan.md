@@ -88,3 +88,30 @@ All five steps are built and tested (918 tests, typecheck, production build). Wh
 - Simulated against the 13 trainers (expert bot on the child's side, 52 duels): Dark Magician 41, Blue-Eyes 44,
   Elemental HEROes 30 wins: the HERO Deck is the hardest to win with. A Deck saved with cards a starter no longer
   has, or breaking the banlist, becomes the starter's new Deck when the game opens (`refreshDeck`).
+
+## Smarter trainers, Set monsters, newer cards, a real Deck builder (2026-11-21)
+
+- **Why a medium trainer Summoned a 900 ATK monster in front of two stronger ones:** the game had no Normal Set, so a
+  weak monster could only go to Attack Position or stay in the hand. Set monsters are now in the rules (face-down
+  Defense Position, flipped when attacked, Flip Summon on a later turn, "face-up" on a card now matters), for the child
+  too, and taught by two levels on the island of steps (`st-set`, `st-flip`).
+- **The bot** (`bot.ts`) now weighs what the opponent's next Battle Phase would cost it (`foreseen`), never looks at a
+  face-down monster of the other player (an attack on one is weighed as an attack on an unknown 1500 DEF monster),
+  weighs a coin toss as the average of both results, and a mistake by a medium or strong trainer is a move nearly as
+  good as the best (`slack`), never a plainly bad one.
+- **New cards**, each as printed, none on the Forbidden & Limited List: Dark Time Wizard, Time Wizard, Thousand
+  Dragon, Meteor Dragon, Meteor Black Dragon, Inferno Fire Blast, Rocket Warrior (Joey); Dark Magical Curtain (MAMO),
+  Dark Magic Curtain, Sage's Stone, Dark Magic Attack, Dark Burning Attack, Magician's Valkyria (Yugi, Atem, Arkana);
+  Blue-Eyes Alternative White Dragon, Burst Stream of Destruction, Shrink, Enemy Controller, Silver's Cry, Trade-In,
+  Ancient Rules (Kaiba); Book of Moon, Forbidden Chalice, Smashing Ground, Storming Mirror Force, Widespread Ruin
+  (staples). Coin tosses use the duel's seed (`Board.rng`).
+- **Left out or simplified, stated:** Dark Time Wizard's first effect (no card in the game mentions it); Enemy
+  Controller's second effect (take control); Dark Magical Curtain chooses for the player (Dark Magician or Dark Magician
+  Girl first, else the highest ATK; the opponent's highest ATK) and takes the first Spell/Trap that mentions "Dark
+  Magician"; Dark Time Wizard and the Curtain take no target, the other Quick-Play Spells only the opponent's monster
+  (Rush Recklessly your own); Flip effects; one Magician's Valkyria per deck (two lock every attack).
+- **Deck builder** (`deck-builder.tsx`), after Master Duel and Duel Links: the Deck and the binder as grids of card
+  pictures, filters by kind, a search, a sort, and a panel with the tapped card large, its whole text, its limit on the
+  list and the buttons to add or take out a copy.
+- **Simulated** (expert bot on the child's side, 4 duels per trainer): Dark Magician 39/52, Blue-Eyes 40/52, HEROes
+  31/52; about 3 in 4 against basic trainers, 2 to 3 in 4 against experts.

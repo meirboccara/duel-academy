@@ -23,7 +23,7 @@ type Holding =
 	| { kind: "hand"; card: CardId; set?: true }
 	/** A Spell placed in a zone, waiting for the Monster it should hit. */
 	| { kind: "aim"; card: CardId; zone: number }
-	| { kind: "tributes"; card: CardId; chosen: number[] }
+	| { kind: "tributes"; card: CardId; chosen: number[]; set?: true }
 	| { kind: "monster"; zone: number }
 	/** A Set card being flipped, waiting for the Monster it targets: one of the child's (`you`) or of the rival. */
 	| { kind: "trap"; zone: number; aim: Side }
@@ -35,8 +35,8 @@ type Holding =
 	| { kind: "act-cost"; zone: number; target?: number }
 	/** A Monster whose effect is being used, waiting for its target. */
 	| { kind: "ability"; zone: number }
-	/** A Spell with a cost, waiting for the card to discard. */
-	| { kind: "cost"; card: CardId; zone: number; target?: number }
+	/** A Spell with a cost, waiting for the card to discard; with `pick`, a Spell waiting for the monster of the hand it Special Summons. */
+	| { kind: "cost"; card: CardId; zone: number; target?: number; pick?: true }
 	/** A Spell that targets a card in a Graveyard, waiting for that card. */
 	| { kind: "grave"; card: CardId; zone: number }
 	/** A Ritual Spell or Polymerization, waiting for the monsters to use; `summon` is the Fusion Monster. */
@@ -56,6 +56,11 @@ const aimsAt = (card: CardId): Side => (spellTarget(card) === "own" ? "you" : "r
 const firstFree = (board: Board) => Math.max(0, board.you.backrow.findIndex((slot) => !slot));
 const firstMonsterZone = (board: Board) => Math.max(0, board.you.monsters.findIndex((slot, zone) => zone < mainZones(board) && !slot));
 const levelOf = (card: CardId) => monsterOf(card).level;
+/** A Spell that targets a card in a Graveyard is not Set: it could not be given its target when flipped. */
+const isReviver = (card: CardId) => {
+	const info = cardOf(card);
+	return info.kind === "spell" && info.effect.type === "revive";
+};
 const handEffect = (card: CardId) => {
 	const info = cardOf(card);
 	return info.kind === "monster" && !!info.hand;
@@ -179,7 +184,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	const useAbility = (zone: number, target?: number) => {
 		const slot = session.board[session.board.pending ? (session.board.turn === "you" ? "rival" : "you") : "you"].monsters[zone];
 		const paid = slot ? monsterOf(slot.card).act : undefined;
-		if (paid && paid.kind !== "tribute-synchro") return setPick({ kind: "act-cost", zone, ...(target === undefined ? {} : { target }) });
+		if (paid && (paid.kind === "destroy" || paid.kind === "negate-spell")) return setPick({ kind: "act-cost", zone, ...(target === undefined ? {} : { target }) });
 		act({ type: "ability", zone, ...(target === undefined ? {} : { target }) });
 	};
 	/* Against a trainer of the masters' island, the trainer plays its turn by itself, one move at a time. */
@@ -207,7 +212,9 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 		const info = cardOf(card);
 		/* With no other card in hand there is nothing to pay with: the move is tried, and the rule explains why not. */
 		const others = board.you.hand.filter((held) => held !== card).length + board.you.hand.filter((held) => held === card).length - 1;
-		if (info.kind !== "monster" && info.cost && others > 0) return setPick({ kind: "cost", card, zone, ...extra });
+		if (info.kind !== "monster" && info.cost?.type === "discard" && others > 0) return setPick({ kind: "cost", card, zone, ...extra });
+		/* Ancient Rules: the monster of the hand to Special Summon is chosen like a cost, by tapping it. */
+		if (info.kind === "spell" && info.effect.type === "hand-summon" && others > 0) return setPick({ kind: "cost", card, zone, pick: true });
 		act({ type: "place", card, row: "backrow", zone, ...extra });
 	};
 	const onHand = (card: CardId, index: number) => {
@@ -221,7 +228,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 			return setPick({ ...pick, chosen: already ? pick.chosen.filter((item) => !(item.from === "hand" && item.index === index)) : [...pick.chosen, { from: "hand", card, index }] });
 		}
 		if (pick && pick.kind !== "extra" && "card" in pick && pick.card === card) return setPick(null);
-		if (pick?.kind === "cost") return act({ type: "place", card: pick.card, row: "backrow", zone: pick.zone, ...(pick.target === undefined ? {} : { target: pick.target }), discard: card });
+		if (pick?.kind === "cost") return act({ type: "place", card: pick.card, row: "backrow", zone: pick.zone, ...(pick.target === undefined ? {} : { target: pick.target }), ...(pick.pick ? { pick: card } : { discard: card }) });
 		const info = cardOf(card);
 		if (info.kind === "spell" && info.effect.type === "revive") return setPick({ kind: "grave", card, zone: firstFree(board) });
 		if (info.kind === "spell" && info.effect.type === "ritual") return setPick({ kind: "materials", mode: "ritual", card, zone: firstFree(board), chosen: [] });
@@ -321,15 +328,16 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 		}
 		/* A Spell that helps one of your Monsters may be dropped straight onto it. */
 		if (pick?.kind === "hand" && needsTarget(pick.card) && aimsAt(pick.card) === "you" && board.you.monsters[zone]) return placeSpell(pick.card, firstFree(board), zone);
-		if (pick?.kind === "hand") return act({ type: "place", card: pick.card, row, zone });
+		if (pick?.kind === "hand") return act({ type: "place", card: pick.card, row, zone, ...(pick.set ? { set: true as const } : {}) });
 		if (pick?.kind === "aim") return placeSpell(pick.card, pick.zone, aimsAt(pick.card) === "you" ? zone : undefined);
 		if (pick?.kind === "tributes") {
 			const info = cardOf(pick.card);
 			const need = info.kind === "monster" ? tributesFor(info.level) : 0;
-			if (!board.you.monsters[zone] || pick.chosen.includes(zone)) return act({ type: "place", card: pick.card, row, zone, tributes: pick.chosen });
+			const face = pick.set ? { set: true as const } : {};
+			if (!board.you.monsters[zone] || pick.chosen.includes(zone)) return act({ type: "place", card: pick.card, row, zone, tributes: pick.chosen, ...face });
 			const chosen = [...pick.chosen, zone];
 			/* The last Tribute makes room: the big Monster lands where the first one stood. */
-			return chosen.length >= need ? act({ type: "place", card: pick.card, row, zone: chosen[0] ?? zone, tributes: chosen }) : setPick({ ...pick, chosen });
+			return chosen.length >= need ? act({ type: "place", card: pick.card, row, zone: chosen[0] ?? zone, tributes: chosen, ...face }) : setPick({ ...pick, chosen });
 		}
 		if (!board.you.monsters[zone]) return;
 		setPick(pick?.kind === "monster" && pick.zone === zone ? null : { kind: "monster", zone });
@@ -409,7 +417,9 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	const detaching = !!pickedAbility && !!monsterOf(pickedAbility.card).detach;
 	/* An effect with no target to tap: Dark Paladin negating a Spell, Blue-Eyes Spirit Dragon Tributing itself. */
 	const pickedAct = pickedAbility ? monsterOf(pickedAbility.card).act : undefined;
-	const untargeted = !!pickedAct && pickedAct.kind !== "destroy";
+	const untargeted = !!pickedAct && pickedAct.kind !== "destroy" && pickedAct.kind !== "destroy-free";
+	/* Setting a monster face-down is taught on the island of steps: offered from there on. */
+	const settable = WORLD_IDS.indexOf(level.world) >= WORLD_IDS.indexOf("steps");
 	/** The words for the choice being made: what to tap, and the sum so far. */
 	const choosing = (): string => {
 		if (pick?.kind === "grave" || pick?.kind === "haunt" || pick?.kind === "revive") return copy.chooseGrave;
@@ -599,9 +609,9 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 									{copy.useEffect}
 								</button>
 							)}
-							{free && pick?.kind === "hand" && !pick.set && isQuickPlay(pick.card) && (
+							{free && (pick?.kind === "hand" || pick?.kind === "tributes") && !pick.set && ((isQuickPlay(pick.card) && !isReviver(pick.card)) || (settable && cardOf(pick.card).kind === "monster" && !monsterOf(pick.card).frame && !monsterOf(pick.card).noNormal)) && (
 								<button type="button" onClick={() => setPick({ ...pick, set: true })} className={quiet}>
-									{copy.setFaceDown}
+									{cardOf(pick.card).kind === "monster" ? copy.setMonster : copy.setFaceDown}
 								</button>
 							)}
 							{pickedSpecial && (

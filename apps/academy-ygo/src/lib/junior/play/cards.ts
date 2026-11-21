@@ -10,15 +10,40 @@ export type Effect =
 	| { type: "boost"; amount: number }
 	/**
 	 * Spell: target one face-up monster your opponent controls and destroy it. `skipDraw`: "also skip your next Draw
-	 * Phase"; `needs`: "If you control [this card]"; `foeGains`: "then your opponent gains [n] LP".
+	 * Phase"; `needs`: "If you control [this card]"; `foeGains`: "then your opponent gains [n] LP"; `anyFace`: the
+	 * card says "1 monster", not "1 face-up monster", so a face-down monster can be targeted too.
 	 */
-	| { type: "destroy"; skipDraw?: true; needs?: string; foeGains?: number }
+	| { type: "destroy"; skipDraw?: true; needs?: string; foeGains?: number; anyFace?: true }
+	/** Quick-Play Spell: toss a coin. Right: destroy the opponent's monsters and inflict half their combined original ATK. Wrong: destroy all monsters you control. */
+	| { type: "coin-wipe" }
+	/** Dark Magical Curtain: each player Special Summons 1 DARK Spellcaster from the hand or Deck; Dark Magician (Girl) brings a Spell/Trap that mentions "Dark Magician". */
+	| { type: "curtain" }
+	/** Special Summon 1 [card] from these places; `needs`: only while you control this card, face-up; `lock`: no other Summon that turn (a Set is allowed). */
+	| { type: "call"; card: string; from: readonly ("hand" | "deck")[]; needs?: string; lock?: true }
+	/** Ancient Rules: "Special Summon 1 Level 5 or higher Normal Monster from your hand." */
+	| { type: "hand-summon"; minLevel: number }
+	/** Inferno Fire Blast: target 1 [card] you control; inflict its original ATK; it cannot attack this turn. */
+	| { type: "fire-blast"; name: string }
+	/** Quick-Play, target 1 face-up monster: its original ATK is halved until the end of this turn. */
+	| { type: "shrink" }
+	/** Quick-Play, target 1 face-up monster: until the end of this turn it gains ATK, but its effects are negated. */
+	| { type: "chalice"; amount: number }
+	/** Quick-Play, target 1 face-up monster: change it to face-down Defense Position. */
+	| { type: "book" }
+	/** Quick-Play, target 1 face-up monster your opponent controls: change its battle position. */
+	| { type: "switch" }
+	/** Destroy the 1 face-up monster your opponent controls with the highest DEF (your choice, if tied). */
+	| { type: "smash" }
+	/** Trap, when an opponent's monster declares an attack: return all their Attack Position monsters to the hand. */
+	| { type: "storm-force" }
+	/** Trap, when an opponent's monster declares an attack: destroy their Attack Position monster with the highest ATK. */
+	| { type: "ruin" }
 	/** Spell: "Inflict [n] damage to your opponent." */
 	| { type: "burn"; amount: number }
 	/** Spell: "Destroy all monsters on the field." */
 	| { type: "wipe" }
-	/** Spell or Trap: destroy every Spell and Trap your opponent controls (`foe`), or on the field (`all`). */
-	| { type: "clear-backrow"; scope: "foe" | "all" }
+	/** Spell or Trap: destroy every Spell and Trap your opponent controls (`foe`), or on the field (`all`). `needs`: "If you control [this card]". */
+	| { type: "clear-backrow"; scope: "foe" | "all"; needs?: string }
 	/** Swords of Revealing Light: it stays; the opponent's monsters cannot declare an attack; destroyed in the End Phase of the opponent's 3rd turn. */
 	| { type: "swords" }
 	/** Spell: "Add 1 [card] from your Deck to your hand." */
@@ -33,8 +58,11 @@ export type Effect =
 	| { type: "just-desserts"; amount: number }
 	/** Trap: "Gain 1000 LP for each face-up [Elemental HERO] monster you control." */
 	| { type: "recharge"; amount: number; prefix: string }
-	/** Spell, no target: destroy every monster your opponent controls when it resolves. */
-	| { type: "destroy-all" }
+	/**
+	 * Spell, no target: destroy every monster your opponent controls when it resolves. `faceUp`: only the face-up ones;
+	 * `needs`: "If you control [a card with this name, or whose id starts with it]"; `lockAttack`: those cannot attack this turn.
+	 */
+	| { type: "destroy-all"; faceUp?: true; needs?: string; lockAttack?: true }
 	/** Trap, when an opponent's monster declares an attack: that monster loses ATK until the end of the turn. */
 	| { type: "weaken-attacker"; amount: number }
 	/**
@@ -46,8 +74,8 @@ export type Effect =
 	| { type: "reinforce"; amount: number }
 	/** Trap, in answer to an opponent's Spell: return one of your monsters to your hand. */
 	| { type: "return-to-hand" }
-	/** Spell: "Target 1 monster in either GY; Special Summon it." */
-	| { type: "revive" }
+	/** Spell: "Target 1 monster in either GY; Special Summon it." `dragonNormal`: only a Dragon Normal Monster in your own GY (Silver's Cry). */
+	| { type: "revive"; dragonNormal?: true }
 	/** Field Spell: every monster of these Types on the field, on both sides, gains ATK and DEF while it is face-up; those of `minus` lose as much. */
 	| { type: "field-boost"; types: readonly MonsterType[]; amount: number; minus?: readonly MonsterType[] }
 	/** Trap, when an opponent's monster declares an attack: target the attacking monster; destroy it. */
@@ -115,7 +143,14 @@ export interface FusionMaterial {
  * of the opponent (`quick`: either player's turn; `weaker`: whose original ATK is lower than this card's ATK), negate
  * a Spell, or Tribute this Synchro Summoned card to Special Summon a LIGHT Dragon Synchro Monster (no cost).
  */
-export type Act = { kind: "destroy"; quick: boolean; oncePerTurn: boolean; weaker?: true } | { kind: "negate-spell" } | { kind: "tribute-synchro" };
+export type Act =
+	| { kind: "destroy"; quick: boolean; oncePerTurn: boolean; weaker?: true }
+	| { kind: "negate-spell" }
+	| { kind: "tribute-synchro" }
+	/** Time Wizard: once per turn, toss a coin. Right: destroy all monsters the opponent controls. Wrong: destroy your own, and take half their total ATK. */
+	| { kind: "coin" }
+	/** Blue-Eyes Alternative White Dragon: once per turn, target 1 monster your opponent controls; destroy it. This card cannot attack that turn. */
+	| { kind: "destroy-free" };
 /** "Gains [n] ATK for each…": what is counted. */
 export type Gains =
 	/** each of these cards in either Graveyard (Dark Magician Girl) */
@@ -156,8 +191,17 @@ export interface MonsterCard {
 	fusion?: readonly (string | FusionMaterial)[];
 	/** Xyz Monster: "2 Level 4 monsters". */
 	xyz?: { level: number; count: number };
-	/** "If only your opponent controls a monster, you can Special Summon this card (from your hand)." No Chain. */
-	special?: "alone";
+	/**
+	 * Special Summoned from the hand by its own text. "alone": "If only your opponent controls a monster". `reveal`:
+	 * "by revealing [card] in your hand", once per turn. No Chain.
+	 */
+	special?: "alone" | { reveal: string };
+	/** "Cannot be Normal Summoned/Set." */
+	noNormal?: true;
+	/** Rocket Warrior: during its controller's Battle Phase it is not destroyed by battle and its controller takes no battle damage from its battles; a monster it attacks loses ATK until the end of the turn. */
+	rocket?: { weaken: number };
+	/** Magician's Valkyria: the opponent's monsters cannot attack other face-up monsters of this Type. */
+	shields?: MonsterType;
 	/** "(Quick Effect): You can discard this card; you take no battle damage from that battle." Used from the hand. */
 	hand?: "no-battle-damage";
 	/** "When a monster declares an attack: You can detach 1 material from this card; negate the attack." Attacked with no material, it is destroyed. */
@@ -214,8 +258,10 @@ export interface MonsterCard {
 	negatesGraveyard?: true;
 }
 export type Cost =
-	/** "Discard 1 card;": paid when the card is activated, before anything else happens. */
-	| { type: "discard" }
+	/** "Discard 1 card;": paid when the card is activated, before anything else happens. `level`: "Discard 1 Level 8 monster". */
+	| { type: "discard"; level?: number }
+	/** "Pay half your LP;" */
+	| { type: "half-lp" }
 	/** "Banish 10 cards from the top of your Deck, face-down;" */
 	| { type: "banish-deck"; count: number };
 export interface EffectCard {
@@ -246,6 +292,8 @@ function real(id: string, rest: Partial<MonsterCard> = {}): MonsterCard {
 	const type = asType(entry.race);
 	return { kind: "monster", level: entry.level ?? 0, atk: entry.atk ?? 0, def: entry.def ?? 0, art: "🃏", ...(type ? { type } : {}), ...(frame ? { frame } : {}), ...rest };
 }
+/** Does this card's printed text mention this card name, in quotes ("Dark Magician")? */
+export const mentions = (card: CardId, name: string): boolean => !!CARD_ART[card]?.text?.includes(`"${name}"`);
 /** Is this card, by name, the one named: itself, or a card whose name becomes it (Dark Magician the Dragon Knight). */
 export const named = (card: string, name: string): boolean => card === name || (card in CARDS && cardOf(card as CardId).kind === "monster" && monsterOf(card as CardId).nameAs === name);
 /** A monster's Attribute, as printed; the original cards have none. */
@@ -277,7 +325,7 @@ export const CARDS = {
 	"shadow-wolf": { ...monster(6, 2200, 1500, "⚖️"), type: "warrior" }, // Judge Man
 	"glint-lynx": { ...monster(4, 1300, 1100, "🐆"), ability: { quick: true, oncePerTurn: true, weaken: 800 } },
 	"cinder-hedgehog": { ...monster(3, 1000, 700, "🦔"), ability: { quick: false, oncePerTurn: true, weaken: 800 } },
-	"spark-trade": { kind: "spell", cost: { type: "discard" }, effect: { type: "destroy" }, art: "🔁" }, // Tribute to the Doomed
+	"spark-trade": { kind: "spell", cost: { type: "discard" }, effect: { type: "destroy", anyFace: true }, art: "🔁" }, // Tribute to the Doomed
 	"dozy-moth": { ...monster(2, 400, 400, "🦋"), trigger: { word: "when", damage: 500 } },
 	"busy-bee": { ...monster(2, 500, 300, "🐝"), trigger: { word: "if", damage: 500 } },
 	/* Real Spells and Traps, under the ids of the original cards they replaced. The other side's targets are left out. */
@@ -309,7 +357,7 @@ export const CARDS = {
 	"flash-knight": { ...monster(4, 1800, 600, "🌟"), type: "warrior", scale: 7 },
 	dragong: { ...monster(4, 500, 2100, "🔔"), scale: 7 },
 	mandragon: { ...monster(5, 2500, 1000, "🌱"), scale: 2 },
-	"lightning-vortex": { kind: "spell", cost: { type: "discard" }, effect: { type: "destroy-all" }, art: "🌪️" },
+	"lightning-vortex": { kind: "spell", cost: { type: "discard" }, effect: { type: "destroy-all", faceUp: true }, art: "🌪️" },
 	fissure: { kind: "spell", effect: { type: "destroy-lowest" }, art: "🌋" },
 	"upstart-goblin": { kind: "spell", effect: { type: "draw-then-gift", lp: 1000 }, art: "👺" },
 	"cyber-dragon": { ...monster(5, 2100, 1600, "🐉"), special: "alone" },
@@ -470,6 +518,32 @@ export const CARDS = {
 	"elemental-hero-great-tornado": real("elemental-hero-great-tornado", { fusion: [{ prefix: "elemental-hero-" }, { attribute: "WIND" }], onFusion: "halve-foes" }),
 	"elemental-hero-nova-master": real("elemental-hero-nova-master", { fusion: [{ prefix: "elemental-hero-" }, { attribute: "FIRE" }], battleDraw: true }),
 	"elemental-hero-rampart-blaster": real("elemental-hero-rampart-blaster", { fusion: ["elemental-hero-clayman", "elemental-hero-burstinatrix"], defenseAttack: true }),
+	/* Trainers' and starters' newer cards. */
+	"time-wizard": real("time-wizard", { act: { kind: "coin" } }),
+	"thousand-dragon": real("thousand-dragon", { fusion: ["time-wizard", "baby-dragon"] }),
+	"meteor-dragon": real("meteor-dragon"),
+	"meteor-black-dragon": real("meteor-black-dragon", { fusion: ["red-eyes-black-dragon", "meteor-dragon"] }),
+	"blue-eyes-alternative-white-dragon": real("blue-eyes-alternative-white-dragon", { special: { reveal: "blue-eyes-white-dragon" }, noNormal: true, nameAs: "blue-eyes-white-dragon", act: { kind: "destroy-free" } }),
+	"rocket-warrior": real("rocket-warrior", { rocket: { weaken: 500 } }),
+	"magicians-valkyria": real("magicians-valkyria", { shields: "spellcaster" }),
+	"dark-time-wizard": { kind: "spell", icon: "quick-play", effect: { type: "coin-wipe" }, onePerTurn: true, art: "⏳" },
+	"dark-magical-curtain": { kind: "spell", icon: "quick-play", effect: { type: "curtain" }, onePerTurn: true, art: "🎭" },
+	"dark-magic-curtain": { kind: "spell", cost: { type: "half-lp" }, effect: { type: "call", card: "dark-magician", from: ["deck"], lock: true }, art: "🎪" },
+	"sages-stone": { kind: "spell", effect: { type: "call", card: "dark-magician", from: ["hand", "deck"], needs: "dark-magician-girl" }, art: "💎" },
+	"dark-magic-attack": { kind: "spell", effect: { type: "clear-backrow", scope: "foe", needs: "dark-magician" }, art: "🪄" },
+	"dark-burning-attack": { kind: "spell", effect: { type: "destroy-all", faceUp: true, needs: "dark-magician-girl" }, art: "🔥" },
+	"burst-stream-of-destruction": { kind: "spell", effect: { type: "destroy-all", needs: "blue-eyes-white-dragon", lockAttack: true }, art: "💥" },
+	"trade-in": { kind: "spell", cost: { type: "discard", level: 8 }, effect: { type: "draw", count: 2 }, art: "🔄" },
+	"ancient-rules": { kind: "spell", effect: { type: "hand-summon", minLevel: 5 }, art: "📜" },
+	"silvers-cry": { kind: "spell", icon: "quick-play", effect: { type: "revive", dragonNormal: true }, onePerTurn: true, art: "🐉" },
+	"inferno-fire-blast": { kind: "spell", effect: { type: "fire-blast", name: "red-eyes-black-dragon" }, art: "☄️" },
+	shrink: { kind: "spell", icon: "quick-play", effect: { type: "shrink" }, art: "🔻" },
+	"forbidden-chalice": { kind: "spell", icon: "quick-play", effect: { type: "chalice", amount: 400 }, art: "🏆" },
+	"book-of-moon": { kind: "spell", icon: "quick-play", effect: { type: "book" }, art: "🌙" },
+	"enemy-controller": { kind: "spell", icon: "quick-play", effect: { type: "switch" }, art: "🎮" },
+	"smashing-ground": { kind: "spell", effect: { type: "smash" }, art: "👊" },
+	"storming-mirror-force": { kind: "trap", effect: { type: "storm-force" }, art: "🌬️" },
+	"widespread-ruin": { kind: "trap", effect: { type: "ruin" }, art: "💣" },
 	/* Spells. */
 	"pot-of-greed": { kind: "spell", effect: { type: "draw", count: 2 }, art: "🏺" },
 	raigeki: { kind: "spell", effect: { type: "destroy-all" }, art: "⚡" },
@@ -478,7 +552,7 @@ export const CARDS = {
 	ookazi: { kind: "spell", effect: { type: "burn", amount: 800 }, art: "🔥" },
 	"harpies-feather-duster": { kind: "spell", effect: { type: "clear-backrow", scope: "foe" }, art: "🪶" },
 	"heavy-storm": { kind: "spell", effect: { type: "clear-backrow", scope: "all" }, art: "🌪️" },
-	"thousand-knives": { kind: "spell", effect: { type: "destroy", needs: "dark-magician" }, art: "🔪" },
+	"thousand-knives": { kind: "spell", effect: { type: "destroy", needs: "dark-magician", anyFace: true }, art: "🔪" },
 	"soul-taker": { kind: "spell", effect: { type: "destroy", foeGains: 1000 }, art: "👻" },
 	"swords-of-revealing-light": { kind: "spell", effect: { type: "swords" }, art: "🗡️" },
 	"fusion-sage": { kind: "spell", effect: { type: "search", card: "polymerization" }, art: "📖" },
@@ -502,7 +576,15 @@ export const CARDS = {
 
 export type CardId = keyof typeof CARDS;
 export const CARD_IDS = Object.keys(CARDS) as CardId[];
-export const cardOf = (id: CardId): Card => CARDS[id];
+/** Every card with its printed Type filled in where the hand-written data leaves it out (the course's first real monsters). */
+const PRINTED: Record<string, Card> = Object.fromEntries(
+	Object.entries(CARDS as Record<string, Card>).map(([id, card]) => {
+		const entry = CARD_ART[id];
+		const type = card.kind === "monster" && !card.type && entry?.kind === "monster" ? asType(entry.race) : undefined;
+		return [id, type ? { ...card, type } : card];
+	}),
+);
+export const cardOf = (id: CardId): Card => PRINTED[id] as Card;
 export function monsterOf(id: CardId): MonsterCard {
 	const card = cardOf(id);
 	if (card.kind !== "monster") throw new Error(`${id} is not a monster`);
@@ -515,7 +597,9 @@ export function monsterOf(id: CardId): MonsterCard {
 export function spellTarget(card: CardId): "own" | "foe" | null {
 	const info = cardOf(card);
 	if (info.kind !== "spell") return null;
-	return info.effect.type === "boost" || info.effect.type === "equip" ? "own" : info.effect.type === "destroy" ? "foe" : null;
+	const type = info.effect.type;
+	if (type === "boost" || type === "equip" || type === "fire-blast") return "own";
+	return type === "destroy" || type === "shrink" || type === "chalice" || type === "book" || type === "switch" ? "foe" : null;
 }
 /** A Spell or Trap that stays face-up on the field once it has resolved: Continuous, Equip and Field. */
 export function staysOnField(id: CardId): boolean {
@@ -535,7 +619,7 @@ export function trapTargetsOwn(id: CardId): boolean {
 /** Does the card carry rules text? A Normal Monster only carries a description that does not affect the game. */
 export function hasRulesText(id: CardId): boolean {
 	const card = cardOf(id);
-	return card.kind !== "monster" || !!(card.ability || card.trigger || card.frame || card.special || card.hand || card.wins || card.detach || card.gains || card.direct || card.pierce || card.attacks || card.noTraps || card.battleImmune || card.noBattleDamage || card.attackBonus || card.standby || card.battleBurn || card.summonRevive || card.act || card.nameAs || card.defenseAttack);
+	return card.kind !== "monster" || !!(card.ability || card.trigger || card.frame || card.special || card.hand || card.wins || card.detach || card.gains || card.direct || card.pierce || card.attacks || card.noTraps || card.battleImmune || card.noBattleDamage || card.attackBonus || card.standby || card.battleBurn || card.summonRevive || card.act || card.nameAs || card.defenseAttack || card.rocket || card.shields || card.noNormal);
 }
 /** The four limbs of the Forbidden One. */
 export const FORBIDDEN_LIMBS: readonly CardId[] = ["right-arm-of-the-forbidden-one", "left-arm-of-the-forbidden-one", "right-leg-of-the-forbidden-one", "left-leg-of-the-forbidden-one"];

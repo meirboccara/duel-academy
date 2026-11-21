@@ -29,7 +29,7 @@ export const STARTERS: Record<StarterId, Starter> = {
 	warrior: {
 		cover: "dark-magician",
 		deck: {
-			main: build(["dark-magician", 3], ["dark-magician-girl", 2], ["buster-blader", 2], ["curse-of-dragon", 2], ["gaia-the-fierce-knight", 1], ["summoned-skull", 1], ["red-eyes-black-dragon", 1], ["celtic-guardian", 3], ["giant-soldier-of-stone", 3], ["tune-warrior", 2], ["beta-the-magnet-warrior", 2], ["polymerization", 3], ["thousand-knives", 2], ["monster-reborn", 1], ["dark-hole", 1], ["swords-of-revealing-light", 1], ["upstart-goblin", 1], ["spark-dash", 2], ["magic-cylinder", 1], ["negate-attack", 1], ...TRAPS),
+			main: build(["dark-magician", 3], ["dark-magician-girl", 2], ["magicians-valkyria", 1], ["buster-blader", 2], ["curse-of-dragon", 2], ["gaia-the-fierce-knight", 1], ["summoned-skull", 1], ["red-eyes-black-dragon", 1], ["celtic-guardian", 2], ["giant-soldier-of-stone", 2], ["tune-warrior", 2], ["beta-the-magnet-warrior", 1], ["polymerization", 3], ["dark-magical-curtain", 2], ["sages-stone", 1], ["dark-magic-attack", 1], ["thousand-knives", 2], ["monster-reborn", 1], ["dark-hole", 1], ["swords-of-revealing-light", 1], ["spark-dash", 1], ["magic-cylinder", 1], ["negate-attack", 1], ...TRAPS),
 			extra: build(["dark-paladin", 2], ["dark-magician-the-dragon-knight", 2], ["dark-magician-girl-the-dragon-knight", 2], ["gaia-the-dragon-champion", 1], ["black-skull-dragon", 1], ["gaia-dragon-the-thunder-charger", 1], ["gaia-knight", 1], ["gem-knight-pearl", 1], ["utopia", 1], ["lanphorhynchus", 1]),
 		},
 	},
@@ -37,7 +37,7 @@ export const STARTERS: Record<StarterId, Starter> = {
 	dragon: {
 		cover: "blue-eyes-white-dragon",
 		deck: {
-			main: build(["blue-eyes-white-dragon", 3], ["flamvell-guard", 2], ["vorse-raider", 3], ["la-jinn-the-mystical-genie-of-the-lamp", 3], ["x-head-cannon", 3], ["luster-dragon-2", 2], ["lesser-dragon", 2], ["tune-warrior", 2], ["polymerization", 2], ["monster-reborn", 1], ["raigeki", 1], ["dark-hole", 1], ["mountain", 1], ["upstart-goblin", 1], ["spark-dash", 2], ["thunder-clap", 2], ["negate-attack", 2], ["magic-cylinder", 1], ["fog-snare", 1], ...TRAPS),
+			main: build(["blue-eyes-white-dragon", 3], ["blue-eyes-alternative-white-dragon", 2], ["flamvell-guard", 2], ["vorse-raider", 3], ["la-jinn-the-mystical-genie-of-the-lamp", 3], ["x-head-cannon", 2], ["luster-dragon-2", 2], ["tune-warrior", 2], ["polymerization", 2], ["ancient-rules", 1], ["trade-in", 2], ["burst-stream-of-destruction", 1], ["silvers-cry", 1], ["monster-reborn", 1], ["raigeki", 1], ["dark-hole", 1], ["spark-dash", 2], ["thunder-clap", 1], ["negate-attack", 2], ["magic-cylinder", 1], ...TRAPS),
 			extra: build(["blue-eyes-ultimate-dragon", 2], ["blue-eyes-twin-burst-dragon", 2], ["blue-eyes-spirit-dragon", 2], ["gaia-knight", 2], ["gem-knight-pearl", 2], ["utopia", 1], ["lanphorhynchus", 1]),
 		},
 	},
@@ -45,7 +45,7 @@ export const STARTERS: Record<StarterId, Starter> = {
 	hero: {
 		cover: "elemental-hero-flame-wingman",
 		deck: {
-			main: build(["elemental-hero-avian", 3], ["elemental-hero-burstinatrix", 3], ["elemental-hero-clayman", 2], ["elemental-hero-sparkman", 3], ["elemental-hero-bladedge", 1], ["elemental-hero-neos", 1], ["tune-warrior", 2], ["polymerization", 3], ["fusion-sage", 2], ["monster-reborn", 1], ["dark-hole", 1], ["raigeki", 1], ["the-warrior-returning-alive", 2], ["upstart-goblin", 1], ["spark-dash", 2], ["thunder-clap", 2], ["swords-of-revealing-light", 1], ["hero-barrier", 2], ["magic-cylinder", 1], ["negate-attack", 1], ...TRAPS),
+			main: build(["elemental-hero-avian", 3], ["elemental-hero-burstinatrix", 3], ["elemental-hero-clayman", 2], ["elemental-hero-sparkman", 3], ["elemental-hero-bladedge", 1], ["elemental-hero-neos", 2], ["tune-warrior", 1], ["polymerization", 3], ["fusion-sage", 2], ["ancient-rules", 1], ["monster-reborn", 1], ["dark-hole", 1], ["raigeki", 1], ["the-warrior-returning-alive", 1], ["forbidden-chalice", 1], ["smashing-ground", 1], ["book-of-moon", 1], ["spark-dash", 2], ["thunder-clap", 1], ["swords-of-revealing-light", 1], ["hero-barrier", 2], ["magic-cylinder", 1], ...TRAPS),
 			extra: build(["elemental-hero-flame-wingman", 3], ["elemental-hero-shining-flare-wingman", 2], ["elemental-hero-thunder-giant", 2], ["elemental-hero-great-tornado", 2], ["elemental-hero-nova-master", 2], ["elemental-hero-rampart-blaster", 1], ["gem-knight-pearl", 1], ["utopia", 1], ["lanphorhynchus", 1]),
 		},
 	},

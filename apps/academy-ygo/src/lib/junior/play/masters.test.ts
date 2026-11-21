@@ -116,3 +116,46 @@ describe("the TCG Forbidden & Limited List", () => {
 	});
 });
 
+
+describe("how the trainers think", () => {
+	const turnOf = async (persona: (typeof PERSONAS)[MasterId], setup: Parameters<typeof import("./engine").board>[0]) => {
+		const { botMove } = await import("./bot");
+		const { apply, board } = await import("./engine");
+		let state = board({ full: true, turn: "rival", ...setup });
+		const moves: import("./engine").Move[] = [];
+		for (let step = 0; step < 12 && state.turn === "rival" && !state.winner; step++) {
+			const move = botMove(state, persona, seeded(step + 1));
+			const result = apply(state, move);
+			if (!result.ok) break;
+			moves.push(move);
+			state = result.board;
+		}
+		return { moves, state };
+	};
+	it.each(["joey-wheeler", "yugi-muto", "seto-kaiba"] as const)("%s does not Summon a weak monster in Attack Position in front of two stronger ones: it is Set face-down", async (master) => {
+		for (let seed = 1; seed <= 5; seed++) {
+			const { state } = await turnOf(PERSONAS[master], { seed, you: { monsters: ["iron-boar", "lantern-owl"] }, rival: { hand: ["flame-manipulator"] } });
+			const placed = state.rival.monsters.find(Boolean);
+			if (placed) expect(placed).toMatchObject({ card: "flame-manipulator", position: "defense", faceDown: true });
+		}
+		const { state } = await turnOf(PERSONAS[master], { you: { monsters: ["iron-boar", "lantern-owl"] }, rival: { hand: ["flame-manipulator"] } });
+		expect(state.rival.monsters.find(Boolean)).toMatchObject({ faceDown: true });
+	});
+	it("an expert does not peek at a face-down monster: it treats a wall and a weakling the same", async () => {
+		const first = async (card: "moss-beetle" | "mud-toad") => (await turnOf(PERSONAS["seto-kaiba"], { phase: "battle", you: { monsters: [{ card, faceDown: true }] }, rival: { monsters: ["river-otter"] } })).moves[0];
+		expect(await first("moss-beetle")).toEqual(await first("mud-toad"));
+	});
+	it("an expert does not know how the coin will land: its choice is the same whatever the duel's seed", async () => {
+		const choice = async (seed: number) => (await turnOf(PERSONAS["seto-kaiba"], { seed, you: { monsters: ["blue-eyes-white-dragon"] }, rival: { monsters: ["time-wizard", "iron-boar"] } })).moves[0];
+		const all = await Promise.all([1, 2, 3, 4, 5, 6].map(choice));
+		expect(new Set(all.map((move) => JSON.stringify(move))).size).toBe(1);
+	});
+});
+
+describe("the coin of a duel", () => {
+	it("has its own seed in every duel: not the same toss each time", () => {
+		const seeds = new Set([1, 2, 3, 4, 5, 6].map((seed) => duelSetup("joey-wheeler", STARTERS.dragon.deck, seeded(seed)).seed));
+		expect(seeds.size).toBeGreaterThan(3);
+		expect(seeds.has(undefined)).toBe(false);
+	});
+});

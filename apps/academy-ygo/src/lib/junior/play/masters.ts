@@ -54,9 +54,9 @@ export const MASTER_TIER: Record<MasterId, Tier> = {
 	atem: "expert",
 };
 const TIER_PLAY: Record<Tier, Omit<Persona, "aggression">> = {
-	basic: { skill: 0.25, caution: 0.2, answers: 0.5 },
-	medium: { skill: 0.5, caution: 0.7, answers: 0.8, plans: 1 },
-	strong: { skill: 0.85, caution: 1, answers: 1, plans: 1 },
+	basic: { skill: 0.3, caution: 0.3, answers: 0.5, slack: 0 },
+	medium: { skill: 0.5, caution: 0.9, answers: 0.85, slack: 0.7, plans: 1 },
+	strong: { skill: 0.85, caution: 1, answers: 1, slack: 0.85, plans: 1 },
 	expert: { skill: 1, caution: 1, answers: 1, plans: 2 },
 };
 /** How much each trainer goes for the opponent's Life Points: Kaiba and Rex attack, Yugi and Weevil wait. */
@@ -142,5 +142,7 @@ export function duelSetup(master: MasterId, mine: Deck, random: () => number): S
 	};
 	const you = deal(mine);
 	const rival = deal(theirs);
-	return { full: true, strict: true, phase: "draw", turnNumber: 1, turn: random() < 0.5 ? "you" : "rival", you, rival };
+	const turn = random() < 0.5 ? "you" : "rival";
+	/* The coin tosses and the shuffles after a search follow from the same seed as the deal. */
+	return { full: true, strict: true, phase: "draw", turnNumber: 1, turn, you, rival, seed: Math.floor(random() * 2 ** 32) };
 }
