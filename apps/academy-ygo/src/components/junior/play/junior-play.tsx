@@ -27,8 +27,8 @@ import { type Dorm, dormCapId, dormKeyFor, dormToChoose, loadDorm, saveDorm } fr
 import { IslandWorld } from "../world/island-world";
 import { AlbumCards, AlbumDialog } from "./album-dialog";
 import { DeckDialog, StarterDialog } from "./deck-dialog";
-import { DevPanel } from "../dev/dev-panel";
-import { DEV_DEFAULTS, devDuelLevel, devToolsOn, loadDev, saveDev, solvedBefore, solvedThrough, type DevSettings } from "@/lib/junior/dev/dev-tools";
+import { DEV_TOOLS, DevPanelSlot } from "../dev/dev-slot";
+import { DEV_DEFAULTS, devDuelLevel, loadDev, saveDev, solvedBefore, solvedThrough, type DevSettings } from "@/lib/junior/dev/dev-tools";
 import { CARD_IDS } from "@/lib/junior/play/cards";
 import { LevelPlayer } from "./level-player";
 import { RewardReveal } from "./reward-reveal";
@@ -108,7 +108,7 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 	/* Each duel against a trainer is dealt anew: a fresh seed every time the duel is opened. */
 	const [duelSeed, setDuelSeed] = useState(1);
 	/* The developer tools: only under `next dev`, never in a production build. */
-	const dev = devToolsOn();
+	const dev = DEV_TOOLS;
 	const [devSettings, setDevSettings] = useState<DevSettings>(DEV_DEFAULTS);
 	const [shopOpen, setShopOpen] = useState(false);
 	const [albumOpen, setAlbumOpen] = useState(false);
@@ -155,7 +155,7 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 		setShop(record);
 		setDorm(chosen);
 		setDeck(loadDeck(storage, deckKey));
-		if (devToolsOn()) setDevSettings(loadDev(storage));
+		if (DEV_TOOLS) setDevSettings(loadDev(storage));
 		setDeviceReduced(typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 		setHydrated(true);
 	}, [apply, storageOf, shopKey, dormKey, deckKey]);
@@ -561,8 +561,8 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 				{deckOpen && !deck.starter && <StarterDialog copy={copy} locale={locale} onChoose={(starter) => keepDeck(startWith(starter))} onClose={() => setDeckOpen(false)} />}
 				{deckOpen && deck.starter && <DeckDialog deck={deck} owned={owned} copy={copy} locale={locale} onSave={keepDeck} onClose={() => setDeckOpen(false)} />}
 				{!level && shopOpen && <ShopDialog stars={stars} bought={bought} wardrobe={wardrobe} preview={previewOk ? preview : undefined} copy={copy} locale={locale} progress={progress} onBuy={onBuy} onClose={() => setShopOpen(false)} />}
-				{dev && hydrated && (
-					<DevPanel
+				{DevPanelSlot && hydrated && (
+					<DevPanelSlot
 						copy={copy}
 						settings={devSettings}
 						actions={{

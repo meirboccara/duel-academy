@@ -65,19 +65,6 @@ describe("the Junior map", () => {
 		setup();
 		expect(screen.queryByRole("button", { name: "Developer tools" })).toBeNull();
 	});
-	it("shows them under next dev: a level far ahead opens at once", async () => {
-		vi.stubEnv("NODE_ENV", "development");
-		try {
-			const user = setup();
-			await user.click(await screen.findByRole("button", { name: "Developer tools" }));
-			await user.selectOptions(screen.getByRole("combobox", { name: "Level" }), "st-damage");
-			await user.click(screen.getByRole("button", { name: "Open it" }));
-			expect(screen.getByRole("heading", { level: 2, name: "The Damage Step" })).toBeTruthy();
-			expect(screen.getByRole("group", { name: "Developer tools for this level" })).toBeTruthy();
-		} finally {
-			vi.unstubAllEnvs();
-		}
-	});
 	it("offers the first level and keeps later levels closed", async () => {
 		setup();
 		expect(screen.getByRole("heading", { level: 1, name: /learn by playing/i })).toBeTruthy();

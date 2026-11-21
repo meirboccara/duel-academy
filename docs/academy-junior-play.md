@@ -224,7 +224,7 @@ yet (Stardust Dragon, Toons, Time Wizard, the Egyptian Gods among them).
 
 ## Developer tools (local only)
 
-Under `next dev` only (`devToolsOn`, `src/lib/junior/dev/dev-tools.ts`; a production build never shows them), a wrench
+Under `next dev` only (`src/components/junior/dev/dev-slot.tsx`): a production build leaves their code out entirely (checked by searching the built `.next` files), and a wrench
 in the bottom corner of the Junior page opens a panel, in English:
 
 - open any level or trainer duel, locked or not; solve every level before one; finish up to an island, or all;
