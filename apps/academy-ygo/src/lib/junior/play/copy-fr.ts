@@ -343,6 +343,7 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 		chooseAttackTarget: "Touche ce qu’il doit attaquer.",
 		chooseDiscard: "Paie le coût : touche une autre carte de ta main pour la défausser.",
 		chooseGrave: "Touche un Cimetière, puis touche le Monstre à cibler.",
+		chooseFromDeck: "Choisis la carte à prendre dans ton Deck.",
 		chooseRitual: (sum, need) => `Touche les Monstres à Sacrifier, dans ta main ou sur le terrain. Niveaux : ${sum} sur ${need}.`,
 		chooseFusion: "Touche les Monstres que nomme le Monstre Fusion, dans ta main ou sur le terrain.",
 		chooseExtra: "Touche un Monstre de ton Extra Deck.",
@@ -356,7 +357,7 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 		setMonster: "Le Poser face verso (Défense)",
 		pendulumSummon: "Invocation Pendule",
 		detach: "Détacher un Matériel",
-		useFromHand: "La défausser : Effet Rapide",
+		useFromHand: "Utiliser son effet depuis la main",
 		solved: "Bravo, c’est réussi !",
 		solvedFirstTry: "Du premier coup, sans aide. Cette règle est à toi !",
 		solvedWithHint: "Réussi avec un indice. Rejoue-le pour gagner l’étoile.",
@@ -476,8 +477,16 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 					return `${name(event.card)} va dans une Zone Pendule, comme une Magie : Échelle Pendule ${event.scale}.`;
 				case "pendulum":
 					return `Invocation Pendule ! Échelles ${event.low} et ${event.high} : ${list(event.cards.map(name))} ${event.cards.length === 1 ? "vient" : "viennent"} de la main.`;
-				case "hand-effect":
-					return `${mine ? "Tu défausses" : `${RIVAL} défausse`} ${name(event.card)} depuis la main pour payer le coût de son Effet Rapide : aucun dommage de combat de ce combat.`;
+				case "hand-effect": {
+					const effect = monsterOf(event.card).hand;
+					const discards = mine ? "Tu défausses" : `${RIVAL} défausse`;
+					if (effect === "ash") return `${discards} ${name(event.card)} depuis la main : son Effet Rapide annule une carte qui prend dans le Deck.`;
+					if (effect === "veiler") return `${mine ? "Tu envoies" : `${RIVAL} envoie`} ${name(event.card)} de la main au Cimetière : son Effet Rapide annule les effets d’un Monstre jusqu’à la fin de ce tour.`;
+					if (effect === "scarecrow") return `${discards} ${name(event.card)} depuis la main : l’attaque directe est annulée, puis la Battle Phase se termine.`;
+					if (effect === "fader") return `${mine ? "Tu Invoques Spécialement" : `${RIVAL} Invoque Spécialement`} ${name(event.card)} depuis la main : la Battle Phase se termine.`;
+					if (effect === "crow") return `${discards} ${name(event.card)} depuis la main : son Effet Rapide bannit la carte ciblée dans le Cimetière.`;
+					return `${discards} ${name(event.card)} depuis la main pour payer le coût de son Effet Rapide : aucun dommage de combat de ce combat.`;
+				}
 				case "skip-draw":
 					return mine ? "Tu sautes ta Draw Phase, comme le disait ta carte : pas de pioche ce tour." : `${RIVAL} saute sa Draw Phase : pas de pioche ce tour.`;
 				case "drew":
@@ -537,7 +546,8 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 					return "Damage Step : juste avant le calcul des dommages.";
 				case "window":
 					if (event.step === "damage") return mine ? "Stop ! Kuriboh et les cartes qui changent l’ATK peuvent encore agir." : `${RIVAL} peut encore changer l’ATK.`;
-					if (!mine) return `${RIVAL} peut répondre avec un Piège Posé.`;
+					if (!mine) return `${RIVAL} peut répondre.`;
+					if (event.kind === "summon") return "Stop ! Un Monstre vient d’être Invoqué : tu peux répondre maintenant.";
 					return event.kind === "attack" ? "Stop ! Tu peux répondre maintenant." : "Stop ! Tu peux répondre maintenant. Ta réponse se résoudra en premier.";
 				case "sprung":
 					return `${mine ? "Tu retournes" : `${RIVAL} retourne`} un Piège : ${name(event.card)} !`;

@@ -34,7 +34,7 @@ describe("a Set monster", () => {
 		const flipped = ok(later, { type: "position", zone: 0 });
 		expect(flipped.board.you.monsters[0]).toMatchObject({ card: "pebble-crab", position: "attack" });
 		expect(flipped.board.you.monsters[0]?.faceDown).toBeUndefined();
-		expect(flipped.events).toEqual([{ type: "flipped", side: "you", card: "pebble-crab", how: "summon" }]);
+		expect(flipped.events).toEqual([{ type: "flipped", side: "you", card: "pebble-crab", how: "summon", zone: 0 }]);
 	});
 	it("is flipped face-up when attacked, before damage is calculated, and its controller takes no damage when it is destroyed", () => {
 		const attacked = ok(mat({ turn: "rival", phase: "battle", you: { monsters: [down("pebble-crab")] }, rival: { monsters: ["shadow-wolf"] } }), attack(0, 0));

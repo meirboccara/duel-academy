@@ -64,6 +64,18 @@ export const SHOP_CARDS: readonly ShopCard[] = [
 	...sell("ultra", ["luster-dragon-2", "blue-eyes-alternative-white-dragon"], "seto-kaiba"),
 	...sell("super", ["magic-cylinder", "dark-magical-curtain"], "atem"),
 	...sell("ultra", ["gaia-the-dragon-champion"], "atem"),
+	/* Cards played in tournaments: hand traps, Traps that answer a Summon, and searchers. */
+	...sell("rare", ["trap-hole"], "rex-raptor"),
+	...sell("super", ["torrential-tribute"], "mako-tsunami"),
+	...sell("rare", ["swift-scarecrow"], "joey-wheeler"),
+	...sell("super", ["magicians-rod"], "arkana"),
+	...sell("rare", ["dd-crow", "battle-fader"], "yami-bakura"),
+	...sell("super", ["bottomless-trap-hole"], "maximillion-pegasus"),
+	...sell("rare", ["e-emergency-call", "elemental-hero-blazeman"], "jaden-yuki"),
+	...sell("super", ["a-hero-lives"], "jaden-yuki"),
+	...sell("super", ["reinforcement-of-the-army"], "yusei-fudo"),
+	...sell("ultra", ["effect-veiler"], "yusei-fudo"),
+	...sell("secret", ["ash-blossom-joyous-spring"], "seto-kaiba"),
 ];
 /** Is this card on sale for this child: always, or once its trainer is beaten. */
 export const onSale = (item: ShopCard, progress: PlayProgress): boolean => !item.unlock || masterLevelId(item.unlock) in progress.levels;

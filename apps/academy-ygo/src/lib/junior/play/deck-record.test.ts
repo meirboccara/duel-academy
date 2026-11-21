@@ -43,7 +43,7 @@ describe("the child's Deck", () => {
 		const deck = startWith("warrior");
 		const owned = new Set(deckable(starterCards(deck)));
 		expect(deckReady(deck, owned)).toBe(true);
-		expect(deckReady(removeCard(deck, "celtic-guardian"), owned)).toBe(false);
+		expect(deckReady(removeCard(deck, "tune-warrior"), owned)).toBe(false);
 		expect(deckReady(deck, new Set())).toBe(false);
 	});
 });

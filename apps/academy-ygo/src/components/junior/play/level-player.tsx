@@ -3,7 +3,7 @@
 import { ArrowLeft, ArrowRight, Box, CircleCheck, Hand, Lightbulb, MonitorPlay, Printer, RotateCcw, Square, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
 import type { Locale } from "@/lib/i18n/locales";
-import { cardOf, hasRulesText, isQuickPlay, monsterOf, spellTarget, tributesFor, type CardId } from "@/lib/junior/play/cards";
+import { cardOf, hasRulesText, inPool, isQuickPlay, mentions, monsterOf, spellTarget, tributesFor, type CardId } from "@/lib/junior/play/cards";
 import { PLAY_COPY, VOICE_LOCALE, narrateAll, phasesStarted, playCopyFor, stepsStarted, type PlayCopy } from "@/lib/junior/play/copy";
 import { MASTER_NAMES, masterPicture } from "@/lib/junior/play/masters";
 import { fusionFits, mainZones, scalesOf, type Board, type GameEvent, type Move, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
@@ -39,6 +39,8 @@ type Holding =
 	| { kind: "cost"; card: CardId; zone: number; target?: number; pick?: true }
 	/** A Spell that targets a card in a Graveyard, waiting for that card. */
 	| { kind: "grave"; card: CardId; zone: number }
+	/** A card to choose in the Deck: for a Spell that searches (`card`), or for the monster just Normal Summoned in `zone` (Magician's Rod). */
+	| { kind: "search"; card?: CardId; zone: number }
 	/** A Ritual Spell or Polymerization, waiting for the monsters to use; `summon` is the Fusion Monster. */
 	| { kind: "materials"; mode: "ritual" | "fusion"; card: CardId; zone: number; summon?: CardId; chosen: Chosen[] }
 	/** A Synchro, Xyz or Link Monster picked in the Extra Deck, waiting for its materials on the field. */
@@ -64,6 +66,23 @@ const isReviver = (card: CardId) => {
 const handEffect = (card: CardId) => {
 	const info = cardOf(card);
 	return info.kind === "monster" && !!info.hand;
+};
+/** Effect Veiler: its effect from the hand waits for the rival's Monster it targets. */
+const handAims = (card: CardId) => {
+	const info = cardOf(card);
+	return info.kind === "monster" && info.hand === "veiler";
+};
+/** The cards of the Deck a searching effect may take, each once. */
+const searchable = (board: Board, pick: { card?: CardId; zone: number }): CardId[] => {
+	const deck = [...new Set(board.you.deck)];
+	if (pick.card) {
+		const info = cardOf(pick.card);
+		const effect = info.kind === "spell" ? info.effect : null;
+		return effect && (effect.type === "search-pick" || effect.type === "deck-summon") ? deck.filter((card) => inPool(card, effect.pool)) : [];
+	}
+	const source = board.summonTrigger?.card ?? board.you.monsters[pick.zone]?.card;
+	const named = source ? monsterOf(source).summonSearch : undefined;
+	return named ? deck.filter((card) => cardOf(card).kind !== "monster" && mentions(card, named)) : [];
 };
 
 export interface LevelPlayerProps {
@@ -230,6 +249,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 		if (pick && pick.kind !== "extra" && "card" in pick && pick.card === card) return setPick(null);
 		if (pick?.kind === "cost") return act({ type: "place", card: pick.card, row: "backrow", zone: pick.zone, ...(pick.target === undefined ? {} : { target: pick.target }), ...(pick.pick ? { pick: card } : { discard: card }) });
 		const info = cardOf(card);
+		if (info.kind === "spell" && (info.effect.type === "search-pick" || info.effect.type === "deck-summon")) return setPick({ kind: "search", card, zone: firstFree(board) });
 		if (info.kind === "spell" && info.effect.type === "revive") return setPick({ kind: "grave", card, zone: firstFree(board) });
 		if (info.kind === "spell" && info.effect.type === "ritual") return setPick({ kind: "materials", mode: "ritual", card, zone: firstFree(board), chosen: [] });
 		if (info.kind === "spell" && info.effect.type === "fusion") {
@@ -269,6 +289,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 		/* A Set card that targets: the Monster tapped on the side it aims at. */
 		if ((status === "answer" || free) && pick?.kind === "trap" && row === "monsters") return side === pick.aim ? act({ type: "spring", zone: pick.zone, target: zone }) : undefined;
 		if (status === "answer") {
+			if (pick?.kind === "hand" && handAims(pick.card) && side === "rival" && row === "monsters") return act({ type: "hand", card: pick.card, target: zone });
 			if (pick?.kind === "ability" && side === "rival" && row === "monsters") return useAbility(pick.zone, zone);
 			if (side !== "you") return;
 			if (row === "monsters") {
@@ -286,7 +307,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 			return act({ type: "spring", zone });
 		}
 		if (!free) return;
-		if (pick?.kind === "grave" || pick?.kind === "pendulum") return;
+		if (pick?.kind === "grave" || pick?.kind === "pendulum" || pick?.kind === "search") return;
 		if (pick?.kind === "materials" || pick?.kind === "extra") {
 			/* Choosing monsters on the field: a tap adds one, a second tap takes it back. */
 			if (side !== "you" || row !== "monsters" || !board.you.monsters[zone]) return;
@@ -424,6 +445,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	const choosing = (): string => {
 		if (pick?.kind === "grave" || pick?.kind === "haunt" || pick?.kind === "revive") return copy.chooseGrave;
 		if (pick?.kind === "act-cost") return copy.chooseDiscard;
+		if (pick?.kind === "search") return copy.chooseFromDeck;
 		if (pick?.kind === "pendulum") return scales ? copy.choosePendulum(scales.low, scales.high) : "";
 		if (pick?.kind === "materials") {
 			if (pick.mode === "fusion") return copy.chooseFusion;
@@ -445,16 +467,16 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 		status === "rival"
 			? copy.rivalTurn
 			: status === "answer"
-				? pick?.kind === "hand" || detaching
+				? (pick?.kind === "hand" && !handAims(pick.card)) || detaching
 					? ""
-					: pick?.kind === "trap" || pick?.kind === "ability"
+					: pick?.kind === "trap" || pick?.kind === "ability" || pick?.kind === "hand"
 						? copy.chooseTarget
 						: pick?.kind === "act-cost"
 							? copy.chooseDiscard
 							: copy.answerNow
 				: status !== "playing"
 					? ""
-					: pick?.kind === "grave" || pick?.kind === "materials" || pick?.kind === "extra" || pick?.kind === "pendulum"
+					: pick?.kind === "grave" || pick?.kind === "materials" || pick?.kind === "extra" || pick?.kind === "pendulum" || pick?.kind === "search"
 						? choosing()
 						: pick?.kind === "hand"
 						? `${copy.selected(copy.cards[pick.card].name)} ${copy.chooseZone}`
@@ -572,7 +594,20 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 									<ArrowRight className="h-5 w-5 rtl:rotate-180" aria-hidden />
 								</button>
 							)}
-							{status === "answer" && pick?.kind === "hand" && (
+							{free &&
+								pick?.kind === "search" &&
+								searchable(board, pick).map((card) => (
+									<button
+										key={card}
+										type="button"
+										data-search={card}
+										onClick={() => act(pick.card ? { type: "place", card: pick.card, row: "backrow", zone: pick.zone, pick: card } : { type: "ability", zone: pick.zone, pick: card })}
+										className={quiet}
+									>
+										<bdi lang={copy.englishCards ? "en" : undefined}>{copy.cards[card].name}</bdi>
+									</button>
+								))}
+							{status === "answer" && pick?.kind === "hand" && !handAims(pick.card) && (
 								<button type="button" onClick={() => act({ type: "hand", card: pick.card })} className={primary}>
 									{copy.useFromHand}
 								</button>
@@ -601,7 +636,11 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 								<button
 									type="button"
 									onClick={() => {
-										setPick({ kind: "revive", zone: board.summonTrigger?.zone ?? 0 });
+										const zone = board.summonTrigger?.zone ?? 0;
+										const summoned = board.summonTrigger?.card ?? board.you.monsters[zone]?.card;
+										/* Magician's Rod takes a card in the Deck; Junk Synchron a monster in the Graveyard. */
+										if (summoned && monsterOf(summoned).summonSearch) return setPick({ kind: "search", zone });
+										setPick({ kind: "revive", zone });
 										setOpen({ side: "you", pile: "graveyard" });
 									}}
 									className={primary}

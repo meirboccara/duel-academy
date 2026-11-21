@@ -256,5 +256,19 @@
 	"storming-mirror-force": { "card": 5650082, "image": 5650082 },
 	"widespread-ruin": { "card": 77754945, "image": 77754945 },
 	"rocket-warrior": { "card": 30860696, "image": 30860696 },
-	"magicians-valkyria": { "card": 80304126, "image": 80304126 }
+	"magicians-valkyria": { "card": 80304126, "image": 80304126 },
+	"ash-blossom-joyous-spring": { "card": 14558128, "image": 14558128 },
+	"effect-veiler": { "card": 97268402, "image": 97268402 },
+	"swift-scarecrow": { "card": 18964575, "image": 18964575 },
+	"battle-fader": { "card": 19665973, "image": 19665973 },
+	"dd-crow": { "card": 24508238, "image": 24508238 },
+	"trap-hole": { "card": 4206964, "image": 4206964 },
+	"bottomless-trap-hole": { "card": 29401950, "image": 29401950 },
+	"torrential-tribute": { "card": 53582587, "image": 53582587 },
+	"reinforcement-of-the-army": { "card": 32807846, "image": 32807846 },
+	"e-emergency-call": { "card": 213326, "image": 213326 },
+	"a-hero-lives": { "card": 8949584, "image": 8949584 },
+	"magicians-rod": { "card": 7084129, "image": 7084129 },
+	"elemental-hero-blazeman": { "card": 63060238, "image": 63060238 },
+	"elemental-hero-gaia": { "card": 16304628, "image": 16304628 }
 }

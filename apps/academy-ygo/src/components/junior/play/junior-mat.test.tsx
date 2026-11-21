@@ -233,12 +233,12 @@ describe("every word counts", () => {
 		await rivalNext(user);
 		await user.click(hand("Kuriboh"));
 		expect(document.querySelector("[data-card-text]")?.textContent).toContain("(Quick Effect): You can discard this card;");
-		await user.click(button("Discard it: Quick Effect"));
+		await user.click(button("Use its effect from the hand"));
 		expect(status().textContent).toMatch(/Not yet: the card says "During damage calculation"\. Wait for the Damage Step\./);
 		await user.click(button("Let it happen"));
 		expect(status().textContent).toMatch(/Damage Step: just before damage is calculated\. Stop! Kuriboh and cards that change ATK can still act\./);
 		await user.click(hand("Kuriboh"));
-		await user.click(button("Discard it: Quick Effect"));
+		await user.click(button("Use its effect from the hand"));
 		expect(status().textContent).toMatch(/You discard Kuriboh from the hand to pay the cost of its Quick Effect: no battle damage from this battle\./);
 		expect(screen.getByText("Your Life Points: 2000")).toBeTruthy();
 	});

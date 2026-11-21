@@ -115,3 +115,46 @@ All five steps are built and tested (918 tests, typecheck, production build). Wh
   list and the buttons to add or take out a copy.
 - **Simulated** (expert bot on the child's side, 4 duels per trainer): Dark Magician 39/52, Blue-Eyes 40/52, HEROes
   31/52; about 3 in 4 against basic trainers, 2 to 3 in 4 against experts.
+
+## Tournament decks, hand traps, Traps that answer a Summon (2026-11-22)
+
+- **Research** (yugiohmeta.com tournament lists and the YGOPRODeck API, read 2026-11-22; one source family, Konami's
+  own list page not opened): Blue-Eyes plays Sage/Maiden/Wishes, the Primite cards, Effect Veiler x2 and Ash Blossom
+  x3; Dark Magician plays Dark Magical Curtain x3, Magician's Rod x3, Illusion of Chaos, Soul Servant; HERO plays A Hero
+  Lives x3, Fusion Destiny, Stratos, Vision/Destiny HEROes, with Masked HERO Dark Law. Most played hand traps: Ash
+  Blossom (90% of lists), Droll & Lock Bird, Mulcharmy Fuwalos, Ghost Ogre, then Effect Veiler (35%). Forbidden now:
+  Called by the Grave, Crossout Designator, Maxx "C", Pot of Greed, Magicians' Souls, Red-Eyes Dark Dragoon.
+  Limited: Reinforcement of the Army, Foolish Burial, Terraforming.
+- **New rules:** a moment to answer a Summon (`pending.kind === "summon"`, after a Normal, Flip or Special Summon by
+  the turn player, only when the other player has an answer); monsters' effects used from the hand on the other
+  player's turn (`HandEffect`); a card chosen in the Deck (`pick` on a Spell or on Magician's Rod's effect).
+- **New cards, as printed:** Ash Blossom & Joyous Spring, Effect Veiler, Swift Scarecrow, Battle Fader, D.D. Crow;
+  Trap Hole, Bottomless Trap Hole, Torrential Tribute; Reinforcement of the Army (Limited: 1), E - Emergency Call,
+  A Hero Lives, Elemental HERO Blazeman, Elemental HERO Gaia, Magician's Rod.
+- **Left out, stated:** Ash Blossom answers Spell Cards only (not a monster's effect such as Magician's Rod's, and
+  not "send from the Deck to the GY", which no card here does); Effect Veiler and the Traps are offered when a Spell
+  is activated or a monster Summoned, not at any moment of the Main Phase; D.D. Crow only banishes the card a Spell
+  targets in the Graveyard; Blazeman's second effect; Magician's Rod's second effect; Gaia halves the opponent's
+  highest-ATK face-up monster (no choice); Blazeman adds Polymerization without asking, before the moment to answer
+  its Summon (Effect Veiler cannot stop it); Battle Fader always arrives in Defense Position and A Hero Lives'
+  monster in Attack Position; Torrential Tribute and the Trap Holes answer the turn player's Summons only (not your
+  own, not a Pendulum Summon, not a Summon during the Battle Phase); a Set Quick-Play Spell is not offered in answer to a Summon; hand traps are used on the
+  other player's turn only. Not playable exactly, so
+  not in any deck: the Primite, Sage/Maiden/Wishes, Illusion of Chaos, Soul Servant, Fusion Destiny, Stratos, Masked
+  HEROes, Droll & Lock Bird, Mulcharmy Fuwalos, Ghost Ogre, Infinite Impermanence, Nibiru.
+- **Decks:** the three starters get Ash Blossom x2, Effect Veiler, Trap Hole, Bottomless Trap Hole and Torrential
+  Tribute; Dark Magician gets Magician's Rod x3; Blue-Eyes uses Effect Veiler as a Level 1 Tuner for Spirit Dragon;
+  HEROes get A Hero Lives, E - Emergency Call, Reinforcement of the Army, Blazeman and Gaia; Blue-Eyes also gets one
+  Battle Fader. Trainers, more as their level rises: Rex and Weevil get Trap Hole, Mako Trap Hole and Torrential
+  Tribute; Joey Trap Hole and Swift Scarecrow, Arkana Magician's Rod and the two Trap Holes, Bakura Trap Hole and
+  D.D. Crow; Pegasus and Yusei Effect Veiler and Bottomless Trap Hole, Yugi Magician's Rod, Ash Blossom and Effect
+  Veiler, Jaden the HERO searchers and Ash Blossom; Marik, Kaiba and Atem Ash Blossom x2, Effect Veiler, Bottomless
+  Trap Hole and Torrential Tribute. Only the three starter strategies (and so Yugi, Atem, Arkana, Kaiba, Jaden) were
+  researched in tournament lists; the other trainers keep their anime theme and get the staples. Swift Scarecrow,
+  Battle Fader and D.D. Crow are not tournament cards today: they are there as simple first hand traps. The shop
+  sells the new cards as trainers are beaten.
+- **Bot:** it never Set a Trap (a Trap in the hand was worth as much as a Set one): fixed, and this changes every
+  trainer. It keeps a hand trap in the hand unless it needs a last wall, and uses Effect Veiler on a monster with an
+  effect to use.
+- **Simulated** (expert bot on the child's side, 8 duels per trainer, 104 per Deck): Dark Magician 71, Blue-Eyes 81,
+  HEROes 74 wins; 6 to 8 of 8 against basic trainers, 1 to 6 of 8 against experts. No duel got stuck.

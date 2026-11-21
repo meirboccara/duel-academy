@@ -38,6 +38,16 @@ export type Effect =
 	| { type: "storm-force" }
 	/** Trap, when an opponent's monster declares an attack: destroy their Attack Position monster with the highest ATK. */
 	| { type: "ruin" }
+	/** Trap, when the opponent Normal or Flip Summons 1 monster with this much ATK or more: destroy it. */
+	| { type: "trap-hole"; minAtk: number }
+	/** Trap, when the opponent Summons monsters with this much ATK or more: destroy them, and if you do, banish them. */
+	| { type: "bottomless"; minAtk: number }
+	/** Trap, when a monster is Summoned: destroy all monsters on the field. */
+	| { type: "torrential" }
+	/** Spell: add 1 monster of this kind, chosen, from your Deck to your hand. */
+	| { type: "search-pick"; pool: DeckPool }
+	/** Spell: "If you control no face-up monsters:" Special Summon 1 monster of this kind, chosen, from your Deck. */
+	| { type: "deck-summon"; pool: DeckPool }
 	/** Spell: "Inflict [n] damage to your opponent." */
 	| { type: "burn"; amount: number }
 	/** Spell: "Destroy all monsters on the field." */
@@ -132,6 +142,26 @@ export interface Trigger {
 	/** No "you can": it always happens, even when going to the GY was not the last thing (it cannot miss its timing). */
 	forced?: true;
 }
+/**
+ * A monster's effect used from the hand, on the opponent's turn (a "hand trap"):
+ * - "no-battle-damage" (Kuriboh): discard during damage calculation; no battle damage from that battle.
+ * - "ash" (Ash Blossom & Joyous Spring): discard to negate an effect that adds a card from the Deck to the hand,
+ *   Special Summons from the Deck, or sends a card from the Deck to the GY. Once per turn.
+ * - "veiler" (Effect Veiler): in the opponent's Main Phase, send to the GY to negate an Effect Monster until the end of the turn.
+ * - "scarecrow" (Swift Scarecrow): discard on a direct attack; negate the attack, then end the Battle Phase.
+ * - "fader" (Battle Fader): on a direct attack, Special Summon it from the hand, then end the Battle Phase; banished when it leaves the field.
+ * - "crow" (D.D. Crow): discard to banish 1 card in the opponent's GY.
+ */
+export type HandEffect = "no-battle-damage" | "ash" | "veiler" | "scarecrow" | "fader" | "crow";
+/** The cards of the Deck an effect chooses among. */
+export type DeckPool = "low-warrior" | "elemental-hero" | "low-elemental-hero";
+/** Does this card of the Deck fit what an effect looks for? */
+export function inPool(card: CardId, pool: DeckPool): boolean {
+	const info = cardOf(card);
+	if (info.kind !== "monster" || info.frame) return false;
+	if (pool === "low-warrior") return info.type === "warrior" && info.level <= 4;
+	return card.startsWith("elemental-hero-") && (pool === "elemental-hero" || info.level <= 4);
+}
 /** A Fusion Material described, not named: of this Type, of this Attribute, or whose id starts with `prefix` (an archetype). */
 export interface FusionMaterial {
 	type?: MonsterType;
@@ -203,7 +233,11 @@ export interface MonsterCard {
 	/** Magician's Valkyria: the opponent's monsters cannot attack other face-up monsters of this Type. */
 	shields?: MonsterType;
 	/** "(Quick Effect): You can discard this card; you take no battle damage from that battle." Used from the hand. */
-	hand?: "no-battle-damage";
+	hand?: HandEffect;
+	/** Magician's Rod: "When this card is Normal Summoned: You can add 1 Spell/Trap from your Deck to your hand, that specifically lists the card [name] in its text." */
+	summonSearch?: string;
+	/** Blazeman: "If this card is Normal or Special Summoned: You can add 1 [card] from your Deck to your hand." */
+	summonAdd?: string;
 	/** "When a monster declares an attack: You can detach 1 material from this card; negate the attack." Attacked with no material, it is destroyed. */
 	detach?: "negate-attack";
 	/** "If you have [the four limbs] in addition to this card in your hand, you win the Duel." */
@@ -249,7 +283,7 @@ export interface MonsterCard {
 	/** Nova Master: "If this card destroys an opponent's monster by battle: Draw 1 card." */
 	battleDraw?: true;
 	/** Great Tornado: "If this card is Fusion Summoned: Halve the ATK and DEF of all face-up monsters your opponent currently controls." */
-	onFusion?: "halve-foes";
+	onFusion?: "halve-foes" | "gaia";
 	/** Rampart Blaster: "can attack while in face-up Defense Position, but only if your opponent controls no monsters", its ATK halved. */
 	defenseAttack?: true;
 	/** Blue-Eyes Spirit Dragon: "Neither player can Special Summon 2 or more monsters at the same time." */
@@ -294,6 +328,8 @@ function real(id: string, rest: Partial<MonsterCard> = {}): MonsterCard {
 }
 /** Does this card's printed text mention this card name, in quotes ("Dark Magician")? */
 export const mentions = (card: CardId, name: string): boolean => !!CARD_ART[card]?.text?.includes(`"${name}"`);
+/** "Must be Fusion Summoned and cannot be Special Summoned by other ways": never brought back from a Graveyard. */
+export const fusionOnly = (card: CardId): boolean => !!CARD_ART[card]?.text?.includes("cannot be Special Summoned by other ways");
 /** Is this card, by name, the one named: itself, or a card whose name becomes it (Dark Magician the Dragon Knight). */
 export const named = (card: string, name: string): boolean => card === name || (card in CARDS && cardOf(card as CardId).kind === "monster" && monsterOf(card as CardId).nameAs === name);
 /** A monster's Attribute, as printed; the original cards have none. */
@@ -544,6 +580,21 @@ export const CARDS = {
 	"smashing-ground": { kind: "spell", effect: { type: "smash" }, art: "👊" },
 	"storming-mirror-force": { kind: "trap", effect: { type: "storm-force" }, art: "🌬️" },
 	"widespread-ruin": { kind: "trap", effect: { type: "ruin" }, art: "💣" },
+	/* Hand traps, Traps that answer a Summon, and searchers. */
+	"ash-blossom-joyous-spring": real("ash-blossom-joyous-spring", { tuner: true, hand: "ash" }),
+	"effect-veiler": real("effect-veiler", { tuner: true, hand: "veiler" }),
+	"swift-scarecrow": real("swift-scarecrow", { hand: "scarecrow" }),
+	"battle-fader": real("battle-fader", { hand: "fader" }),
+	"dd-crow": real("dd-crow", { hand: "crow" }),
+	"magicians-rod": real("magicians-rod", { summonSearch: "Dark Magician" }),
+	"elemental-hero-blazeman": real("elemental-hero-blazeman", { summonAdd: "polymerization" }),
+	"elemental-hero-gaia": real("elemental-hero-gaia", { fusion: [{ prefix: "elemental-hero-" }, { attribute: "EARTH" }], onFusion: "gaia" }),
+	"trap-hole": { kind: "trap", effect: { type: "trap-hole", minAtk: 1000 }, art: "🕳️" },
+	"bottomless-trap-hole": { kind: "trap", effect: { type: "bottomless", minAtk: 1500 }, art: "⚫" },
+	"torrential-tribute": { kind: "trap", effect: { type: "torrential" }, art: "🌊" },
+	"reinforcement-of-the-army": { kind: "spell", effect: { type: "search-pick", pool: "low-warrior" }, art: "📯" },
+	"e-emergency-call": { kind: "spell", effect: { type: "search-pick", pool: "elemental-hero" }, art: "🚨" },
+	"a-hero-lives": { kind: "spell", cost: { type: "half-lp" }, effect: { type: "deck-summon", pool: "low-elemental-hero" }, art: "🦸" },
 	/* Spells. */
 	"pot-of-greed": { kind: "spell", effect: { type: "draw", count: 2 }, art: "🏺" },
 	raigeki: { kind: "spell", effect: { type: "destroy-all" }, art: "⚡" },
@@ -601,6 +652,11 @@ export function spellTarget(card: CardId): "own" | "foe" | null {
 	if (type === "boost" || type === "equip" || type === "fire-blast") return "own";
 	return type === "destroy" || type === "shrink" || type === "chalice" || type === "book" || type === "switch" ? "foe" : null;
 }
+/** An Effect Monster: a monster with an effect of its own (not a monster that only names its materials). */
+export function isEffectMonster(id: CardId): boolean {
+	const card = cardOf(id);
+	return card.kind === "monster" && hasRulesText(id) && !!Object.keys(card).some((key) => !["kind", "level", "atk", "def", "art", "type", "frame", "tuner", "rank", "link", "scale", "fusion", "xyz", "synchroTuner", "synchroNonTuner"].includes(key));
+}
 /** A Spell or Trap that stays face-up on the field once it has resolved: Continuous, Equip and Field. */
 export function staysOnField(id: CardId): boolean {
 	const card = cardOf(id);
@@ -619,7 +675,7 @@ export function trapTargetsOwn(id: CardId): boolean {
 /** Does the card carry rules text? A Normal Monster only carries a description that does not affect the game. */
 export function hasRulesText(id: CardId): boolean {
 	const card = cardOf(id);
-	return card.kind !== "monster" || !!(card.ability || card.trigger || card.frame || card.special || card.hand || card.wins || card.detach || card.gains || card.direct || card.pierce || card.attacks || card.noTraps || card.battleImmune || card.noBattleDamage || card.attackBonus || card.standby || card.battleBurn || card.summonRevive || card.act || card.nameAs || card.defenseAttack || card.rocket || card.shields || card.noNormal);
+	return card.kind !== "monster" || !!(card.ability || card.trigger || card.frame || card.special || card.hand || card.wins || card.detach || card.gains || card.direct || card.pierce || card.attacks || card.noTraps || card.battleImmune || card.noBattleDamage || card.attackBonus || card.standby || card.battleBurn || card.summonRevive || card.act || card.nameAs || card.defenseAttack || card.rocket || card.shields || card.noNormal || card.summonSearch || card.summonAdd);
 }
 /** The four limbs of the Forbidden One. */
 export const FORBIDDEN_LIMBS: readonly CardId[] = ["right-arm-of-the-forbidden-one", "left-arm-of-the-forbidden-one", "right-leg-of-the-forbidden-one", "left-leg-of-the-forbidden-one"];

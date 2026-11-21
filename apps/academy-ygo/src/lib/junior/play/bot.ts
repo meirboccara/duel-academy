@@ -1,3 +1,4 @@
+import { cardOf, monsterOf } from "./cards";
 import { actor, apply, atkOf, defOf, legalPlays, other, type Board, type Move, type Side } from "./engine";
 
 /**
@@ -60,7 +61,14 @@ export function evaluate(state: Board, me: Side, persona: Persona): number {
 	let score = mine.lp / 100 - (theirs.lp / 100) * persona.aggression;
 	score += strength(me) - strength(other(me));
 	score += (mine.hand.length - theirs.hand.length) * 3;
+	/* A hand trap is kept to be used: stopping a card with it is worth the trade. (Its own hand only: it knows it.) */
+	score -= mine.hand.filter((card) => {
+		const info = cardOf(card);
+		return info.kind === "monster" && !!info.hand && info.hand !== "no-battle-damage";
+	}).length;
 	score += (setCards(me) - setCards(other(me))) * 3;
+	/* A Trap does nothing in the hand: Set, it is ready for the other player's turn. (Its own Traps only: it knows them.) */
+	score += mine.backrow.filter((slot) => slot && !slot.up && !slot.open && cardOf(slot.card).kind === "trap").length;
 	score += (mine.field ? 2 : 0) - (theirs.field ? 2 : 0);
 	return score - foreseen(state, me) * persona.caution;
 }
@@ -70,7 +78,13 @@ const UNKNOWN_DEF = 1500;
 /** What a monster on the field is worth to its controller. The other player's face-down monsters are unknown. */
 function worthOf(slot: NonNullable<Board["you"]["monsters"][number]>, state: Board, own: boolean): number {
 	if (slot.faceDown && !own) return (UNKNOWN_DEF * 0.8) / 100 + 4;
-	return (slot.position === "attack" ? atkOf(slot, state) : defOf(slot, state) * 0.8) / 100 + 4;
+	/* A monster with an effect to use is worth less on the turn that effect is negated (Effect Veiler). */
+	const info = monsterOf(slot.card);
+	const spent = state.used.some((key) => key.includes(`:${slot.card}`));
+	/* An effect "when Normal Summoned" only counts on the turn of that Summon, while it has not been used. */
+	const fresh = slot.summoned && !!(info.summonSearch || info.summonRevive);
+	const silenced = slot.negatedTurn && !spent && (info.act || info.ability || fresh) ? 2.5 : 0;
+	return (slot.position === "attack" ? atkOf(slot, state) : defOf(slot, state) * 0.8) / 100 + 4 - silenced;
 }
 /**
  * What the opponent's next Battle Phase would cost `me`, on the board as both players see it: each of their face-up
@@ -162,8 +176,15 @@ export function botMove(state: Board, persona: Persona, random: () => number = M
 	};
 	/** The best move of one kind on a board, by how much it improves this turn's board. */
 	const pick = (board: Board, options: ReturnType<typeof legalPlays>, kind: "attack" | "other") => {
+		/* A hand trap is kept in the hand for the other player's turn: it is only put on the field as a last wall. */
+		const exposed = !board[me].monsters.some(Boolean) && board[other(me)].monsters.some((slot) => !!slot && !slot.faceDown && slot.position === "attack");
+		const kept = (move: Move) => {
+			if (move.type !== "place" || move.row !== "monsters" || exposed) return false;
+			const info = cardOf(move.card);
+			return info.kind === "monster" && !!info.hand && info.hand !== "no-battle-damage";
+		};
 		let ranked = options
-			.filter((play) => play.move.type !== "phase" && play.move.type !== "draw" && (kind === "attack") === (play.move.type === "attack"))
+			.filter((play) => play.move.type !== "phase" && play.move.type !== "draw" && (kind === "attack") === (play.move.type === "attack") && !kept(play.move))
 			.map((play) => ({ move: play.move, board: play.board, gain: worth(board, play) - now, sure: !unsure(play) }))
 			.sort((a, b) => b.gain - a.gain);
 		if (persona.plans && !board.strict) {

@@ -125,6 +125,8 @@ export interface PlayCopy {
 	chooseAttackTarget: string;
 	chooseDiscard: string;
 	chooseGrave: string;
+	/** A card to take in the Deck (Reinforcement of the Army, Magician's Rod). */
+	chooseFromDeck: string;
 	/** A Ritual Summon: the Levels chosen so far, and the number on the Ritual Spell. */
 	chooseRitual: (sum: number, need: number) => string;
 	chooseFusion: string;

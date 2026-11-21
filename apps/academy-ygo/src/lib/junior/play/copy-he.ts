@@ -329,6 +329,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 		chooseAttackTarget: "געו במה שהיא צריכה לתקוף.",
 		chooseDiscard: `שלמו את ה${w("מחיר", "cost")}: געו בקלף אחר ביד כדי ${w("להשליך", "discard")} אותו.`,
 		chooseGrave: `געו ב${w("בית קברות", "Graveyard")}, ואז ב${MONSTER} שתהיה ה${w("מטרה", "target")}.`,
+		chooseFromDeck: "בחרו את הקלף שלוקחים מהחפיסה.",
 		chooseRitual: (sum, need) => `געו ב${MONSTERS} שאתם ${w("מקריבים", "Tribute")}, ביד או בשדה. ${w("רמות", "Levels")}: ${sum} מתוך ${need}.`,
 		chooseFusion: `געו ב${MONSTERS} שכתובות על ${w("מפלצת המיזוג", "Fusion Monster")}, ביד או בשדה.`,
 		chooseExtra: `געו ב${MONSTER} ב${EXTRA}.`,
@@ -342,7 +343,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 		setMonster: `${w("להניח", "Set")} ${DOWN} (${w("הגנה", "Defense")})`,
 		pendulumSummon: w("זימון מטוטלת", "Pendulum Summon"),
 		detach: `${w("לנתק", "detach")} ${w("חומר", "material")}`,
-		useFromHand: `${w("להשליך", "discard")}: ${L("Quick Effect")}`,
+		useFromHand: "להשתמש באפקט שלו מהיד",
 		solved: "הצלחתם!",
 		solvedFirstTry: "בניסיון הראשון, בלי עזרה. הכלל הזה שלכם!",
 		solvedWithHint: "נפתר עם רמז. שחקו שוב כדי לזכות בכוכב.",
@@ -463,8 +464,16 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 					return `${name(event.card)} מונח ב${w("אזור מטוטלת", "Pendulum Zone")}, כמו ${w("לחש", "Spell")}: ${L(`Pendulum Scale ${event.scale}`)}.`;
 				case "pendulum":
 					return `${w("זימון מטוטלת", "Pendulum Summon")}! ${w("סקאלות", "Scales")} ${event.low} ו־${event.high}: ${list(event.cards.map(name))} ${event.cards.length === 1 ? "מגיע" : "מגיעים"} מהיד.`;
-				case "hand-effect":
-					return `${mine ? w("השלכתם", "discard") : `${RIVAL} ${w("משליך", "discards")}`} את ${name(event.card)} מהיד כדי לשלם את ה${COST} של ה־${L("Quick Effect")} שלו: אין נזק מהקרב הזה.`;
+				case "hand-effect": {
+					const effect = monsterOf(event.card).hand;
+					const discards = mine ? w("השלכתם", "discard") : `${RIVAL} ${w("משליך", "discards")}`;
+					if (effect === "ash") return `${discards} את ${name(event.card)} מהיד: ה־${L("Quick Effect")} שלו מבטל קלף שלוקח מהחפיסה.`;
+					if (effect === "veiler") return `${mine ? "שלחתם" : `${RIVAL} שולח`} את ${name(event.card)} מהיד ל${GY}: ה־${L("Quick Effect")} שלו מבטל את האפקטים של ${MONSTER} עד סוף התור הזה.`;
+					if (effect === "scarecrow") return `${discards} את ${name(event.card)} מהיד: ההתקפה הישירה מבוטלת, ואז ה־${L("Battle Phase")} נגמר.`;
+					if (effect === "fader") return `${name(event.card)} מגיע מהיד ב${w("זימון מיוחד", "Special Summon")}: ה־${L("Battle Phase")} נגמר.`;
+					if (effect === "crow") return `${discards} את ${name(event.card)} מהיד: ה־${L("Quick Effect")} שלו ${w("מגלה", "banishes")} את הקלף שנבחר ב${GY}.`;
+					return `${discards} את ${name(event.card)} מהיד כדי לשלם את ה${COST} של ה־${L("Quick Effect")} שלו: אין נזק מהקרב הזה.`;
+				}
 				case "skip-draw":
 					return mine ? `מדלגים על ה־${L("Draw Phase")} שלכם, כמו שהקלף אמר: אין שליפה בתור הזה.` : `${RIVAL} מדלג על ה־${L("Draw Phase")}: אין שליפה בתור הזה.`;
 				case "drew":
@@ -524,7 +533,8 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 					return `${L("Damage Step")}: רגע לפני חישוב הנזק.`;
 				case "window":
 					if (event.step === "damage") return mine ? `עצרו! ${L("Kuriboh")} וקלפים שמשנים ATK עוד יכולים לפעול.` : `${RIVAL} עוד יכול לשנות ATK.`;
-					if (!mine) return `${RIVAL} יכול לענות עם ${w("מלכודת מונחת", "Set Trap")}.`;
+					if (!mine) return `${RIVAL} יכול לענות.`;
+					if (event.kind === "summon") return `עצרו! ${MONSTER} זומנה עכשיו: אפשר לענות.`;
 					return event.kind === "attack" ? "עצור! עכשיו אפשר לענות." : "עצור! עכשיו אפשר לענות. התשובה שלכם תיפתר ראשונה.";
 				case "sprung":
 					return `${mine ? "הפכתם" : `${RIVAL} הופך`} ${w("מלכודת", "Trap")}: ${name(event.card)}!`;

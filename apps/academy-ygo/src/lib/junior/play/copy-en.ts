@@ -338,6 +338,7 @@ export function englishCopy(RIVAL: string): PlayCopy {
 		chooseAttackTarget: "Tap what it should attack.",
 		chooseDiscard: "Pay the cost: tap another card in your hand to discard it.",
 		chooseGrave: "Tap a Graveyard, then tap the Monster to target.",
+		chooseFromDeck: "Choose the card to take from your Deck.",
 		chooseRitual: (sum, need) => `Tap the Monsters to Tribute, in your hand or on the field. Levels: ${sum} of ${need}.`,
 		chooseFusion: "Tap the Monsters the Fusion Monster names, in your hand or on the field.",
 		chooseExtra: "Tap a Monster in your Extra Deck.",
@@ -351,7 +352,7 @@ export function englishCopy(RIVAL: string): PlayCopy {
 		setMonster: "Set it face-down (Defense)",
 		pendulumSummon: "Pendulum Summon",
 		detach: "Detach a material",
-		useFromHand: "Discard it: Quick Effect",
+		useFromHand: "Use its effect from the hand",
 		solved: "You did it!",
 		solvedFirstTry: "First try, no help. That rule is yours!",
 		solvedWithHint: "Solved with a hint. Play it again to earn the star.",
@@ -471,8 +472,15 @@ export function englishCopy(RIVAL: string): PlayCopy {
 					return `${name(event.card)} is placed in a Pendulum Zone, like a Spell: Pendulum Scale ${event.scale}.`;
 				case "pendulum":
 					return `Pendulum Summon! Scales ${event.low} and ${event.high}: ${list(event.cards.map(name))} ${event.cards.length === 1 ? "comes" : "come"} from the hand.`;
-				case "hand-effect":
+				case "hand-effect": {
+					const effect = monsterOf(event.card).hand;
+					if (effect === "ash") return `${who} discard${s} ${name(event.card)} from the hand: its Quick Effect negates a card that takes from the Deck.`;
+					if (effect === "veiler") return `${who} send${s} ${name(event.card)} from the hand to the Graveyard: its Quick Effect negates a Monster's effects until the end of this turn.`;
+					if (effect === "scarecrow") return `${who} discard${s} ${name(event.card)} from the hand: the direct attack is negated, then the Battle Phase ends.`;
+					if (effect === "fader") return `${who} Special Summon${s} ${name(event.card)} from the hand: the Battle Phase ends.`;
+					if (effect === "crow") return `${who} discard${s} ${name(event.card)} from the hand: its Quick Effect banishes the card targeted in the Graveyard.`;
 					return `${who} discard${s} ${name(event.card)} from the hand to pay the cost of its Quick Effect: no battle damage from this battle.`;
+				}
 				case "skip-draw":
 					return mine ? "You skip your Draw Phase, as your card said: no draw this turn." : `${RIVAL} skips its Draw Phase: no draw this turn.`;
 				case "drew":
@@ -531,7 +539,8 @@ export function englishCopy(RIVAL: string): PlayCopy {
 					return "Damage Step: just before damage is calculated.";
 				case "window":
 					if (event.step === "damage") return mine ? "Stop! Kuriboh and cards that change ATK can still act." : `${RIVAL} can still change ATK.`;
-					if (!mine) return `${RIVAL} can answer with a Set Trap.`;
+					if (!mine) return `${RIVAL} can answer.`;
+					if (event.kind === "summon") return "Freeze! A Monster was just Summoned: you can answer now.";
 					return event.kind === "attack" ? "Freeze! You can answer now." : "Freeze! You can answer now. Your answer will resolve first.";
 				case "sprung":
 					return `${who} flip${mine ? "" : "s"} a Trap: ${name(event.card)}!`;
