@@ -270,6 +270,7 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 		atk: "ATK",
 		def: "DEF",
 		lifePoints: (side, lp) => (side === "you" ? `Tes Points de Vie : ${lp}` : `Points de Vie de ${RIVAL} : ${lp}`),
+		handCount: (side, count) => `${side === "you" ? "Ta main" : `Main de ${RIVAL}`} : ${count} ${count === 1 ? "carte" : "cartes"}`,
 		monsterZone: (side, number) => (side === "you" ? `Ta Zone Monstre ${number}` : `Zone Monstre ${number} de ${RIVAL}`),
 		backZone: (side, number) => (side === "you" ? `Ta Zone Magie & Piège ${number}` : `Zone Magie & Piège ${number} de ${RIVAL}`),
 		mainZone: (side, number) => (side === "you" ? `Ta Zone Monstre Main ${number}` : `Zone Monstre Main ${number} de ${RIVAL}`),
@@ -506,7 +507,7 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 				case "gained":
 					return `${mine ? "Tu gagnes" : `${RIVAL} gagne`} ${event.amount} Points de Vie : ${event.lp} maintenant.`;
 				case "boosted":
-					return `${name(event.card)} ${event.amount > 0 ? "gagne" : "perd"} ${Math.abs(event.amount)} ATK : ${event.atk} jusqu’à la fin du tour.`;
+					return `${name(event.card)} ${event.amount > 0 ? "gagne" : "perd"} ${Math.abs(event.amount)} ATK : ${event.atk} ${event.lasting === "damage-step" ? "pendant la Damage Step seulement" : event.lasting === "for-good" ? "pour de bon" : "jusqu’à la fin du tour"}.`;
 				case "destroyed":
 					return `${name(event.card)} est détruit et va au Cimetière.`;
 				case "no-effect":

@@ -29,7 +29,7 @@ describe("the child's Deck", () => {
 		const lighter = removeCard(deck, "elemental-hero-avian");
 		expect(lighter.main).toHaveLength(39);
 		expect(addCard(lighter, "elemental-hero-avian").main).toHaveLength(40);
-		expect(addCard(removeCard(deck, "elemental-hero-flame-wingman"), "elemental-hero-flame-wingman").extra).toHaveLength(3);
+		expect(addCard(removeCard(deck, "elemental-hero-flame-wingman"), "elemental-hero-flame-wingman").extra).toHaveLength(deck.extra.length);
 	});
 	it("is ready to duel only with a legal deck of cards the child owns", () => {
 		const deck = startWith("warrior");

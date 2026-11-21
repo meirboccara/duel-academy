@@ -1,7 +1,7 @@
 "use client";
 
 import { animate, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cardArtUrl } from "@/lib/junior/play/card-art";
 import { CARDS, cardOf, monsterOf, tributesFor, type CardId } from "@/lib/junior/play/cards";
 import { PLAY_COPY, cardType, type PlayCopy } from "@/lib/junior/play/copy";
@@ -187,7 +187,9 @@ function HeldFace({ hold, playId, atk, def, ...face }: CardFaceProps & { atk: nu
 	return <CardFace {...face} atk={held ? hold.atk : atk} def={held ? hold.def : def} />;
 }
 /** Life Points as a lantern that drains. The number is always there in words. */
-function Lantern({ side, lp, copy, moving, count, playId }: { side: Side; lp: number; copy: PlayCopy; moving: boolean; count?: LpCount | undefined; playId?: number | undefined }) {
+/** `hand`: the number of cards held, shown for the rival. The bar is measured against the highest Life Points seen (4000, or 8000 against a trainer). */
+function Lantern({ side, lp, copy, moving, count, playId, hand }: { side: Side; lp: number; copy: PlayCopy; moving: boolean; count?: LpCount | undefined; playId?: number | undefined; hand?: number }) {
+	const peak = useRef(START_LP);
 	const counting = moving && !!count && count.from !== lp;
 	const from = count?.from ?? lp;
 	const delay = count?.delay ?? 0;
@@ -199,7 +201,8 @@ function Lantern({ side, lp, copy, moving, count, playId }: { side: Side; lp: nu
 	}, [counting, from, lp, delay, playId]);
 	/* The number on show: the real one, or while an effect plays the one the count has reached. */
 	const shown = !counting ? lp : tick && tick.id === playId ? tick.value : from;
-	const share = Math.max(0, Math.min(100, (shown / START_LP) * 100));
+	peak.current = Math.max(peak.current, lp, from);
+	const share = Math.max(0, Math.min(100, (shown / peak.current) * 100));
 	return (
 		<div data-spot={`${side}-lantern`} className="flex items-center gap-2">
 			<span aria-hidden className={`text-2xl ${shown === 0 ? "opacity-30 grayscale" : ""}`}>
@@ -219,6 +222,7 @@ function Lantern({ side, lp, copy, moving, count, playId }: { side: Side; lp: nu
 				<div className="h-2 overflow-hidden rounded-full bg-ink-700" dir="ltr">
 					<div className={`h-full rounded-full ${side === "you" ? "bg-arcane-400" : "bg-ember-400"} ${moving && !counting ? "transition-[width] duration-700" : ""}`} style={{ width: `${share}%` }} />
 				</div>
+				{hand !== undefined && <p className="text-xs text-fg-muted">✋ {copy.handCount(side, hand)}</p>}
 			</div>
 		</div>
 	);
@@ -298,7 +302,7 @@ function SmallBoard({ board, copy, moving, glow, chosen, onZone, landing, counti
 	return (
 		<div role="group" aria-label={copy.board} dir="ltr" className="mx-auto max-w-md space-y-2 rounded-2xl border border-white/10 bg-surface/70 p-3">
 			<div dir="auto">
-				<Lantern side="rival" lp={board.rival.lp} copy={copy} moving={moving} count={counting?.rival} playId={playId} />
+				<Lantern side="rival" lp={board.rival.lp} copy={copy} moving={moving} count={counting?.rival} playId={playId} hand={board.rival.hand.length} />
 			</div>
 			{row("rival", "backrow")}
 			{row("rival", "monsters")}
@@ -426,7 +430,7 @@ function FullMat({ board, copy, moving, glow, chosen, onZone, onPile, landing, c
 	return (
 		<div role="group" aria-label={copy.board} dir="ltr" className="mx-auto max-w-xl space-y-1 rounded-2xl border border-white/10 bg-surface/70 p-2">
 			<div dir="auto">
-				<Lantern side="rival" lp={board.rival.lp} copy={copy} moving={moving} count={counting?.rival} playId={playId} />
+				<Lantern side="rival" lp={board.rival.lp} copy={copy} moving={moving} count={counting?.rival} playId={playId} hand={board.rival.hand.length} />
 			</div>
 			{line([extra("rival"), ...zones.map((at) => back("rival", at)), deck("rival")])}
 			{line([field("rival"), ...zones.map((at) => monster("rival", at)), graveyard("rival")])}

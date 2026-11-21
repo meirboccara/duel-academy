@@ -242,7 +242,8 @@ export type GameEvent =
 	| { type: "burned"; side: Side; card: CardId; amount: number }
 	/** A card goes to its owner's hand from the Deck or the Graveyard. */
 	| { type: "added"; side: Side; card: CardId; from: "deck" | "graveyard" }
-	| { type: "boosted"; side: Side; card: CardId; amount: number; atk: number }
+	/** ATK gained or lost: until the end of the turn (no `lasting`), for the Damage Step only, or for good. */
+	| { type: "boosted"; side: Side; card: CardId; amount: number; atk: number; lasting?: "damage-step" | "for-good" }
 	| { type: "destroyed"; side: Side; card: CardId }
 	| { type: "no-effect"; card: CardId }
 	| { type: "position"; side: Side; card: CardId; position: Position }
@@ -628,7 +629,7 @@ class Play {
 			if (!slot || !standby || s.winner) return;
 			if (standby.gain) {
 				slot.bonus = (slot.bonus ?? 0) + standby.gain;
-				this.events.push({ type: "boosted", side: s.turn, card: slot.card, amount: standby.gain, atk: atkOf(slot, s) });
+				this.events.push({ type: "boosted", side: s.turn, card: slot.card, amount: standby.gain, atk: atkOf(slot, s), lasting: "for-good" });
 			}
 			if (standby.burn) {
 				this.events.push({ type: "burned", side: s.turn, card: slot.card, amount: standby.burn });
@@ -933,7 +934,7 @@ class Play {
 			const total = me.monsters.reduce((sum, slot) => (slot && slot !== summoned && monsterOf(slot.card).level > 0 && monsterOf(slot.card).level <= gain.maxLevel ? sum + atkOf(slot, s) : sum), 0);
 			if (total > 0) {
 				summoned.bonus = (summoned.bonus ?? 0) + total;
-				this.events.push({ type: "boosted", side: s.turn, card: summoned.card, amount: total, atk: atkOf(summoned, s) });
+				this.events.push({ type: "boosted", side: s.turn, card: summoned.card, amount: total, atk: atkOf(summoned, s), lasting: "for-good" });
 			}
 		}
 	}
@@ -1336,6 +1337,7 @@ class Play {
 			if (pending.noDamage) return;
 			const bonus = live(attacker)?.attackBonus;
 			const amount = atk + (bonus && !bonus.vs ? bonus.amount : 0);
+			if (amount !== atk) this.events.push({ type: "boosted", side: s.turn, card: attacker.card, amount: amount - atk, atk: amount, lasting: "damage-step" });
 			this.events.push({ type: "direct", side: s.turn, attacker: attacker.card, amount });
 			return this.damage(other(s.turn), amount);
 		}
@@ -1344,6 +1346,8 @@ class Play {
 		/* "If this card attacks [a WIND monster], it gains [n] ATK during the Damage Step only." */
 		const bonus = live(attacker)?.attackBonus;
 		const fought = atk + (bonus && (!bonus.vs || attributeOf(defender.card) === bonus.vs) ? bonus.amount : 0);
+		/* Said before the monsters meet: the ATK on the card is not the one that fights. */
+		if (fought !== atk) this.events.push({ type: "boosted", side: s.turn, card: attacker.card, amount: fought - atk, atk: fought, lasting: "damage-step" });
 		return this.fight(pending, attacker, defender, fought);
 	}
 	/** Damage calculation between two monsters, then what the battle destroyed, last of all. */

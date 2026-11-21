@@ -32,7 +32,7 @@ export const DECK_COPY: Record<Locale, DeckCopy> = {
 		deckButton: "Mon Deck",
 		deckTitle: "Ton Deck pour les maîtres",
 		chooseTitle: "Choisis ton Deck de départ",
-		chooseText: "Ses cartes vont dans ton classeur. Ensuite, tu pourras changer ton Deck quand tu veux, avec toutes les cartes de ton classeur.",
+		chooseText: "Chaque Deck a déjà son Extra Deck (Fusion, Synchro, Xyz et Lien). Ses cartes vont dans ton classeur. Ensuite, tu pourras changer ton Deck quand tu veux, avec toutes les cartes de ton classeur.",
 		starters: {
 			warrior: { name: "Magiciens et guerriers", text: "Des Monstres solides, Magicien Sombre, et des Pièges pour se défendre." },
 			dragon: { name: "Dragons", text: "Des Dragons puissants, et la Montagne pour les renforcer." },
@@ -64,7 +64,7 @@ export const DECK_COPY: Record<Locale, DeckCopy> = {
 		deckButton: "My Deck",
 		deckTitle: "Your Deck for the masters",
 		chooseTitle: "Choose your starter Deck",
-		chooseText: "Its cards go into your binder. Then you can change your Deck any time, with every card in your binder.",
+		chooseText: "Each Deck comes with its Extra Deck (Fusion, Synchro, Xyz and Link). Its cards go into your binder. Then you can change your Deck any time, with every card in your binder.",
 		starters: {
 			warrior: { name: "Magicians and warriors", text: "Sturdy Monsters, Dark Magician, and Traps to defend with." },
 			dragon: { name: "Dragons", text: "Mighty Dragons, and Mountain to make them stronger." },
@@ -96,7 +96,7 @@ export const DECK_COPY: Record<Locale, DeckCopy> = {
 		deckButton: `החפיסה שלי (${L("Deck")})`,
 		deckTitle: "החפיסה שלכם מול המאסטרים",
 		chooseTitle: "בחרו חפיסת התחלה",
-		chooseText: "הקלפים שלה נכנסים לאלבום שלכם. אחר כך אפשר לשנות את החפיסה מתי שרוצים, עם כל הקלפים שבאלבום.",
+		chooseText: `לכל חפיסה כבר יש ${L("Extra Deck")} (${L("Fusion")}, ${L("Synchro")}, ${L("Xyz")}, ${L("Link")}). הקלפים שלה נכנסים לאלבום שלכם. אחר כך אפשר לשנות את החפיסה מתי שרוצים, עם כל הקלפים שבאלבום.`,
 		starters: {
 			warrior: { name: "קוסמים ולוחמים", text: `מפלצות חזקות, ${L("Dark Magician")}, ומלכודות להגנה.` },
 			dragon: { name: "דרקונים", text: `דרקונים עוצמתיים, ו־${L("Mountain")} שמחזק אותם.` },

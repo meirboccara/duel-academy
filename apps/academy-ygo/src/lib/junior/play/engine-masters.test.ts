@@ -203,3 +203,13 @@ describe("what the review found", () => {
 		expect(after.you.monsters.slice(0, 2).every(Boolean)).toBe(true);
 	});
 });
+
+describe("what the child sees in a battle", () => {
+	it("announces a Damage Step bonus before the monsters meet: Dash Warrior shows 600 ATK but fights at 1800", () => {
+		const fought = ok(mat({ phase: "battle", you: { monsters: ["dash-warrior"] }, rival: { monsters: ["lesser-dragon"] } }), attack(0, 0));
+		const types = fought.events.map((event) => event.type);
+		expect(types.indexOf("boosted")).toBeGreaterThan(-1);
+		expect(types.indexOf("boosted")).toBeLessThan(types.indexOf("battle"));
+		expect(fought.events.find((event) => event.type === "boosted")).toMatchObject({ card: "dash-warrior", amount: 1200, atk: 1800 });
+	});
+});

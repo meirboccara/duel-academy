@@ -596,6 +596,8 @@ describe("the masters' island", () => {
 		expect(screen.getByRole("heading", { level: 2, name: "Duel: Rex Raptor · beginner" })).toBeTruthy();
 		expect(screen.getAllByText(/Your Life Points: 8000/).length).toBeGreaterThan(0);
 		expect(screen.getAllByText(/Rex Raptor's Life Points: 8000/).length).toBeGreaterThan(0);
+		/* The trainer's hand is face-down, but how many cards it holds is shown. */
+		expect(screen.getAllByText(/Rex Raptor's hand: \d+ cards/).length).toBeGreaterThan(0);
 	});
 });
 

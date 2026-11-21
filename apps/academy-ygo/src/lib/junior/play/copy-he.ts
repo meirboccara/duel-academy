@@ -256,6 +256,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 		atk: "ATK",
 		def: "DEF",
 		lifePoints: (side, lp) => (side === "you" ? `${LP} שלכם: ${lp}` : `${LP} של ${RIVAL}: ${lp}`),
+		handCount: (side, count) => `${side === "you" ? "היד שלכם" : `היד של ${RIVAL}`}: ${count} קלפים`,
 		monsterZone: (side, number) => (side === "you" ? `${w("אזור מפלצות", "Monster Zone")} ${number} שלכם` : `${w("אזור מפלצות", "Monster Zone")} ${number} של ${RIVAL}`),
 		backZone: (side, number) => (side === "you" ? `${w("אזור לחשים ומלכודות", "Spell & Trap Zone")} ${number} שלכם` : `${w("אזור לחשים ומלכודות", "Spell & Trap Zone")} ${number} של ${RIVAL}`),
 		mainZone: (side, number) => `${w("אזור מפלצות ראשי", "Main Monster Zone")} ${number} ${side === "you" ? "שלכם" : `של ${RIVAL}`}`,
@@ -493,7 +494,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 				case "gained":
 					return `${mine ? "קיבלתם" : `${RIVAL} מקבל`} ${event.amount} ${LP}: עכשיו ${event.lp}.`;
 				case "boosted":
-					return `${name(event.card)}: ${event.amount > 0 ? "עוד" : "פחות"} ${Math.abs(event.amount)} ATK. עכשיו ${event.atk}, עד סוף התור.`;
+					return `${name(event.card)}: ${event.amount > 0 ? "עוד" : "פחות"} ${Math.abs(event.amount)} ATK. עכשיו ${event.atk}, ${event.lasting === "damage-step" ? `רק ב־${L("Damage Step")}` : event.lasting === "for-good" ? "לתמיד" : "עד סוף התור"}.`;
 				case "destroyed":
 					return `${name(event.card)} ${w("הושמד", "destroyed")} והולך ל${w("בית הקברות", "Graveyard")}.`;
 				case "no-effect":

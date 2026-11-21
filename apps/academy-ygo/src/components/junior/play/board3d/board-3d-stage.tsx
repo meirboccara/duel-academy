@@ -54,7 +54,9 @@ export interface Board3dStageProps {
 }
 
 /** Life Points over a corner of the mat: a name, the number (counted up or down while an effect plays) and a bar. Decorative: the HTML twin says them. */
-function LifeChip({ side, name, lp, moving, count, playId }: { side: Side; name: string; lp: number; moving: boolean; count?: LpCount | undefined; playId: number }) {
+/** `hand`: the line saying how many cards the rival holds. The bar is measured against the highest Life Points seen. */
+function LifeChip({ side, name, lp, moving, count, playId, hand }: { side: Side; name: string; lp: number; moving: boolean; count?: LpCount | undefined; playId: number; hand?: string }) {
+	const peak = useRef(START_LP);
 	const counting = moving && !!count && count.from !== lp;
 	const from = count?.from ?? lp;
 	const delay = count?.delay ?? 0;
@@ -65,7 +67,8 @@ function LifeChip({ side, name, lp, moving, count, playId }: { side: Side; name:
 		return () => controls.stop();
 	}, [counting, from, lp, delay, playId]);
 	const shown = !counting ? lp : tick && tick.id === playId ? tick.value : from;
-	const share = Math.max(0, Math.min(100, (shown / START_LP) * 100));
+	peak.current = Math.max(peak.current, lp, from);
+	const share = Math.max(0, Math.min(100, (shown / peak.current) * 100));
 	return (
 		<div data-spot={`${side}-lantern`} className={`pointer-events-none absolute top-1.5 w-[7rem] rounded-xl border-2 bg-ink-950/80 px-2 py-0.5 backdrop-blur-sm md:w-[9.5rem] md:px-3 md:py-1 ${side === "rival" ? "left-1.5 border-ember-400" : "right-1.5 border-arcane-400"}`}>
 			<p className="flex items-baseline justify-between gap-1 text-xs font-semibold text-white">
@@ -79,6 +82,7 @@ function LifeChip({ side, name, lp, moving, count, playId }: { side: Side; name:
 			<div className="h-1.5 overflow-hidden rounded-full bg-ink-700" dir="ltr">
 				<div className={`h-full rounded-full ${side === "you" ? "bg-arcane-400" : "bg-ember-400"} ${moving && !counting ? "transition-[width] duration-700" : ""}`} style={{ width: `${share}%` }} />
 			</div>
+			{hand && <p className="truncate text-[10px] text-white/80 md:text-xs">✋ {hand}</p>}
 		</div>
 	);
 }
@@ -186,7 +190,7 @@ export function Board3dStage({ three, board, before, beats, playId, copy, moving
 					</Suspense>
 				</SceneBoundary>
 			)}
-			<LifeChip side="rival" name={copy.rivalName} lp={board.rival.lp} moving={moving} count={counting?.rival} playId={playId} />
+			<LifeChip side="rival" name={copy.rivalName} lp={board.rival.lp} moving={moving} count={counting?.rival} playId={playId} hand={copy.handCount("rival", board.rival.hand.length)} />
 			<LifeChip side="you" name={words.you} lp={board.you.lp} moving={moving} count={counting?.you} playId={playId} />
 			{effects && found?.id === playId && beats.length > 0 && effects(found.find, found.stage)}
 		</div>

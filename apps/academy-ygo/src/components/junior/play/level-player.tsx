@@ -176,7 +176,9 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	/* Against a trainer of the masters' island, the trainer plays its turn by itself, one move at a time. */
 	useEffect(() => {
 		if (!level.duel || session.status !== "rival") return;
-		const timer = window.setTimeout(() => update(next(session)), moving ? 700 : 250);
+		/* After the trainer activates a card or changes a monster's ATK, a longer pause: the child reads what changed. */
+		const telling = session.events.some((event) => (event.type === "activated" || event.type === "sprung" || event.type === "boosted") && event.side === "rival");
+		const timer = window.setTimeout(() => update(next(session)), telling ? 2200 : moving ? 700 : 250);
 		return () => window.clearTimeout(timer);
 	}, [level.duel?.master, session, moving]);
 	const showHint = (from: Session) => {
