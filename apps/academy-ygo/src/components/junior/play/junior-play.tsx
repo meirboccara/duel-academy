@@ -27,6 +27,9 @@ import { type Dorm, dormCapId, dormKeyFor, dormToChoose, loadDorm, saveDorm } fr
 import { IslandWorld } from "../world/island-world";
 import { AlbumCards, AlbumDialog } from "./album-dialog";
 import { DeckDialog, StarterDialog } from "./deck-dialog";
+import { DevPanel } from "../dev/dev-panel";
+import { DEV_DEFAULTS, devDuelLevel, devToolsOn, loadDev, saveDev, solvedBefore, solvedThrough, type DevSettings } from "@/lib/junior/dev/dev-tools";
+import { CARD_IDS } from "@/lib/junior/play/cards";
 import { LevelPlayer } from "./level-player";
 import { RewardReveal } from "./reward-reveal";
 import { ShopDialog, type WardrobeActions } from "./shop-dialog";
@@ -104,6 +107,9 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 	const [deckOpen, setDeckOpen] = useState(false);
 	/* Each duel against a trainer is dealt anew: a fresh seed every time the duel is opened. */
 	const [duelSeed, setDuelSeed] = useState(1);
+	/* The developer tools: only under `next dev`, never in a production build. */
+	const dev = devToolsOn();
+	const [devSettings, setDevSettings] = useState<DevSettings>(DEV_DEFAULTS);
 	const [shopOpen, setShopOpen] = useState(false);
 	const [albumOpen, setAlbumOpen] = useState(false);
 	const [heroOpen, setHeroOpen] = useState(false);
@@ -149,6 +155,7 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 		setShop(record);
 		setDorm(chosen);
 		setDeck(loadDeck(storage, deckKey));
+		if (devToolsOn()) setDevSettings(loadDev(storage));
 		setDeviceReduced(typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 		setHydrated(true);
 	}, [apply, storageOf, shopKey, dormKey, deckKey]);
@@ -222,11 +229,11 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 		[active, commit],
 	);
 	/* A duel against a trainer is dealt once per opening: the same board until the child leaves it. */
-	const played = useMemo(() => (level?.duel ? { ...level, duel: { ...level.duel, seed: duelSeed }, setup: duelSetup(level.duel.master, deck, seeded(duelSeed)) } : level), [level, duelSeed, deck]);
+	const played = useMemo(() => (level?.duel ? devDuelLevel({ ...level, duel: { ...level.duel, seed: duelSeed }, setup: duelSetup(level.duel.master, deck, seeded(duelSeed)) }, dev ? devSettings : DEV_DEFAULTS) : level), [level, duelSeed, deck, dev, devSettings]);
 	const upNext = nextLevel(progress);
 	/* The binder: the cards played with, the trainers' cards, the cards bought, and the starter Deck's cards. */
 	const cards = binder(progress, [...bought, ...starterCards(deck)], dorm);
-	const owned = useMemo(() => deckable(cards), [cards]);
+	const owned = useMemo(() => deckable(dev && devSettings.allCards ? [...cards, ...CARD_IDS] : cards), [cards, dev, devSettings.allCards]);
 	const ownedSet = useMemo(() => new Set<string>(owned), [owned]);
 	const deckWords = DECK_COPY[locale];
 	const keepDeck = (record: DeckRecord) => {
@@ -450,7 +457,8 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 					</section>
 				) : level ? (
 					<LevelPlayer
-						key={level.duel ? `${level.id}:${duelSeed}` : level.id}
+						dev={dev}
+						key={level.duel ? `${level.id}:${duelSeed}:${dev ? `${devSettings.first}:${devSettings.tier}` : ""}` : level.id}
 						level={played ?? level}
 						number={levelsOf(level.world).indexOf(level) + 1}
 						total={levelsOf(level.world).length}
@@ -553,6 +561,41 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 				{deckOpen && !deck.starter && <StarterDialog copy={copy} locale={locale} onChoose={(starter) => keepDeck(startWith(starter))} onClose={() => setDeckOpen(false)} />}
 				{deckOpen && deck.starter && <DeckDialog deck={deck} owned={owned} copy={copy} locale={locale} onSave={keepDeck} onClose={() => setDeckOpen(false)} />}
 				{!level && shopOpen && <ShopDialog stars={stars} bought={bought} wardrobe={wardrobe} preview={previewOk ? preview : undefined} copy={copy} locale={locale} progress={progress} onBuy={onBuy} onClose={() => setShopOpen(false)} />}
+				{dev && hydrated && (
+					<DevPanel
+						copy={copy}
+						settings={devSettings}
+						actions={{
+							onOpen: open,
+							onUnlockTo: (id) => commit((current) => solvedBefore(current, id)),
+							onFinishIsland: (world) => commit((current) => solvedThrough(current, world)),
+							onFinishAll: () => commit((current) => solvedThrough(current, WORLD_IDS[WORLD_IDS.length - 1]!)),
+							onResetProgress: () => {
+								/* Like every save: never into a save another tab deleted or replaced. */
+								const current = playerRef.current;
+								if (current && !current.stillMine()) return current.onChangePlayer();
+								/* Saving merges with the stored record, which would keep every solved level: this one is written over. */
+								const storage = storageOf();
+								const empty = { ...emptyPlayProgress(), sound: progressRef.current.sound };
+								try {
+									storage?.setItem(PLAY_PROGRESS_KEY, JSON.stringify(empty));
+								} catch {
+									/* Nothing stored: the reset lasts for this visit. */
+								}
+								apply(empty);
+							},
+							onResetDeck: () => {
+								const storage = shopStorage();
+								if (storage) saveDeck(storage, deckKey, NO_DECK);
+								setDeck(NO_DECK);
+							},
+							onSettings: (settings) => {
+								setDevSettings(settings);
+								saveDev(getStorage(), settings);
+							},
+						}}
+					/>
+				)}
 				{!level && revealed.length > 0 && <RewardReveal
 						cards={revealed}
 						copy={copy}

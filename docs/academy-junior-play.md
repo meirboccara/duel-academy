@@ -221,3 +221,15 @@ Still left out: Set Monsters and Flip effects, replays, the hand size limit, Spe
 an attack", Trap Hole and other cards that answer a Summon, and the anime cards with effects the engine does not play
 yet (Stardust Dragon, Toons, Time Wizard, the Egyptian Gods among them).
 
+
+## Developer tools (local only)
+
+Under `next dev` only (`devToolsOn`, `src/lib/junior/dev/dev-tools.ts`; a production build never shows them), a wrench
+in the bottom corner of the Junior page opens a panel, in English:
+
+- open any level or trainer duel, locked or not; solve every level before one; finish up to an island, or all;
+- forget every solved level of this save, or its starter Deck;
+- masters' island: every playable card in the binder (Deck editor), who starts a duel, every trainer at one level.
+
+In a level, a dashed "Dev" bar under the board plays the recorded solution, lets the bot play the child's turn, or
+wins at once. The settings are kept in this browser under `academy-ygo:junior:dev`.

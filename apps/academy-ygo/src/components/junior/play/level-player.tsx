@@ -8,7 +8,8 @@ import { PLAY_COPY, VOICE_LOCALE, narrateAll, phasesStarted, playCopyFor, stepsS
 import { MASTER_NAMES, masterPicture } from "@/lib/junior/play/masters";
 import { mainZones, scalesOf, type Board, type GameEvent, type Move, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
 import { WORLD_IDS, type Level } from "@/lib/junior/play/levels";
-import { hint as askHint, next, outcome, play, restart, start, undo, type Outcome, type Session } from "@/lib/junior/play/session";
+import { hint as askHint, botTurn, forceWin, next, outcome, play, playOut, restart, start, undo, type Outcome, type Session } from "@/lib/junior/play/session";
+import { DevLevelBar } from "../dev/dev-panel";
 import { chime, speak, stopSpeaking } from "@/lib/junior/play/sound";
 import { BEAT, BoardStage } from "./board-stage";
 import type { HandItem } from "./board3d/board-3d-stage";
@@ -59,6 +60,8 @@ const handEffect = (card: CardId) => {
 };
 
 export interface LevelPlayerProps {
+	/** The developer tools bar under the board: only under `next dev`. */
+	dev?: boolean;
 	level: Level;
 	number: number;
 	total: number;
@@ -85,7 +88,7 @@ export interface LevelPlayerProps {
  * still on the page, hidden from the eyes only, so a keyboard and a screen reader play exactly as before, and a
  * "Flat board" button brings the HTML board back for anyone who prefers it. Without WebGL nothing changes.
  */
-export function LevelPlayer({ level, number, total, copy, locale, moving, sound, solvedBefore, hasNext, onSolved, onNext, onExit }: LevelPlayerProps) {
+export function LevelPlayer({ dev = false, level, number, total, copy, locale, moving, sound, solvedBefore, hasNext, onSolved, onNext, onExit }: LevelPlayerProps) {
 	const [session, setSession] = useState<Session>(() => start(level));
 	const [pick, setPick] = useState<Holding>(null);
 	/** The pile the child has opened to look through. */
@@ -485,6 +488,7 @@ export function LevelPlayer({ level, number, total, copy, locale, moving, sound,
 					<BoardStage board={board} events={session.events} copy={copy} moving={moving} glow={glow} chosen={chosen} onZone={onZone} onPile={onPile} {...(handItems ? { hand: handItems, handFocus } : {})} />
 					{opened && <PileViewer title={opened.title} copy={copy} cards={opened.cards} {...(pileTap ? { pickable: pileTap, onPick: onPileCard } : {})} onClose={() => setOpen(null)} />}
 					<ClashBanner events={session.events} copy={copy} moving={moving} />
+					{dev && <DevLevelBar canSolve={!level.duel} onSolve={() => update({ ...playOut(start(level), level.solution), stats: session.stats })} onBotTurn={() => update(botTurn(session))} onWin={() => update(forceWin(session))} />}
 					<ChainTower events={session.events} board={board} copy={copy} />
 					<div className="mx-auto max-w-md space-y-2 rounded-xl border border-white/20 bg-ink-800 p-3">
 						<div role="status" aria-live="polite" className="min-h-14 space-y-1">

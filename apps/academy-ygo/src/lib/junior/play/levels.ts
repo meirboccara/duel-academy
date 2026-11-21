@@ -1,5 +1,6 @@
 import { FORBIDDEN_LIMBS, cardOf, type CardId } from "./cards";
 import { EXTRA_ZONE, type Material, type Move, type Setup, type Side } from "./engine";
+import type { Persona } from "./bot";
 import { MASTERS, masterLevelId, type MasterId } from "./masters";
 
 /** The rules of the Junior course, in teaching order. Each is taught by one level and used again by later ones. */
@@ -56,7 +57,7 @@ export interface Level {
 	 * A duel against a trainer of the masters' island: no script and no recorded solution. The board is dealt when the
 	 * duel starts (the child's Deck and the trainer's, shuffled with `seed`), and the trainer is a bot.
 	 */
-	duel?: { master: MasterId; seed?: number };
+	duel?: { master: MasterId; seed?: number; persona?: Persona };
 	bar: PhaseBar;
 	/** One way to solve it, the player's moves only. Checked by the tests. */
 	solution: readonly Move[];

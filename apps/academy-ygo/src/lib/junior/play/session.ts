@@ -193,7 +193,7 @@ const botRandom = (session: Session) => seeded((session.level.duel?.seed ?? 1) *
 function botNext(session: Session): Session {
 	const master = session.level.duel?.master;
 	if (!master) return session;
-	const persona = PERSONAS[master];
+	const persona = session.level.duel?.persona ?? PERSONAS[master];
 	const tired = !session.board.pending && session.rivalStep >= MOST_BOT_MOVES;
 	const move: Move = tired ? { type: "phase", to: "end" } : botMove(session.board, persona, botRandom(session));
 	let result = apply(session.board, move);
@@ -308,3 +308,47 @@ export function demoFrames(demo: Demo): Frame[] {
 	}
 	return frames;
 }
+
+/**
+ * Plays these moves of the child, with the rival's steps in between, until the try ends or the moves run out. For the
+ * developer tools ("play the solution") and the tests.
+ */
+export function playOut(session: Session, moves: readonly Move[]): Session {
+	let current = session;
+	for (const move of moves) {
+		while (current.status === "rival") current = next(current);
+		if (current.status !== "playing" && current.status !== "answer") break;
+		current = play(current, move);
+	}
+	while (current.status === "rival") current = next(current);
+	return current;
+}
+/** The developer tools' "win now": the rival's Life Points drop to 0, to see what a win gives. */
+export function forceWin(session: Session): Session {
+	/* A try already over stays as it ended. */
+	if (session.status === "solved" || session.status === "failed") return session;
+	const board = { ...session.board, rival: { ...session.board.rival, lp: 0 }, winner: "you" as const, pending: null };
+	return settle({ ...session, board, events: [{ type: "won", side: "you" }], rejected: null });
+}
+/** The developer tools' "bot plays my turn": the hint bot plays the child's moves until the turn passes or the try ends. */
+export function botTurn(session: Session): Session {
+	let current = session;
+	const turn = current.board.turnNumber;
+	const random = seeded(turn * 31 + session.moves.length);
+	for (let step = 0; step < 80 && current.board.turnNumber === turn; step++) {
+		/* The rival answering in the middle of the turn (a Trap flipped): it answers, then the turn goes on. */
+		if (current.status === "rival") {
+			current = next(current);
+			continue;
+		}
+		if (current.status !== "playing" && current.status !== "answer") break;
+		/* The best bot's move, at once: never the slow search of the hints. */
+		const move = botMove(current.board, HINT_PERSONA, random);
+		const after = play(current, move);
+		current = after.rejected ? play(current, current.board.pending ? { type: "pass" } : { type: "phase", to: "end" }) : after;
+		if (current.rejected) break;
+	}
+	/* What the bot did is not the child's: no refused move of its own counts as a slip. Failed tries still count. */
+	return { ...current, rejected: null, stats: { ...current.stats, slips: session.stats.slips } };
+}
+
