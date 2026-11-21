@@ -15,9 +15,11 @@ export interface Persona {
 	caution: number;
 	/** How often (0 to 1) the bot answers when an answer would help: a basic trainer forgets its Traps. */
 	answers: number;
+	/** How many more moves of its own turn it looks at, after each move (Summon then attack, destroy the blocker then attack directly). */
+	plans?: number;
 }
 /** The persona used for the child's hints: the best move, carefully. */
-export const HINT_PERSONA: Persona = { aggression: 1, skill: 1, caution: 1, answers: 1 };
+export const HINT_PERSONA: Persona = { aggression: 1, skill: 1, caution: 1, answers: 1, plans: 1 };
 
 const WIN = 1_000_000;
 /** A random number generator in [0, 1) from a seed: the same seed gives the same duel. */
@@ -70,6 +72,8 @@ export function evaluate(state: Board, me: Side, persona: Persona): number {
 
 /** The smallest gain that makes a move worth playing: moves that change nothing are not played. */
 const WORTH = 0.01;
+/** How many of its best moves an expert looks past, one move further. */
+const PLANNED = 8;
 
 /**
  * The bot's next move, for the player who has to act now. On its own turn it draws, plays what helps in Main Phase 1,
@@ -94,13 +98,32 @@ export function botMove(state: Board, persona: Persona, random: () => number = M
 	}
 	if (state.phase === "draw" && !state.drawn && state.turnNumber > 1 && plays.some((play) => play.move.type === "draw")) return { type: "draw" };
 	const now = score(state);
+	/** The best board `depth` more moves of this turn reach from here (no answer pending, same player still acting). */
+	const follow = (board: Board, depth: number): number => {
+		const here = score(board);
+		if (depth <= 0 || board.pending || board.winner || board.turn !== state.turn) return here;
+		const next = legalPlays(board)
+			.filter((play) => play.move.type !== "phase" && play.move.type !== "draw")
+			.map((play) => ({ board: play.board, value: score(play.board) }))
+			.sort((a, b) => b.value - a.value)
+			.slice(0, PLANNED);
+		return Math.max(here, ...next.map((item) => (depth > 1 ? follow(item.board, depth - 1) : item.value)));
+	};
 	/** The best move of one kind on a board, by how much it improves this turn's board. */
 	const pick = (board: Board, options: ReturnType<typeof legalPlays>, kind: "attack" | "other") => {
-		const ranked = options
+		let ranked = options
 			.filter((play) => play.move.type !== "phase" && play.move.type !== "draw" && (kind === "attack") === (play.move.type === "attack"))
-			.map((play) => ({ move: play.move, gain: score(play.board) - now }))
-			.filter((option) => option.gain > WORTH)
+			.map((play) => ({ move: play.move, board: play.board, gain: score(play.board) - now }))
 			.sort((a, b) => b.gain - a.gain);
+		if (persona.plans && !board.strict) {
+			/* An expert also counts the best move each one opens up this turn: a move that sets up a winning attack comes first. */
+			ranked = ranked
+				.slice(0, PLANNED)
+				.map((option) => ({ ...option, gain: Math.max(option.gain, follow(option.board, persona.plans ?? 0) - now - WORTH) }))
+				.concat(ranked.slice(PLANNED))
+				.sort((a, b) => b.gain - a.gain);
+		}
+		ranked = ranked.filter((option) => option.gain > WORTH);
 		if (ranked.length === 0) return null;
 		/* A gentle trainer sometimes plays a good move that is not the best one. */
 		if (ranked.length > 1 && random() > persona.skill) return ranked[1 + Math.floor(random() * (ranked.length - 1))]?.move ?? null;

@@ -64,5 +64,7 @@ All five steps are built and tested (918 tests, typecheck, production build). Wh
 - Non-anime cards in a deck are fine when the anime gives too few the engine plays (`filler` in `master-decks.ts`).
 - Trainers have levels: basic (Rex Raptor, Weevil, Mako), medium (Joey, Arkana, Yami Bakura), strong (Pegasus,
   Yugi, Jaden, Yusei), expert (Yami Marik, Kaiba, Atem). The level is shown after the trainer's name. A basic trainer
-  often plays a weaker move and answers with its Traps only half the time; an expert always plays its best
-  (`MASTER_TIER`, `TIER_PLAY` in `masters.ts`).
+  plays one move at a time, often a weaker one, and answers with its Traps half the time; medium and strong trainers
+  look one move further (Summon, then attack), medium still making mistakes; an expert looks two moves further and
+  always plays its best. Simulated with the same deck (20 duels each): medium beats basic 16 times, strong beats medium
+  14, expert beats strong 12 and basic 18 (`MASTER_TIER`, `TIER_PLAY` in `masters.ts`).

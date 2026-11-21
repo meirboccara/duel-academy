@@ -31,7 +31,9 @@ export const MASTER_NAMES: Record<MasterId, string> = {
 
 /**
  * The trainers' levels (the owner's choice): the first ones are really basic, then medium, strong, and expert.
- * A basic trainer often plays a weaker move and sometimes forgets its Traps; an expert always plays its best.
+ * A basic trainer plays one move at a time, often a weaker one, and forgets its Traps half the time. A medium trainer
+ * looks one move further (Summon, then attack) but still makes mistakes; a strong one rarely does; an expert looks two
+ * moves further and always plays its best. In simulated duels each level beats the one below it most of the time.
  */
 export const TIERS = ["basic", "medium", "strong", "expert"] as const;
 export type Tier = (typeof TIERS)[number];
@@ -52,9 +54,9 @@ export const MASTER_TIER: Record<MasterId, Tier> = {
 };
 const TIER_PLAY: Record<Tier, Omit<Persona, "aggression">> = {
 	basic: { skill: 0.25, caution: 0.2, answers: 0.5 },
-	medium: { skill: 0.6, caution: 0.7, answers: 0.8 },
-	strong: { skill: 0.85, caution: 1, answers: 1 },
-	expert: { skill: 1, caution: 1.2, answers: 1 },
+	medium: { skill: 0.5, caution: 0.7, answers: 0.8, plans: 1 },
+	strong: { skill: 0.85, caution: 1, answers: 1, plans: 1 },
+	expert: { skill: 1, caution: 1, answers: 1, plans: 2 },
 };
 /** How much each trainer goes for the opponent's Life Points: Kaiba and Rex attack, Yugi and Weevil wait. */
 const AGGRESSION: Record<MasterId, number> = {

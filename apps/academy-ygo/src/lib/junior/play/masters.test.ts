@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { seeded } from "./bot";
 import { cardOf, inExtraDeck } from "./cards";
 import { levelById } from "./levels";
-import { MASTERS, MASTER_LP, deckProblems, duelSetup, masterDeck, masterLevelId, shuffled } from "./masters";
+import { MASTERS, MASTER_LP, MASTER_TIER, PERSONAS, TIERS, deckProblems, duelSetup, masterDeck, masterLevelId, shuffled, type MasterId } from "./masters";
 import { STARTERS } from "./starters";
 import { hint, next, play, start, type Session } from "./session";
 
@@ -68,5 +68,34 @@ describe("the trainer bot", () => {
 			state = result.board;
 		}
 		expect(state.you.lp).toBe(8000 - 1700 - 1500 - 1400);
+	});
+});
+
+describe("the trainers' levels", () => {
+	/** A duel between two bots with the same starter deck, phases following the moves; the winner, if any. */
+	async function botDuel(you: (typeof PERSONAS)[MasterId], rival: (typeof PERSONAS)[MasterId], seed: number) {
+		const { botMove } = await import("./bot");
+		const { apply, board, other } = await import("./engine");
+		const deal = (offset: number) => duelSetup("rex-raptor", STARTERS.warrior.deck, seeded(seed + offset));
+		let state = board({ ...deal(0), strict: false, rival: { ...deal(99).you } });
+		const random = seeded(seed * 7);
+		for (let step = 0; step < 3000 && !state.winner; step++) {
+			const result = apply(state, botMove(state, (state.pending ? other(state.turn) : state.turn) === "you" ? you : rival, random));
+			if (!result.ok) break;
+			state = result.board;
+		}
+		return state.winner;
+	}
+	it("an expert beats a basic trainer most of the time, with the same deck", async () => {
+		let wins = 0;
+		for (let seed = 1; seed <= 6; seed++) {
+			const expertFirst = seed % 2 === 0;
+			const winner = expertFirst ? await botDuel(PERSONAS["seto-kaiba"], PERSONAS["rex-raptor"], seed) : await botDuel(PERSONAS["rex-raptor"], PERSONAS["seto-kaiba"], seed);
+			if ((winner === "you") === expertFirst && winner) wins++;
+		}
+		expect(wins).toBeGreaterThanOrEqual(5);
+	}, 120000);
+	it("each level looks further ahead than the one before", () => {
+		expect(TIERS.map((tier) => PERSONAS[MASTERS.find((master) => MASTER_TIER[master] === tier)!].plans ?? 0)).toEqual([0, 1, 1, 2]);
 	});
 });
