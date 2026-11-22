@@ -1,5 +1,5 @@
 import { ashCategories, cardCategories, categoriesOf, type Category, choiceOf, effectsOf, fits as fitsFilter, targetOf, typeOf } from "./effects";
-import { FORBIDDEN_ONE, attributeOf, cardOf, fusionOnly, hasRulesText, inExtraDeck, inPool, isEffectMonster, isQuickPlay, mentions, monsterOf, named, spellTarget, staysOnField, tributesFor, type Action, type Arrow, type CardId, type Condition, type MonsterType, type DataEffect, type Effect, type FusionMaterial, type MonsterCard } from "./cards";
+import { FORBIDDEN_ONE, attributeOf, cardOf, fusionOnly, hasRulesText, inExtraDeck, inPool, isEffectMonster, isQuickPlay, mentions, monsterOf, named, spellTarget, staysOnField, tributesFor, type Action, type Arrow, type CardId, type Condition, type MonsterType, type Watch, type DataEffect, type Effect, type FusionMaterial, type MonsterCard } from "./cards";
 
 /**
  * The Junior duel board. The small board has three Monster Zones and three Spell & Trap Zones per side; the whole
@@ -115,7 +115,7 @@ export type TurnLock =
 	/** "You can only attack directly with [archetype] monsters for the rest of this turn." */
 	| { kind: "direct-only"; side: Side; archetype: string; by: CardId };
 /** What a monster's activated effect does when it resolves: add a card (Blazeman), or the steps of an effect written as data. */
-export type EffectRun = { do: "add"; card: CardId } | { do: "data"; effect: number; pick?: CardId; target?: number };
+export type EffectRun = { do: "add"; card: CardId } | { do: "data"; effect: number; pick?: CardId; target?: number; about?: CardId };
 /**
  * A card activated in answer that waits on the Chain while the other player may answer it in turn: the last one
  * activated resolves first (Rulebook v10 pp. 44-45). Chain Link 1 is what is pending; these are links 2 and up.
@@ -171,7 +171,7 @@ export interface Board {
 	/** A monster just Normal Summoned whose "When this card is Normal Summoned: You can…" may be used now, and only now. */
 	summonTrigger: { side: Side; zone: number; card?: CardId } | null;
 	/** Effects written as data that something just started ("If this card is Summoned / sent to the GY: You can…"): their owner may use them now, and only now. */
-	triggered: { side: Side; card: CardId; effect: number; zone?: number }[];
+	triggered: { side: Side; card: CardId; effect: number; zone?: number; about?: CardId }[];
 	/** The state of the duel's random numbers (coin tosses, shuffling a Deck after a search): the same seed gives the same duel. */
 	rng: number;
 	/** Monsters the turn player has Summoned this turn (a Set is not a Summon), and whether a card forbids any more ("You cannot Summon other monsters the turn you activate this card"). */
@@ -601,7 +601,9 @@ class Play {
 	/** Set while an answer that waited on the Chain resolves: it is played at once, not put on the Chain again. */
 	resolving = false;
 	/** Every card that went to a Graveyard during this move, in order: for "If this card is sent to the GY" effects. */
-	private readonly sentToGraveyard: { side: Side; card: CardId }[] = [];
+	private readonly sentToGraveyard: { side: Side; card: CardId; damageStep: boolean }[] = [];
+	/** Set while a battle's damage is dealt and its monsters destroyed: "except during the Damage Step". */
+	private inDamageStep = false;
 	constructor(
 		source: Board,
 		private readonly forced: { coin?: boolean } = {},
@@ -810,7 +812,7 @@ class Play {
 				const slot = move.zone === undefined ? null : mine.monsters[move.zone];
 				if (!slot || slot.card !== move.card || !live(slot)) return reject("no-ability");
 				zone = move.zone as number;
-			} else if (!mine[from].includes(move.card)) return reject(from === "hand" ? "not-in-hand" : "no-ability");
+			} else if (!(from === "hand-or-graveyard" ? [...mine.hand, ...mine.graveyard] : mine[from]).includes(move.card)) return reject(from === "graveyard" ? "no-ability" : "not-in-hand");
 		} else {
 			const ready = triggered.find((item) => item.side === who && item.card === move.card && item.effect === move.effect);
 			if (!ready) return reject("nothing-to-answer");
@@ -818,13 +820,14 @@ class Play {
 			/* The other effects started at the same time may still be used next. */
 			s.triggered = triggered.filter((item) => item !== ready);
 		}
-		this.activate(who, move.card, move.effect, zone, move.pick, move.target, false);
+		const about = effect.when === "ignition" ? undefined : triggered.find((item) => item.side === who && item.card === move.card && item.effect === move.effect)?.about;
+		this.activate(who, move.card, move.effect, zone, move.pick, move.target, false, about);
 	}
 	/**
 	 * An effect written as data is activated: it counts as used and its cost is paid, then the other player may answer
 	 * it, or it resolves at once. With `auto`, an effect that cannot start with this choice is skipped instead of refused.
 	 */
-	private activate(who: Side, card: CardId, index: number, zone: number, pick: CardId | undefined, target: number | undefined, auto: boolean): boolean {
+	private activate(who: Side, card: CardId, index: number, zone: number, pick: CardId | undefined, target: number | undefined, auto: boolean, about?: CardId): boolean {
 		const s = this.state;
 		const effect = effectsOf(card)[index];
 		if (!effect) return false;
@@ -833,6 +836,7 @@ class Play {
 		if (keys.some((key) => s.used.includes(key))) return refuse("once-per-turn");
 		if (!this.conditionsMet(who, effect.conditions ?? [], card)) return refuse("condition-not-met");
 		if (!this.stepsReady(who, effect.actions, pick, target, card, zone)) return refuse("no-target");
+		if (effect.actions.some((step) => step.do === "special-self") && (this.freeZone(who) < 0 || !this.specialAllowed(who, card))) return refuse("no-free-zone");
 		if (this.deckLocked() && choiceOf(effect.actions)?.from.includes("deck") && categoriesOf(effect.actions).has("search")) return refuse("deck-locked");
 		const mine = s[who];
 		if (effect.cost === "discard-self" && !mine.hand.includes(card)) return refuse("not-in-hand");
@@ -855,7 +859,7 @@ class Play {
 			this.leave(who, zone, "graveyard", "activation");
 		}
 		this.events.push({ type: "effect-used", side: who, card });
-		const run: EffectRun = { do: "data", effect: index, ...(pick ? { pick } : {}), ...(target === undefined ? {} : { target }) };
+		const run: EffectRun = { do: "data", effect: index, ...(pick ? { pick } : {}), ...(target === undefined ? {} : { target }), ...(about ? { about } : {}) };
 		const pending: Extract<Pending, { kind: "effect" }> = { kind: "effect", side: who, card, zone, run };
 		/* The turn player's effect: the other player may answer it (Ash Blossom, Ghost Ogre, Solemn Strike) before it resolves. */
 		if (who === s.turn && !s.pending && !this.resolving) {
@@ -886,12 +890,19 @@ class Play {
 				const slot = s[event.side].monsters[event.zone];
 				if (!slot || slot.card !== event.card || !live(slot)) continue;
 				effectsOf(event.card).forEach((effect, index) => {
-					const when = effect.when === "summoned" || (effect.when === "normal-summoned" && event.type === "summoned") || (effect.when === "special-summoned" && event.type === "special");
+					const when =
+						effect.when === "summoned" ||
+						(effect.when === "normal-summoned" && event.type === "summoned") ||
+						(effect.when === "special-summoned" && event.type === "special") ||
+						(effect.when === "normal-or-special-summoned" && event.type !== "flipped");
 					if (when) started.push({ side: event.side, card: event.card, effect: index, zone: event.zone });
 				});
 			}
+			const fresh = this.events.slice(scanned);
 			scanned = this.events.length;
-			for (const sent of this.sentToGraveyard.splice(0)) effectsOf(sent.card).forEach((effect, index) => effect.when === "sent-to-gy" && started.push({ side: sent.side, card: sent.card, effect: index }));
+			const sent = this.sentToGraveyard.splice(0);
+			for (const item of sent) effectsOf(item.card).forEach((effect, index) => effect.when === "sent-to-gy" && started.push({ side: item.side, card: item.card, effect: index }));
+			started.push(...this.watched(fresh, sent));
 			if (started.length === 0) return;
 			for (const item of started) {
 				const effect = effectsOf(item.card)[item.effect];
@@ -900,6 +911,44 @@ class Play {
 				else this.autoActivate(item);
 			}
 		}
+	}
+	/**
+	 * Effects of cards in the hand or the GY that watch what just happened: a card added from the Deck, a monster
+	 * destroyed by battle, a card sent to the GY, a Special Summon. `about` is the card it happened to.
+	 */
+	private watched(events: readonly GameEvent[], sent: readonly { side: Side; card: CardId; damageStep: boolean }[]): Board["triggered"] {
+		const s = this.state;
+		const out: Board["triggered"] = [];
+		const watchers = (who: Side, test: (watch: Watch, place: "hand" | "graveyard", card: CardId) => CardId | true | false) => {
+			for (const place of ["hand", "graveyard"] as const) {
+				for (const card of new Set(s[who][place])) {
+					effectsOf(card).forEach((effect, index) => {
+						if (typeof effect.when !== "object") return;
+						const from = effect.from ?? "field";
+						if (from !== place && !(from === "hand-or-graveyard")) return;
+						const hit = test(effect.when, place, card);
+						if (hit === false) return;
+						if (out.some((item) => item.side === who && item.card === card && item.effect === index)) return;
+						out.push({ side: who, card, effect: index, ...(hit === true ? {} : { about: hit }) });
+					});
+				}
+			}
+		};
+		for (const event of events) {
+			if (event.type === "added" && event.from === "deck") watchers(event.side, (watch, place, card) => "added" in watch && place === "hand" && card === event.card && event.card);
+			if (event.type === "battle") for (const who of new Set(event.destroyed.map((lost) => lost.side))) watchers(who, (watch, place) => "destroyedByBattle" in watch && place === "hand");
+			if (event.type === "special") watchers(event.side, (watch, place) => "specialSummoned" in watch && place === "graveyard" && fitsFilter(event.card, watch.specialSummoned) && event.card);
+		}
+		for (const item of sent) {
+			if (item.damageStep) continue;
+			watchers(item.side, (watch, place, card) => {
+				if (!("sentToGy" in watch) || !fitsFilter(item.card, watch.sentToGy)) return false;
+				/* "From your GY (if it was there when the monster was sent)": not if it was sent at the same time. */
+				if (place === "graveyard" && sent.some((other) => other.side === item.side && other.card === card)) return false;
+				return item.card;
+			});
+		}
+		return out;
 	}
 	/** A started effect that happens by itself: with the first card that fits its choice and its target. */
 	private autoActivate(item: Board["triggered"][number]): void {
@@ -911,14 +960,14 @@ class Play {
 		const aim = targetOf(effect.actions);
 		const picks: (CardId | undefined)[] = choice ? [...new Set(choice.from.flatMap((place) => mine[place]))].filter((card) => fitsFilter(card, choice.filter)) : [undefined];
 		const targets: (number | undefined)[] = aim ? mine.monsters.flatMap((slot, zone) => (slot && fitsFilter(slot.card, aim) ? [zone] : [])) : [undefined];
-		for (const pick of picks) for (const target of targets) if (this.activate(item.side, item.card, item.effect, item.zone ?? -1, pick, target, true)) return;
+		for (const pick of picks) for (const target of targets) if (this.activate(item.side, item.card, item.effect, item.zone ?? -1, pick, target, true, item.about)) return;
 	}
 	/** The steps of an effect, in order. A step that finds nothing to do stops the ones after it ("and if you do"). */
-	private runSteps(who: Side, actions: readonly Action[], source: CardId, pick?: CardId, target?: number, zone?: number): void {
+	private runSteps(who: Side, actions: readonly Action[], source: CardId, pick?: CardId, target?: number, zone?: number, about?: CardId): void {
 		this.lastSummoned = null;
 		for (const action of actions) {
 			if (this.state.winner) return;
-			const done = this.runStep(who, action, pick, target, zone, source);
+			const done = this.runStep(who, action, pick, target, zone, source, about);
 			/* "Then, if…, you can…" and "also…": when they cannot be done, the rest still happens. */
 			if (!done && action.do !== "special-same" && action.do !== "lock") {
 				this.events.push({ type: "no-effect", card: source });
@@ -947,7 +996,7 @@ class Play {
 	private specialAllowed(who: Side, card: CardId): boolean {
 		return this.state.locks.every((lock) => lock.kind !== "special-only" || lock.side !== who || lock.types.includes(typeOf(card) as MonsterType));
 	}
-	private runStep(who: Side, action: Action, pick?: CardId, target?: number, source?: number, card?: CardId): boolean {
+	private runStep(who: Side, action: Action, pick?: CardId, target?: number, source?: number, card?: CardId, about?: CardId): boolean {
 		const s = this.state;
 		const mine = s[who];
 		switch (action.do) {
@@ -982,6 +1031,23 @@ class Play {
 				if (who === s.turn) s.summons += 1;
 				this.lastSummoned = pick;
 				this.events.push({ type: "special", side: who, card: pick, zone, how: "own", materials: [] });
+				return true;
+			}
+			case "special-self": {
+				/* "Special Summon this card" from the hand, or else from the GY. */
+				const self = card as CardId;
+				const place = mine.hand.includes(self) ? "hand" : mine.graveyard.includes(self) ? "graveyard" : null;
+				const zone = this.freeZone(who);
+				if (!place || zone < 0 || !this.specialAllowed(who, self)) return false;
+				/* "Target 1 of them": the monster that started the effect is still in the GY. */
+				if (action.atkOfThat && (!about || !mine.graveyard.includes(about))) return false;
+				const list = mine[place];
+				list.splice(list.lastIndexOf(self), 1);
+				const bonus = action.atkOfThat && about ? monsterOf(about).atk - monsterOf(self).atk : 0;
+				mine.monsters[zone] = standing(self, { summoned: true, ...(bonus ? { bonus } : {}), ...(action.banishOnLeave ? { banishOnLeave: true } : {}) });
+				if (who === s.turn) s.summons += 1;
+				this.lastSummoned = self;
+				this.events.push({ type: "special", side: who, card: self, zone, how: "own", materials: [] });
 				return true;
 			}
 			case "special-same": {
@@ -1081,7 +1147,7 @@ class Play {
 		else if (!pending.negated) {
 			const run = pending.run;
 			if (run.do === "add") this.addFromDeck(pending.side, run.card);
-			else this.runSteps(pending.side, effectsOf(pending.card)[run.effect]?.actions ?? [], pending.card, run.pick, run.target, pending.zone >= 0 ? pending.zone : undefined);
+			else this.runSteps(pending.side, effectsOf(pending.card)[run.effect]?.actions ?? [], pending.card, run.pick, run.target, pending.zone >= 0 ? pending.zone : undefined, run.about);
 		}
 		if (pending.then && isMain(this.state.phase)) this.openSummon(pending.then.zones, pending.then.how);
 	}
@@ -1118,7 +1184,7 @@ class Play {
 	/** A card goes to its owner's Graveyard. `followedBy` is what happens right after it in the same action, if anything. */
 	private toGraveyard(who: Side, card: CardId, followedBy: After | null): void {
 		this.state[who].graveyard.push(card);
-		this.sentToGraveyard.push({ side: who, card });
+		this.sentToGraveyard.push({ side: who, card, damageStep: this.inDamageStep });
 		this.state.sentThisTurn.push({ side: who, card });
 		const info = cardOf(card);
 		if (info.kind === "monster" && info.trigger) this.state.triggers.push({ side: who, card, after: followedBy });
@@ -2895,7 +2961,9 @@ class Play {
 		this.events.push({ type: "battle", side: s.turn, attacker: attacker.card, attackerValue: atk, defender: defender.card, defenderValue: value, defenderPosition: defender.position, damage, destroyed });
 		/* Damage is calculated first; destroyed monsters go to the Graveyard after, as the last thing of the battle. */
 		if (damage) this.damage(damage.side, damage.amount);
+		this.inDamageStep = true;
 		for (const lost of destroyed) this.leave(lost.side, lost.side === s.turn ? pending.attacker : pending.target, "graveyard");
+		this.inDamageStep = false;
 		/* Flame Wingman: "When this card destroys a monster by battle and sends it to the GY: inflict damage equal to the ATK of the destroyed monster in the GY." */
 		for (const [winner, loser, side] of [[attacker, defender, s.turn], [defender, attacker, other(s.turn)]] as const) {
 			if (s.winner || !live(winner)?.battleBurn) continue;

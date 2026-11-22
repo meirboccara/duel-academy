@@ -16,7 +16,9 @@ export function fits(card: CardId, filter: CardFilter): boolean {
 	if (filter.except !== undefined && card === filter.except) return false;
 	const info = cardOf(card);
 	if (filter.kind !== undefined && info.kind !== filter.kind) return false;
-	if (filter.archetype !== undefined && !CARD_ART[card]?.name.includes(filter.archetype)) return false;
+	if (filter.anyOf && !filter.anyOf.some((one) => fits(card, one))) return false;
+	if (filter.archetype !== undefined && !CARD_ART[card]?.name.includes(filter.archetype) && !(info.kind === "monster" && info.treatedAs === filter.archetype)) return false;
+	if (filter.frame !== undefined && (info.kind !== "monster" || info.frame !== filter.frame)) return false;
 	if (filter.icon !== undefined && (info.kind === "monster" || info.icon !== filter.icon)) return false;
 	if (filter.level !== undefined || filter.maxLevel !== undefined || filter.minLevel !== undefined || filter.type !== undefined || filter.attribute !== undefined || filter.tuner || filter.effect || filter.normal) {
 		if (info.kind !== "monster") return false;

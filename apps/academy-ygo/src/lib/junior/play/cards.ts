@@ -146,6 +146,10 @@ export interface CardFilter {
 	minLevel?: number;
 	/** A Monster Type, as printed ("Dinosaur", "Dragon"). */
 	type?: MonsterType;
+	/** The frame: "a Ritual Monster". */
+	frame?: Frame;
+	/** Any one of these ("a "Blue-Eyes" Ritual Monster and/or "Blue-Eyes White Dragon""). */
+	anyOf?: readonly CardFilter[];
 }
 /** The eight arrows of a Link Monster, as seen by its controller. */
 export type Arrow = "top-left" | "top" | "top-right" | "left" | "right" | "bottom-left" | "bottom" | "bottom-right";
@@ -177,7 +181,22 @@ export type Action =
 	 * "For the rest of this turn": `special` "you cannot Special Summon, except [Types] monsters"; `direct` "you can only
 	 * attack directly with [archetype] monsters".
 	 */
-	| { do: "lock"; special?: readonly MonsterType[]; direct?: string };
+	| { do: "lock"; special?: readonly MonsterType[]; direct?: string }
+	/**
+	 * "Special Summon this card" from where it is (hand or GY). `atkOfThat`: "its ATK becomes that monster's" (the card
+	 * that started the effect); `banishOnLeave`: "banish it when it leaves the field".
+	 */
+	| { do: "special-self"; atkOfThat?: true; banishOnLeave?: true };
+/** Something that happens to other cards, or to this one in the hand, that starts an effect. */
+export type Watch =
+	/** "When this card is added from the Deck to your hand". */
+	| { added: "self" }
+	/** "When a monster you control is destroyed by battle". */
+	| { destroyedByBattle: "ally" }
+	/** "If a [filter] is sent to your GY (except during the Damage Step)". */
+	| { sentToGy: CardFilter }
+	/** "If you Special Summon [filter] (except during the Damage Step)". */
+	| { specialSummoned: CardFilter };
 /** What must be true for an effect to be activated. */
 export type Condition =
 	/** "If a [filter] monster is on the field": face-up, on either side. */
@@ -196,9 +215,12 @@ export interface DataEffect {
 	 * How it starts. "ignition": its owner uses it in their own Main Phase. The others start right after something
 	 * happened to this card: it was Summoned (Normal or Special, or only one of them), or sent to the GY.
 	 */
-	when: "ignition" | "summoned" | "normal-summoned" | "special-summoned" | "sent-to-gy";
-	/** Where the card is when an ignition effect is used: on the field (default), in the hand, or in the GY. */
-	from?: "field" | "hand" | "graveyard";
+	when: "ignition" | "summoned" | "normal-summoned" | "special-summoned" | "normal-or-special-summoned" | "sent-to-gy" | Watch;
+	/**
+	 * Where the card is when the effect is used: on the field (default), in the hand, in the GY, or either of those two
+	 * ("from your GY (if it was there when the monster was sent) or hand").
+	 */
+	from?: "field" | "hand" | "graveyard" | "hand-or-graveyard";
 	/** "You can…": its owner chooses to use it. Without it, the effect happens by itself. */
 	optional?: true;
 	/**
@@ -400,6 +422,8 @@ export interface MonsterCard {
 	defenseAttack?: true;
 	/** Its effects written as data (effects.ts), in the order they are printed. */
 	effects?: readonly DataEffect[];
+	/** "(This card is always treated as a "Blue-Eyes" card.)" */
+	treatedAs?: string;
 	/** Blue-Eyes Spirit Dragon: "Neither player can Special Summon 2 or more monsters at the same time." */
 	oneAtATime?: true;
 	/** Blue-Eyes Spirit Dragon: "Once per turn, when an effect of a card in the Graveyard is activated: You can negate the activation" (the opponent's). */
@@ -714,7 +738,27 @@ export const CARDS = {
 		effects: [{ when: "ignition", once: "copy", actions: [{ do: "special", from: ["hand"], filter: { normal: true, maxLevel: 4 }, to: "pointed" }] }],
 	}),
 	/* Cards written as data (effects.ts): their effects need no code of their own. */
-	/* MAMS (Magnificent Maestros, TCG 2026-11-12). */
+	/* MAMS (Magnificent Maestros, TCG 2026-11-12). Kaibaman the Legend is a reprint there. */
+	"kaibaman-the-legend": real("kaibaman-the-legend", {
+		tuner: true,
+		effects: [
+			{ when: "normal-or-special-summoned", optional: true, once: "name", conditions: [{ show: "blue-eyes-white-dragon", count: 3 }], actions: [{ do: "special", from: ["hand", "deck", "graveyard"], filter: { card: "blue-eyes-white-dragon" } }] },
+			{ when: { specialSummoned: { card: "blue-eyes-white-dragon" } }, from: "graveyard", optional: true, cost: "banish-self", once: "name", actions: [{ do: "search", filter: { kind: "monster", archetype: "Blue-Eyes" } }] },
+		],
+	}),
+	"deep-eyes-white-dragon-the-blue-abyss": real("deep-eyes-white-dragon-the-blue-abyss", {
+		treatedAs: "Blue-Eyes",
+		effects: [
+			{ when: "ignition", from: "hand", cost: "discard-self", once: "name", actions: [{ do: "search", filter: { level: 1, attribute: "LIGHT", tuner: true } }] },
+			{
+				when: { sentToGy: { anyOf: [{ archetype: "Blue-Eyes", frame: "ritual" }, { card: "blue-eyes-white-dragon" }] } },
+				from: "hand-or-graveyard",
+				optional: true,
+				once: "name",
+				actions: [{ do: "special-self", atkOfThat: true, banishOnLeave: true }],
+			},
+		],
+	}),
 	"the-guiding-flute-of-summoning-dragons": {
 		kind: "spell",
 		onePerTurn: true,
@@ -826,7 +870,7 @@ export function spellTarget(card: CardId): "own" | "foe" | null {
 /** An Effect Monster: a monster with an effect of its own (not a monster that only names its materials). */
 export function isEffectMonster(id: CardId): boolean {
 	const card = cardOf(id);
-	return card.kind === "monster" && hasRulesText(id) && !!Object.keys(card).some((key) => !["kind", "level", "atk", "def", "art", "type", "frame", "tuner", "rank", "link", "arrows", "linkMaterials", "scale", "fusion", "xyz", "synchroTuner", "synchroNonTuner"].includes(key));
+	return card.kind === "monster" && hasRulesText(id) && !!Object.keys(card).some((key) => !["kind", "level", "atk", "def", "art", "type", "frame", "tuner", "rank", "link", "arrows", "linkMaterials", "treatedAs", "scale", "fusion", "xyz", "synchroTuner", "synchroNonTuner"].includes(key));
 }
 /** A Spell or Trap that stays face-up on the field once it has resolved: Continuous, Equip and Field. */
 export function staysOnField(id: CardId): boolean {

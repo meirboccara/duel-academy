@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { apply, board, legalMoves, type Board, type Move, type Setup } from "./engine";
+import { apply, atkOf, board, legalMoves, type Board, type Move, type Setup } from "./engine";
 
 /** Cards whose effects are written as data, from the shared vocabulary (effects.ts). Texts in card-art.ts. */
 function ok(state: Board, move: Move) {
@@ -151,6 +151,45 @@ describe("conditions, a second Summon of the same name, locks for the rest of th
 		const drawn = play(later, draw);
 		expect(drawn.you.banished).toEqual([{ card: "the-guiding-flute-of-summoning-dragons", faceDown: false }]);
 		expect(drawn.you.hand).toHaveLength(2);
+	});
+});
+
+describe("effects that watch other cards", () => {
+	it("Kaibaman the Legend: when Summoned, show 3 Blue-Eyes White Dragon to Special Summon one", () => {
+		const shown = play(mat({ you: { hand: ["kaibaman-the-legend", "blue-eyes-white-dragon"], deck: ["blue-eyes-white-dragon", "blue-eyes-white-dragon"] } }), summon("kaibaman-the-legend"));
+		const called = play(shown, use("kaibaman-the-legend", 0, { zone: 0, pick: "blue-eyes-white-dragon" }));
+		expect(called.you.monsters.filter((slot) => slot?.card === "blue-eyes-white-dragon")).toHaveLength(1);
+		const two = play(mat({ you: { hand: ["kaibaman-the-legend"], deck: ["blue-eyes-white-dragon", "blue-eyes-white-dragon"] } }), summon("kaibaman-the-legend"));
+		expect(reason(two, use("kaibaman-the-legend", 0, { zone: 0, pick: "blue-eyes-white-dragon" }))).toBe("condition-not-met");
+	});
+	it("Kaibaman the Legend: in the GY when you Special Summon Blue-Eyes White Dragon, banish it to add a Blue-Eyes monster", () => {
+		const start = mat({ you: { hand: ["monster-reborn"], graveyard: ["kaibaman-the-legend", "blue-eyes-white-dragon"], deck: ["sage-with-eyes-of-blue", "blue-eyes-alternative-white-dragon"] } });
+		const reborn = play(start, cast("monster-reborn", { grave: { side: "you", index: 1 } }));
+		expect(reborn.triggered).toEqual([{ side: "you", card: "kaibaman-the-legend", effect: 1, about: "blue-eyes-white-dragon" }]);
+		/* "Sage with Eyes of Blue" is not a "Blue-Eyes" card: its name does not say so. */
+		expect(reason(reborn, use("kaibaman-the-legend", 1, { pick: "sage-with-eyes-of-blue" }))).toBe("no-target");
+		const done = play(reborn, use("kaibaman-the-legend", 1, { pick: "blue-eyes-alternative-white-dragon" }));
+		expect(done.you.hand).toEqual(["blue-eyes-alternative-white-dragon"]);
+		expect(done.you.banished).toEqual([{ card: "kaibaman-the-legend", faceDown: false }]);
+	});
+	it("Deep-Eyes White Dragon, the Blue Abyss: discard it to add a Level 1 LIGHT Tuner", () => {
+		const done = play(mat({ you: { hand: ["deep-eyes-white-dragon-the-blue-abyss"], deck: ["effect-veiler", "iron-boar"] } }), use("deep-eyes-white-dragon-the-blue-abyss", 0, { pick: "effect-veiler" }));
+		expect(done.you.hand).toEqual(["effect-veiler"]);
+		expect(done.you.graveyard).toEqual(["deep-eyes-white-dragon-the-blue-abyss"]);
+	});
+	it("Deep-Eyes: when Blue-Eyes White Dragon is sent to the GY, it comes from the hand with that ATK, and is banished when it leaves", () => {
+		const sent = play(mat({ you: { hand: ["foolish-burial", "deep-eyes-white-dragon-the-blue-abyss"], deck: ["blue-eyes-white-dragon"] } }), cast("foolish-burial", { pick: "blue-eyes-white-dragon" }));
+		expect(sent.triggered).toEqual([{ side: "you", card: "deep-eyes-white-dragon-the-blue-abyss", effect: 1, about: "blue-eyes-white-dragon" }]);
+		const done = ok(sent, use("deep-eyes-white-dragon-the-blue-abyss", 1));
+		const slot = done.board.you.monsters.find((held) => held?.card === "deep-eyes-white-dragon-the-blue-abyss");
+		expect(slot && atkOf(slot, done.board)).toBe(3000);
+		expect(slot?.banishOnLeave).toBe(true);
+	});
+	it("Deep-Eyes: from the GY too, but not when Blue-Eyes is destroyed in the Damage Step", () => {
+		const fromGy = play(mat({ you: { hand: ["foolish-burial"], graveyard: ["deep-eyes-white-dragon-the-blue-abyss"], deck: ["blue-eyes-white-dragon"] } }), cast("foolish-burial", { pick: "blue-eyes-white-dragon" }));
+		expect(fromGy.triggered).toHaveLength(1);
+		const battle = mat({ phase: "battle", you: { hand: ["deep-eyes-white-dragon-the-blue-abyss"], monsters: ["blue-eyes-white-dragon"] }, rival: { monsters: ["blue-eyes-ultimate-dragon"] } });
+		expect(play(battle, { type: "attack", attacker: 0, target: 0 }).triggered).toEqual([]);
 	});
 });
 
