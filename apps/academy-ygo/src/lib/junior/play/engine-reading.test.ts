@@ -50,7 +50,7 @@ describe("a condition with no colon", () => {
 		const { board: after, events } = ok(state, special());
 		expect(cards(after, "you")[0]).toBe("cyber-dragon");
 		expect(after.summonUsed).toBe(false);
-		expect(events).toEqual([{ type: "special", side: "you", card: "cyber-dragon", zone: 0, how: "own", materials: [] }]);
+		expect(events).toEqual([{ type: "special", side: "you", card: "cyber-dragon", zone: 0, how: "own", materials: [], origin: "hand" }]);
 		expect(reason(after, { type: "place", card: "river-otter", row: "monsters", zone: 1, tributes: [] })).toBe("accepted");
 	});
 	it("is checked when it is used: with a monster of your own, or an empty field opposite, it is refused", () => {
