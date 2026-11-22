@@ -92,6 +92,11 @@ describe("a new edition of the starter Decks", () => {
 		const edited = { ...startWith("dragon"), main: [...STARTERS.dragon.deck.main.slice(1), "flamvell-guard" as const] };
 		expect(refreshDeck(edited, new Set(starterCards(edited)))).toEqual(edited);
 	});
+	it("keeps the cards of every earlier list, not only the last one before the new edition", () => {
+		/* Gem-Knight Pearl and Utopia were in an older Dark Magician starter. */
+		const cards = new Set(starterCards(parseDeck({ starter: "warrior", main: [], extra: [] })));
+		for (const card of ["gem-knight-pearl", "utopia", "tune-warrior"] as const) expect(cards.has(card), card).toBe(true);
+	});
 	it("is not offered before a starter is chosen", () => {
 		expect(starterUpdate(parseDeck(null))).toBeNull();
 	});

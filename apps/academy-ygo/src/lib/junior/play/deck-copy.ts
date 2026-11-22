@@ -152,7 +152,7 @@ export const DECK_COPY: Record<Locale, DeckCopy> = {
 		deckTitle: "החפיסה שלכם מול המאסטרים",
 		chooseTitle: "בחרו חפיסת התחלה",
 		updateTitle: "חפיסת התחלה חדשה!",
-		updateText: (starter) => `לחפיסת ה־${starter} שלכם יש גרסה חדשה, כמו שמשחקים היום: ⁦hand traps⁩, קלפים שמחפשים ב־⁦Deck⁩, ו־⁦Extra Deck⁩ של 15 קלפים. לוקחים אותה, או שומרים את שלכם? הקלפים החדשים נכנסים לאלבום בכל מקרה.`,
+		updateText: (starter) => `לחפיסת ה־${starter} שלכם יש גרסה חדשה, כמו שמשחקים היום: ${L("hand traps")}, קלפים שמחפשים ב־${L("Deck")}, ו־${L("Extra Deck")} של 15 קלפים. לוקחים אותה, או שומרים את שלכם? הקלפים החדשים נכנסים לאלבום בכל מקרה.`,
 		updateCards: "הקלפים החדשים:",
 		updateMore: (count) => `ועוד ${count}`,
 		takeNew: "לקחת את החפיסה החדשה",

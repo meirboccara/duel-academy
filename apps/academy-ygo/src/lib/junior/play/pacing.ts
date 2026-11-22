@@ -29,7 +29,8 @@ const ATTACKS = new Set<GameEvent["type"]>(["attack-declared", "battle", "direct
 /** How long to wait after a step of the rival's turn, by what it did; `moving`: whether motion is shown. */
 export function rivalPause(events: readonly GameEvent[], moving: boolean): number {
 	const beats = events.map((event): number => {
-		if (ACTIVATIONS.has(event.type)) return RIVAL_BEATS.activation;
+		/* The rival's own activations; with motion off they still wait: the words below say what the card did. */
+		if (ACTIVATIONS.has(event.type) && (!("side" in event) || event.side === "rival")) return RIVAL_BEATS.activation;
 		if (!moving) return RIVAL_BEATS.still;
 		if (event.type === "turn") return RIVAL_BEATS.turn;
 		if (ATTACKS.has(event.type)) return RIVAL_BEATS.attack;

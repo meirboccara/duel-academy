@@ -254,6 +254,8 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 	};
 	/* A newer edition of the child's starter Deck, offered once on the map: take it, or keep their own. */
 	const starterOffer = hydrated && !level ? starterUpdate(deck) : null;
+	/* Never over another dialog: the dorm question, the shop, the binder, the hero's room or a reward come first. */
+	const otherDialog = deckOpen || shopOpen || albumOpen || heroOpen || revealed.length > 0 || (!dormLater && !!dormToChoose(progress, dorm));
 	/* Things this character cannot hold (bought before each character had its own) are refunded: they cost nothing. */
 	const heroAvatar = player?.avatar ?? DEFAULT_AVATAR;
 	const stars = starsLeft(progress, bought, shop.items, heroAvatar);
@@ -570,7 +572,7 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 					/>
 				)}
 				{!level && albumOpen && <AlbumDialog cards={cards} rewards={rewards} copy={copy} locale={locale} onClose={() => setAlbumOpen(false)} />}
-				{starterOffer && !deckOpen && (
+				{starterOffer && !otherDialog && (
 					<StarterUpdateDialog starter={starterOffer.starter} added={starterOffer.added} copy={copy} locale={locale} onTake={() => keepDeck(startWith(starterOffer.starter))} onKeep={() => keepDeck(keepOwnDeck(deck))} />
 				)}
 				{deckOpen && !deck.starter && <StarterDialog copy={copy} locale={locale} onChoose={(starter) => keepDeck(startWith(starter))} onClose={() => setDeckOpen(false)} />}

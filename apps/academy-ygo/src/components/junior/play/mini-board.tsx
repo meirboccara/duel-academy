@@ -8,7 +8,7 @@ import { CARDS } from "@duel-academy/cards";
 import { PLAY_COPY, cardType, type PlayCopy } from "@/lib/junior/play/copy";
 import { EXTRA_ZONE, PHASES, START_LP, atkOf, defOf, mainZones, type Board, type GameEvent, type Phase, type Row, type Side } from "@duel-academy/engine";
 import type { PhaseBar as PhaseBarKind } from "@/lib/junior/play/levels";
-import { turnBeat } from "@/lib/junior/play/pacing";
+import { RIVAL_BEATS, turnBeat } from "@/lib/junior/play/pacing";
 
 const KIND_FRAME = { monster: "border-normal-monster bg-normal-monster/15", spell: "border-spell bg-spell/15", trap: "border-trap bg-trap/15" } as const;
 /** Ritual Monsters are blue, Fusion purple, Synchro white, Xyz black and Link dark blue. */
@@ -602,6 +602,15 @@ export function PhaseBar({ bar, board, copy, enabled, hinted, onDraw, onPhase }:
  */
 export function TurnBanner({ events, copy, moving, answering }: { events: readonly GameEvent[]; copy: PlayCopy; moving: boolean; answering: boolean }) {
 	const beat = turnBeat(events);
+	/* A turn or phase banner goes after its beat; "Your chance!" stays while the child may answer. */
+	const [gone, setGone] = useState<readonly GameEvent[] | null>(null);
+	const beatKind = beat?.kind;
+	useEffect(() => {
+		if (answering || !beatKind) return;
+		const timer = setTimeout(() => setGone(events), beatKind === "turn" ? RIVAL_BEATS.turn : RIVAL_BEATS.phase);
+		return () => clearTimeout(timer);
+	}, [events, answering, beatKind]);
+	if (!answering && gone === events) return null;
 	const showPhase = beat?.kind === "phase" && beat.side === "rival";
 	const text = answering ? copy.yourChance : beat?.kind === "turn" ? copy.turnBanner(beat.side) : showPhase ? copy.phases[beat.phase] : null;
 	if (!text) return null;
@@ -609,17 +618,19 @@ export function TurnBanner({ events, copy, moving, answering }: { events: readon
 	const colour = side === "chance" ? "border-gold-400 bg-gold-400/20 text-gold-400" : side === "rival" ? "border-ember-400 bg-ember-500/25 text-ember-400" : "border-arcane-400 bg-arcane-500/25 text-arcane-400";
 	const big = answering || beat?.kind === "turn";
 	return (
-		<motion.div
-			key={text}
-			aria-hidden
-			data-turn-banner={side}
-			initial={moving ? { scaleX: 0.2, opacity: 0 } : false}
-			animate={{ scaleX: 1, opacity: 1 }}
-			transition={{ duration: 0.25 }}
-			className={`mx-auto max-w-md rounded-xl border-2 px-4 py-1 text-center font-display ${big ? "text-2xl" : "text-lg"} ${colour}`}
-		>
-			{text}
-		</motion.div>
+		/* Over the board, not in the page's flow: nothing below it moves when it comes and goes. */
+		<div aria-hidden className="pointer-events-none fixed inset-x-0 top-1/3 z-30 flex justify-center px-4">
+			<motion.div
+				key={text}
+				data-turn-banner={side}
+				initial={moving ? { scaleX: 0.2, opacity: 0 } : false}
+				animate={{ scaleX: 1, opacity: 1 }}
+				transition={{ duration: 0.25 }}
+				className={`max-w-md rounded-xl border-2 px-4 py-1 text-center font-display shadow-lg backdrop-blur ${big ? "text-2xl" : "text-lg"} ${colour}`}
+			>
+				{text}
+			</motion.div>
+		</div>
 	);
 }
 
