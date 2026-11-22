@@ -65,6 +65,8 @@ export interface BackSlot {
 	haunt?: number;
 	/** Swords of Revealing Light: the opponent's End Phases since it was activated. */
 	turns?: number;
+	/** Activated and waiting on the Chain: it cannot be used again before it resolves. */
+	chained?: true;
 }
 export interface SideState {
 	lp: number;
@@ -96,7 +98,34 @@ export type Pending =
 	| { kind: "attack"; attacker: number; target: number | "direct"; noDamage?: true; step?: "damage" }
 	| { kind: "spell"; card: CardId; target?: number; grave?: { side: Side; index: number }; summon?: CardId; materials?: Material[]; zone?: number; pick?: CardId; negated?: true }
 	/** The turn player has just Summoned these monsters: the other player may answer the Summon (Trap Hole, Effect Veiler). */
-	| { kind: "summon"; zones: number[]; how: "normal" | "flip" | "special" };
+	| { kind: "summon"; zones: number[]; how: "normal" | "flip" | "special" }
+	/**
+	 * A monster's effect was activated (Blazeman: "If this card is Summoned: You can add…"): the other player may answer
+	 * it (Ash Blossom, Ghost Ogre, Solemn Strike) before it resolves. `then`: the Summon moment that waits behind it.
+	 */
+	| { kind: "effect"; side: Side; card: CardId; zone: number; run: EffectRun; negated?: true; then?: { zones: number[]; how: "normal" | "flip" | "special" } };
+/** What a monster's activated effect does when it resolves. */
+export type EffectRun = { do: "add"; card: CardId };
+/**
+ * A card activated in answer that waits on the Chain while the other player may answer it in turn: the last one
+ * activated resolves first (Rulebook v10 pp. 44-45). Chain Link 1 is what is pending; these are links 2 and up.
+ */
+export interface ChainLink {
+	side: Side;
+	card: CardId;
+	/** What was activated, for the cards that answer it: a monster's effect, a Spell, or a Trap. */
+	what: "monster" | "spell" | "trap";
+	/** Spell Speed: 3 for a Counter Trap, which only another Counter Trap can answer; 2 otherwise. */
+	speed: 2 | 3;
+	/** The answer played when it resolves (a hand trap, a Trap). A Counter Trap has none: it negates the link below it. */
+	move?: Move;
+	/** The Spell & Trap Zone it was activated in. */
+	zone?: number;
+	/** Taken from the hand: it goes back there just before it resolves, and to the Graveyard if it is negated. */
+	fromHand?: true;
+	/** Negated by this card, which resolved above it. */
+	negatedBy?: CardId;
+}
 export interface Board {
 	you: SideState;
 	rival: SideState;
@@ -112,6 +141,10 @@ export interface Board {
 	/** One Pendulum Summon per turn. */
 	pendulumUsed: boolean;
 	pending: Pending | null;
+	/** Answers waiting on top of what is pending, Chain Link 2 first. Empty unless an answer could itself be answered. */
+	chain: ChainLink[];
+	/** The most Chain Links a level allows (2: one answer, nothing on top of it); null for no limit. */
+	chainLimit: number | null;
 	winner: Side | null;
 	/** Once-per-turn effects already used this turn, as "side:card". */
 	used: string[];
@@ -147,7 +180,7 @@ export type Move =
 	 * Flip a Set card: a Trap or a Quick-Play Spell in answer to the opponent, a Set Quick-Play Spell on your own turn,
 	 * or a Continuous Trap that targets a monster in your Graveyard (`grave`) in your own Main Phase.
 	 */
-	| { type: "spring"; zone: number; target?: number; grave?: { side: Side; index: number } }
+	| { type: "spring"; zone: number; target?: number; grave?: { side: Side; index: number }; discard?: CardId }
 	/** Use the effect of one of your Monsters: on a face-up monster your opponent controls when it targets, or on a monster in your Graveyard (`grave`, Junk Synchron). */
 	| { type: "ability"; zone: number; target?: number; grave?: { side: Side; index: number }; discard?: CardId; pick?: CardId }
 	/** Synchro, Xyz or Link Summon a monster from the Extra Deck with monsters in these zones. */
@@ -281,7 +314,7 @@ export type GameEvent =
 	| { type: "position"; side: Side; card: CardId; position: Position }
 	/** `hidden`: the target is a face-down monster, so it is not named. */
 	| { type: "attack-declared"; side: Side; attacker: CardId; target: CardId | null; hidden?: true; zone?: number }
-	| { type: "window"; side: Side; kind: Pending["kind"]; step?: "damage" }
+	| { type: "window"; side: Side; kind: Pending["kind"] | "chain"; step?: "damage" }
 	/** The attack goes on to the Damage Step, and the defending player may act there. */
 	| { type: "damage-step"; side: Side }
 	| { type: "sprung"; side: Side; card: CardId }
@@ -336,6 +369,8 @@ export interface Setup {
 	strict?: boolean;
 	/** The seed of the duel's coin tosses. */
 	seed?: number;
+	/** The most Chain Links allowed (a teaching limit). */
+	chainLimit?: number;
 }
 
 function fill<T, U>(list: readonly (T | null)[] | undefined, count: number, make: (item: T) => U): (U | null)[] {
@@ -369,7 +404,7 @@ function side(setup: SideSetup = {}, full: boolean): SideState {
 export function board(setup: Setup = {}): Board {
 	const phase = setup.phase ?? "main1";
 	const full = setup.full ?? false;
-	return { you: side(setup.you, full), rival: side(setup.rival, full), full, turn: setup.turn ?? "you", turnNumber: setup.turnNumber ?? 3, phase, strict: setup.strict ?? false, drawn: phase !== "draw", summonUsed: false, pendulumUsed: false, pending: null, winner: null, used: [], proper: [], triggers: [], standbyDone: phase !== "draw", summonTrigger: null, rng: (setup.seed ?? 1) >>> 0, summons: 0, summonLock: false };
+	return { you: side(setup.you, full), rival: side(setup.rival, full), full, turn: setup.turn ?? "you", turnNumber: setup.turnNumber ?? 3, phase, strict: setup.strict ?? false, drawn: phase !== "draw", summonUsed: false, pendulumUsed: false, pending: null, chain: [], chainLimit: setup.chainLimit ?? null, winner: null, used: [], proper: [], triggers: [], standbyDone: phase !== "draw", summonTrigger: null, rng: (setup.seed ?? 1) >>> 0, summons: 0, summonLock: false };
 }
 
 export const other = (who: Side): Side => (who === "you" ? "rival" : "you");
@@ -468,10 +503,14 @@ export function scalesOf(state: Board, who: Side): { low: number; high: number }
 	return a === undefined || b === undefined ? null : { low: Math.min(a, b), high: Math.max(a, b) };
 }
 /** The player who has to act now: the turn player, or the other one while they may answer. */
-export const actor = (state: Board): Side => (state.pending ? other(state.turn) : state.turn);
+export function actor(state: Board): Side {
+	const top = state.chain.at(-1);
+	if (top) return other(top.side);
+	return state.pending ? other(state.turn) : state.turn;
+}
 const isMain = (phase: Phase) => phase === "main1" || phase === "main2";
 const after = (a: Phase, b: Phase) => PHASES.indexOf(a) > PHASES.indexOf(b);
-const TRAP_ANSWERS: Record<Pending["kind"], Effect["type"][]> = { attack: ["weaken-attacker", "stop-attack", "destroy-attacker", "banish-attacker", "reinforce", "negate-attack", "mirror-force", "magic-cylinder", "just-desserts", "clear-backrow", "recharge", "storm-force", "ruin"], spell: ["return-to-hand"], summon: ["trap-hole", "bottomless", "torrential"] };
+const TRAP_ANSWERS: Record<Pending["kind"], Effect["type"][]> = { attack: ["weaken-attacker", "stop-attack", "destroy-attacker", "banish-attacker", "reinforce", "negate-attack", "mirror-force", "magic-cylinder", "just-desserts", "clear-backrow", "recharge", "storm-force", "ruin"], spell: ["return-to-hand"], summon: ["trap-hole", "bottomless", "torrential"], effect: [] };
 /** What Ash Blossom & Joyous Spring can negate: an effect that adds a card from the Deck to the hand or Special Summons from the Deck. */
 function ashHits(card: CardId): boolean {
 	const info = cardOf(card);
@@ -500,6 +539,8 @@ function reject(reason: Reason): never {
 class Play {
 	readonly state: Board;
 	readonly events: GameEvent[] = [];
+	/** Set while an answer that waited on the Chain resolves: it is played at once, not put on the Chain again. */
+	resolving = false;
 	constructor(
 		source: Board,
 		private readonly forced: { coin?: boolean } = {},
@@ -579,6 +620,7 @@ class Play {
 		if (s.winner) return;
 		const zones: number[] = [];
 		let how: "normal" | "flip" | "special" = "special";
+		let opened: Extract<Pending, { kind: "effect" }> | null = null;
 		for (const event of this.events) {
 			if (event.type !== "summoned" && event.type !== "special" && !(event.type === "flipped" && event.how === "summon")) continue;
 			if (event.zone === undefined) continue;
@@ -591,21 +633,59 @@ class Play {
 			const once = `${event.side}:${event.card}:add`;
 			if (add && at >= 0 && !s.used.includes(once)) {
 				s.used.push(once);
-				s[event.side].deck.splice(at, 1);
-				this.shuffle(s[event.side].deck);
-				s[event.side].hand.push(add as CardId);
-				this.events.push({ type: "added", side: event.side, card: add as CardId, from: "deck" });
+				/* The effect is activated: the other player may answer it before the card is added (Ash Blossom, Solemn Strike). */
+				const effect: Extract<Pending, { kind: "effect" }> = { kind: "effect", side: event.side, card: event.card, zone: event.zone, run: { do: "add", card: add as CardId } };
+				if (!s.pending && !opened && event.side === s.turn && isMain(s.phase)) {
+					s.pending = effect;
+					if (this.canAnswer()) opened = effect;
+					else s.pending = null;
+				}
+				if (opened !== effect) this.addFromDeck(event.side, add as CardId);
 			}
 			if (event.side !== s.turn) continue;
 			zones.push(event.zone);
 			if (event.type === "summoned") how = "normal";
 			else if (event.type === "flipped") how = "flip";
 		}
+		if (opened) {
+			/* The Summon's own moment waits until the effect has resolved. */
+			if (zones.length > 0) opened.then = { zones, how };
+			this.events.push({ type: "window", side: other(s.turn), kind: "effect" });
+			return;
+		}
 		/* A Summon in the middle of a battle (a card flipped during an attack) gets no such moment: the battle is already over. */
 		if (zones.length === 0 || s.pending || !isMain(s.phase)) return;
-		s.pending = { kind: "summon", zones, how };
+		this.openSummon(zones, how);
+	}
+	/** The other player may answer the turn player's Summon, when they have something to answer it with. */
+	private openSummon(zones: number[], how: "normal" | "flip" | "special"): void {
+		const s = this.state;
+		const still = zones.filter((zone) => !!s[s.turn].monsters[zone]);
+		if (still.length === 0 || s.winner) return;
+		s.pending = { kind: "summon", zones: still, how };
 		if (this.canAnswer()) this.events.push({ type: "window", side: other(s.turn), kind: "summon" });
 		else s.pending = null;
+	}
+	/** A card is added from the Deck to the hand, and the Deck is shuffled. */
+	private addFromDeck(who: Side, card: CardId): void {
+		const deck = this.state[who].deck;
+		const at = deck.indexOf(card);
+		if (at < 0) return;
+		deck.splice(at, 1);
+		this.shuffle(deck);
+		this.state[who].hand.push(card);
+		this.events.push({ type: "added", side: who, card, from: "deck" });
+	}
+	/**
+	 * A monster's activated effect resolves, unless it was negated, or the monster lost its effects on the field before
+	 * it resolved (Effect Veiler, Infinite Impermanence). Destroyed in answer (Ghost Ogre), its effect still resolves.
+	 */
+	private resolveEffect(pending: Extract<Pending, { kind: "effect" }>): void {
+		const slot = this.state[pending.side].monsters[pending.zone];
+		const lost = !!slot && slot.card === pending.card && !live(slot);
+		if (lost) this.events.push({ type: "no-effect", card: pending.card });
+		else if (!pending.negated) this.addFromDeck(pending.side, pending.run.card);
+		if (pending.then && isMain(this.state.phase)) this.openSummon(pending.then.zones, pending.then.how);
 	}
 	/** The Battle Phase ends at once, as a card said. */
 	private endBattle(): void {
@@ -619,12 +699,16 @@ class Play {
 		const s = this.state;
 		const pending = s.pending;
 		const info = cardOf(card);
+		const damageStep = pending?.kind === "attack" && pending.step === "damage";
+		/* Infinite Impermanence: "If you control no cards, you can activate this card from your hand." */
+		if (pending && info.kind === "trap" && info.effect.type === "impermanence") return !damageStep && !trapsLocked(s) && this.controlsNothing(who) && this.faceUpFoe();
 		const effect = info.kind === "monster" ? info.hand : undefined;
 		if (!pending || !effect) return false;
-		const damageStep = pending.kind === "attack" && pending.step === "damage";
 		if (effect === "no-battle-damage") return damageStep;
 		if (damageStep) return false;
-		if (effect === "ash") return pending.kind === "spell" && ashHits(pending.card) && !s.used.includes(`${who}:ash`);
+		if (effect === "ash") return ((pending.kind === "spell" && ashHits(pending.card)) || (pending.kind === "effect" && pending.run.do === "add")) && !s.used.includes(`${who}:ash`);
+		/* Ghost Ogre & Snow Rabbit: "When a monster on the field activates its effect": that monster is still there. */
+		if (effect === "ogre") return pending.kind === "effect" && s[pending.side].monsters[pending.zone]?.card === pending.card && !s.used.includes(`${who}:ogre`);
 		if (effect === "veiler") return pending.kind !== "attack" && isMain(s.phase) && s[s.turn].monsters.some((slot) => !!slot && !slot.faceDown && isEffectMonster(slot.card));
 		if (effect === "crow") return pending.kind === "spell" && pending.grave?.side === s.turn;
 		const direct = pending.kind === "attack" && pending.target === "direct";
@@ -715,6 +799,11 @@ class Play {
 	private move(move: Move): void {
 		const s = this.state;
 		if (s.winner) reject("duel-over");
+		if (s.chain.length > 0) return this.answerLink(move);
+		if (s.pending && !this.resolving && (move.type === "spring" || move.type === "ability" || move.type === "hand")) {
+			const link = this.linkOf(move);
+			if (link) return this.addLink(link, move);
+		}
 		if (s.pending && move.type !== "spring" && move.type !== "ability" && move.type !== "hand" && move.type !== "pass") reject("answer-first");
 		switch (move.type) {
 			case "draw":
@@ -741,6 +830,232 @@ class Play {
 				if (!s.pending) reject("nothing-to-answer");
 				return this.resolvePending();
 		}
+	}
+
+	/**
+	 * The answer this move activates, when it goes on the Chain instead of resolving at once: a Counter Trap always,
+	 * any other answer only when the opponent could answer it in turn. Null: it is played at once, as always.
+	 */
+	private linkOf(move: Extract<Move, { type: "spring" | "ability" | "hand" }>): ChainLink | null {
+		const s = this.state;
+		const link = this.describe(other(s.turn), move);
+		if (!link) return null;
+		if (link.speed === 3) return link;
+		if (!this.counterReady(s.turn, link, s.chain.length + 3)) return null;
+		/* Checked as if it were played now: an answer that could not be made is refused, Chain or not. */
+		const trial = new Play(s, this.forced);
+		trial.resolving = true;
+		trial.move(move);
+		return link;
+	}
+	/** What an answering move activates: a monster's effect (from the hand or the field), a Trap, or a Quick-Play Spell. */
+	private describe(who: Side, move: Extract<Move, { type: "spring" | "ability" | "hand" }>): ChainLink | null {
+		const s = this.state;
+		if (move.type === "hand") {
+			const info = s[who].hand.includes(move.card) ? cardOf(move.card) : null;
+			if (info?.kind === "monster" && info.hand) return { side: who, card: move.card, what: "monster", speed: 2, move, fromHand: true };
+			if (info?.kind === "trap" && info.effect.type === "impermanence") return { side: who, card: move.card, what: "trap", speed: 2, move, fromHand: true };
+			return null;
+		}
+		if (move.type === "ability") {
+			const slot = s[who].monsters[move.zone];
+			return slot ? { side: who, card: slot.card, what: "monster", speed: 2, move } : null;
+		}
+		const slot = s[who].backrow[move.zone];
+		if (!slot || slot.up || slot.open || slot.chained) return null;
+		const info = cardOf(slot.card);
+		if (info.kind === "trap") return { side: who, card: slot.card, what: "trap", speed: info.effect.type === "counter" ? 3 : 2, move, zone: move.zone };
+		return info.kind === "spell" && isQuickPlay(slot.card) ? { side: who, card: slot.card, what: "spell", speed: 2, move, zone: move.zone } : null;
+	}
+	/** What is pending, as a Counter Trap sees it: a Spell activated, a monster's effect activated, or nothing it can negate. */
+	private pendingWhat(): ChainLink["what"] | null {
+		const pending = this.state.pending;
+		if (pending?.kind === "spell") return "spell";
+		if (pending?.kind === "effect") return "monster";
+		return null;
+	}
+	/** Does this Counter Trap negate what it would answer: the link below it, or what is pending? */
+	private counterFits(card: CardId, below: ChainLink | null): boolean {
+		const info = cardOf(card);
+		if (info.kind !== "trap" || info.effect.type !== "counter") return false;
+		return info.effect.negates === (below ? below.what : this.pendingWhat());
+	}
+	/** Could `who` answer with a Counter Trap that would be Chain Link `link`, on top of `below` (null: on what is pending)? */
+	private counterReady(who: Side, below: ChainLink | null, link: number): boolean {
+		const s = this.state;
+		if (trapsLocked(s) || (s.chainLimit !== null && link > s.chainLimit)) return false;
+		const mine = s[who];
+		return mine.backrow.some((slot) => {
+			if (!slot || slot.setThisTurn || slot.up || slot.open || slot.chained || !this.counterFits(slot.card, below)) return false;
+			const info = cardOf(slot.card);
+			const cost = info.kind === "monster" ? undefined : info.cost;
+			if (cost?.type === "pay-lp") return mine.lp > cost.amount;
+			if (cost?.type === "discard") return mine.hand.length > 0;
+			return true;
+		});
+	}
+	/** An answer goes on the Chain. The other player may answer it in turn; if they cannot, the Chain resolves. */
+	private addLink(link: ChainLink, move: Move): void {
+		const s = this.state;
+		const below = s.chain.at(-1) ?? null;
+		if (link.speed === 3) this.activateCounter(link, move, below);
+		else if (link.fromHand) s[link.side].hand.splice(s[link.side].hand.indexOf(link.card), 1);
+		else if (link.zone !== undefined) s[link.side].backrow[link.zone]!.chained = true;
+		s.chain.push(link);
+		this.events.push({ type: "chain", link: s.chain.length + 1, side: link.side, card: link.card });
+		if (this.counterReady(other(link.side), link, s.chain.length + 2)) {
+			this.events.push({ type: "window", side: other(link.side), kind: "chain" });
+			return;
+		}
+		this.resolveChain();
+	}
+	/** A Counter Trap is flipped and its cost paid, as it is activated. */
+	private activateCounter(link: ChainLink, move: Move, below: ChainLink | null): void {
+		const s = this.state;
+		const mine = s[link.side];
+		const slot = link.zone === undefined ? null : mine.backrow[link.zone];
+		if (move.type !== "spring" || !slot) return reject("nothing-to-answer");
+		if (slot.setThisTurn) reject("trap-just-set");
+		if (trapsLocked(s)) reject("jinzo-lock");
+		if (!this.counterFits(slot.card, below)) reject("cannot-answer-that");
+		if (s.chainLimit !== null && s.chain.length + 2 > s.chainLimit) reject("cannot-answer-that");
+		const info = cardOf(slot.card);
+		const cost = info.kind === "monster" ? undefined : info.cost;
+		if (cost?.type === "pay-lp") {
+			if (mine.lp <= cost.amount) reject("cost-needed");
+			this.damage(link.side, cost.amount);
+		}
+		if (cost?.type === "discard") {
+			const at = move.discard === undefined ? -1 : mine.hand.indexOf(move.discard);
+			if (at < 0) reject("cost-needed");
+			mine.hand.splice(at, 1);
+			this.toGraveyard(link.side, move.discard as CardId, "activation");
+			this.events.push({ type: "discarded", side: link.side, card: move.discard as CardId });
+		}
+		slot.chained = true;
+		this.events.push({ type: "sprung", side: link.side, card: slot.card });
+	}
+	/** Who must act on the Chain may add a Counter Trap, or pass: then the Chain resolves, the last link first. */
+	private answerLink(move: Move): void {
+		const s = this.state;
+		if (move.type === "pass") return this.resolveChain();
+		if (move.type !== "spring") return reject("answer-first");
+		const who = actor(s);
+		const slot = s[who].backrow[move.zone];
+		if (!slot || slot.up || slot.open || slot.chained) return reject("nothing-to-answer");
+		const info = cardOf(slot.card);
+		if (info.kind !== "trap" || info.effect.type !== "counter") return reject("cannot-answer-that");
+		this.addLink({ side: who, card: slot.card, what: "trap", speed: 3, zone: move.zone }, move);
+	}
+	/** The Chain resolves, the last link first; then what was pending, unless an answer already did it. */
+	private resolveChain(): void {
+		const s = this.state;
+		while (s.chain.length > 0) {
+			if (s.winner) {
+				s.chain = [];
+				return;
+			}
+			const link = s.chain.pop() as ChainLink;
+			const number = s.chain.length + 2;
+			if (link.negatedBy) {
+				this.spendNegated(link);
+				continue;
+			}
+			if (link.speed === 3) {
+				/* A Counter Trap negates the activation just below it, and destroys that card. */
+				this.events.push({ type: "resolve", link: number, card: link.card });
+				const below = s.chain.at(-1);
+				if (below) {
+					below.negatedBy = link.card;
+					this.events.push({ type: "negated", side: link.side, card: below.card, by: link.card });
+				} else this.negatePending(link);
+				if (link.zone !== undefined) s[link.side].backrow[link.zone] = null;
+				this.toGraveyard(link.side, link.card, null);
+				continue;
+			}
+			/* The answer at the bottom of the Chain is played now, as it would have been at once; it resolves what was pending too. */
+			if (link.fromHand) s[link.side].hand.push(link.card);
+			const slot = link.zone === undefined ? null : s[link.side].backrow[link.zone];
+			if (slot) delete slot.chained;
+			this.resolving = true;
+			try {
+				this.move(link.move as Move);
+			} catch (error) {
+				if (!(error instanceof Rejected)) throw error;
+				/* What it needed is gone: it resolves without effect. */
+				this.events.push({ type: "no-effect", card: link.card });
+				this.spendNegated(link);
+				this.resolvePending();
+			} finally {
+				this.resolving = false;
+			}
+			return;
+		}
+		this.resolvePending();
+	}
+	/** A negated answer: the card still goes to the Graveyard, and a once-per-turn effect counts as used. A monster on the field is destroyed. */
+	private spendNegated(link: ChainLink): void {
+		const s = this.state;
+		const mine = s[link.side];
+		if (link.fromHand) {
+			const at = mine.hand.indexOf(link.card);
+			if (at >= 0) mine.hand.splice(at, 1);
+			this.toGraveyard(link.side, link.card, "activation");
+			const info = cardOf(link.card);
+			if (info.kind === "monster" && (info.hand === "ash" || info.hand === "ogre")) s.used.push(`${link.side}:${info.hand}`);
+			return;
+		}
+		if (link.zone !== undefined && mine.backrow[link.zone]?.card === link.card) {
+			mine.backrow[link.zone] = null;
+			this.toGraveyard(link.side, link.card, null);
+			this.events.push({ type: "destroyed", side: link.side, card: link.card });
+			return;
+		}
+		if (link.move?.type === "ability" && mine.monsters[link.move.zone]?.card === link.card) {
+			this.events.push({ type: "destroyed", side: link.side, card: link.card });
+			this.leave(link.side, link.move.zone, "graveyard");
+		}
+	}
+	/** A Counter Trap at Chain Link 2 negates what was pending, "and if you do, destroy" the monster whose effect it was. */
+	private negatePending(link: ChainLink): void {
+		const s = this.state;
+		const pending = s.pending;
+		if (pending?.kind !== "spell" && pending?.kind !== "effect") return;
+		pending.negated = true;
+		this.events.push({ type: "negated", side: link.side, card: pending.card, by: link.card });
+		if (pending.kind === "effect" && s[pending.side].monsters[pending.zone]?.card === pending.card) {
+			this.events.push({ type: "destroyed", side: pending.side, card: pending.card });
+			this.leave(pending.side, pending.zone, "graveyard");
+		}
+	}
+	/** Does this player control no cards at all: no monster, no Spell or Trap, no Field Spell? */
+	private controlsNothing(who: Side): boolean {
+		const mine = this.state[who];
+		return !mine.monsters.some(Boolean) && !mine.backrow.some(Boolean) && !mine.field;
+	}
+	/** Does the turn player control a face-up monster, for a card that targets one? */
+	private faceUpFoe(): boolean {
+		const s = this.state;
+		return s[s.turn].monsters.some((slot) => !!slot && !slot.faceDown);
+	}
+	/**
+	 * Infinite Impermanence: "Target 1 face-up monster your opponent controls; negate its effects (until the end of this
+	 * turn)". Its column lock, for a Set copy, is left out of Junior.
+	 */
+	private impermanence(who: Side, target: number | undefined, from: { zone: number } | { hand: number }): void {
+		const s = this.state;
+		const victim = target === undefined ? null : (s[s.turn].monsters[target] ?? null);
+		if (!victim || victim.faceDown) return reject("no-target");
+		const mine = s[who];
+		const card = "zone" in from ? mine.backrow[from.zone]?.card : mine.hand[from.hand];
+		if (!card) return reject("nothing-to-answer");
+		if ("zone" in from) mine.backrow[from.zone] = null;
+		else mine.hand.splice(from.hand, 1);
+		this.toGraveyard(who, card, null);
+		this.events.push({ type: "sprung", side: who, card });
+		victim.negatedTurn = true;
+		this.events.push({ type: "negated", side: who, card: victim.card, by: card });
+		this.resolvePending();
 	}
 
 	private draw(): void {
@@ -1383,6 +1698,7 @@ class Play {
 				return s[s.turn].monsters.some((held) => !!held && (!held.faceDown || (card.effect.type === "destroy" && !!card.effect.anyFace)));
 			}
 			if (damageStep || trapsLocked(s)) return false;
+			if (card.kind === "trap" && card.effect.type === "impermanence") return this.faceUpFoe();
 			if (pending.kind === "summon") return card.kind === "trap" && this.summonTrapFits(card.effect, pending);
 			return card.kind === "trap" && TRAP_ANSWERS[pending.kind].includes(card.effect.type) && (!needsOwnMonster(card.effect.type) || mine.monsters.some((held) => !!held && (card.effect.type !== "reinforce" || !held.faceDown)));
 		});
@@ -1399,7 +1715,9 @@ class Play {
 			});
 		const detach = !damageStep && pending.kind === "attack" && mine.monsters.some((slot) => !!slot && !!live(slot)?.detach && (slot.materials?.length ?? 0) > 0);
 		const hand = mine.hand.some((card) => this.handReady(who, card));
-		return trap || quick || detach || hand || acts;
+		/* A Counter Trap that negates what is pending: a Spell, or a monster's effect. */
+		const counter = !damageStep && this.counterReady(who, null, 2);
+		return trap || quick || detach || hand || acts || counter;
 	}
 	private spent(who: Side, card: CardId): boolean {
 		return monsterOf(card).ability?.oncePerTurn === true && this.state.used.includes(`${who}:${card}`);
@@ -1663,6 +1981,10 @@ class Play {
 		const at = mine.hand.indexOf(card);
 		if (at < 0) reject("not-in-hand");
 		const info = cardOf(card);
+		if (info.kind === "trap" && info.effect.type === "impermanence") {
+			if (!this.handReady(who, card)) return reject("cannot-answer-that");
+			return this.impermanence(who, target, { hand: at });
+		}
 		const effect = info.kind === "monster" ? info.hand : undefined;
 		if (!effect) return reject("no-ability");
 		if (effect === "no-battle-damage") {
@@ -1703,11 +2025,19 @@ class Play {
 			victim.negatedTurn = true;
 			this.events.push({ type: "negated", side: who, card: victim.card, by: card });
 		}
-		if (effect === "ash" && pending.kind === "spell") {
+		if (effect === "ash" && (pending.kind === "spell" || pending.kind === "effect")) {
 			/* "Negate that effect": the card was activated and its cost stays paid, but it does nothing. */
 			s.used.push(`${who}:ash`);
 			pending.negated = true;
 			this.events.push({ type: "negated", side: who, card: pending.card, by: card });
+		}
+		if (effect === "ogre" && pending.kind === "effect") {
+			/* "Destroy that card on the field." Its effect was already activated: it still resolves. */
+			s.used.push(`${who}:ogre`);
+			if (s[pending.side].monsters[pending.zone]?.card === pending.card) {
+				this.events.push({ type: "destroyed", side: pending.side, card: pending.card });
+				this.leave(pending.side, pending.zone, "graveyard");
+			}
 		}
 		if (effect === "crow" && pending.kind === "spell" && pending.grave) {
 			/* "Target 1 card in your opponent's GY; banish that target": the card the Spell was aimed at. */
@@ -1777,8 +2107,9 @@ class Play {
 			if (card.kind === "trap" && card.effect.type === "haunt") return this.haunt(zone, grave);
 			return reject("nothing-to-answer");
 		}
-		if (card.kind !== "trap" || !TRAP_ANSWERS[pending.kind].includes(card.effect.type)) return reject("cannot-answer-that");
 		if (pending.kind === "attack" && pending.step === "damage") return reject("damage-step-closed");
+		if (card.kind === "trap" && card.effect.type === "impermanence") return this.impermanence(owner, target, { zone });
+		if (card.kind !== "trap" || !TRAP_ANSWERS[pending.kind].includes(card.effect.type)) return reject("cannot-answer-that");
 		if (pending.kind === "summon" && !this.summonTrapFits(card.effect, pending)) return reject("cannot-answer-that");
 		const saved = needsOwnMonster(card.effect.type) && target !== undefined ? (mine.monsters[target] ?? null) : null;
 		if (needsOwnMonster(card.effect.type) && !saved) reject("no-target");
@@ -2013,6 +2344,7 @@ class Play {
 		if (!pending) return;
 		if (pending.kind === "summon") return;
 		if (pending.kind === "spell") return this.resolveSpell(pending);
+		if (pending.kind === "effect") return this.resolveEffect(pending);
 		if (pending.step !== "damage" && this.me.monsters[pending.attacker]) {
 			/* The Battle Step is over: on to the Damage Step, where the defender may still act before damage is calculated. */
 			s.pending = { ...pending, step: "damage" };
@@ -2445,10 +2777,19 @@ export function legalPlays(state: Board): { move: Move; board: Board; events: Ga
 	const candidates: Move[] = [];
 	if (state.pending) {
 		candidates.push({ type: "pass" });
-		for (const zone of backZones.filter((at) => who.backrow[at])) candidates.push({ type: "spring", zone }, ...monsterZones.map((target): Move => ({ type: "spring", zone, target })));
+		for (const zone of backZones.filter((at) => who.backrow[at])) {
+			candidates.push({ type: "spring", zone }, ...monsterZones.map((target): Move => ({ type: "spring", zone, target })));
+			/* Magic Jammer: "Discard 1 card;". */
+			const info = cardOf(who.backrow[zone]!.card);
+			if (info.kind === "trap" && info.cost?.type === "discard") for (const discard of new Set(who.hand)) candidates.push({ type: "spring", zone, discard });
+		}
 		for (const zone of held) candidates.push({ type: "ability", zone }, ...monsterZones.map((target): Move => ({ type: "ability", zone, target })));
 		for (const zone of held) if (who.monsters[zone] && monsterOf(who.monsters[zone]!.card).act) for (const discard of new Set(who.hand)) candidates.push({ type: "ability", zone, discard }, ...monsterZones.map((target): Move => ({ type: "ability", zone, target, discard })));
-		for (const card of new Set(who.hand)) candidates.push({ type: "hand", card }, ...(cardOf(card).kind === "monster" && monsterOf(card).hand === "veiler" ? monsterZones.map((target): Move => ({ type: "hand", card, target })) : []));
+		const targets = (card: CardId) => {
+			const info = cardOf(card);
+			return (info.kind === "monster" && info.hand === "veiler") || (info.kind === "trap" && info.effect.type === "impermanence");
+		};
+		for (const card of new Set(who.hand)) candidates.push({ type: "hand", card }, ...(targets(card) ? monsterZones.map((target): Move => ({ type: "hand", card, target })) : []));
 	} else {
 		candidates.push({ type: "draw" }, ...PHASES.map((to): Move => ({ type: "phase", to })));
 		const firstMonster = who.monsters.findIndex((slot, zone) => zone < main && !slot);

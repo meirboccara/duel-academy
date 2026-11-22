@@ -632,7 +632,9 @@ export function ChainTower({ events, board, copy }: { events: readonly GameEvent
 			resolved.push(event.link);
 		}
 	}
-	if (board.pending?.kind === "spell") links.set(1, board.pending.card);
+	if (board.pending?.kind === "spell" || board.pending?.kind === "effect") links.set(1, board.pending.card);
+	/* Answers still waiting on the Chain for the other player's answer. */
+	board.chain.forEach((link, index) => links.set(index + 2, link.card));
 	if (links.size === 0) return null;
 	const order = [...links.keys()].sort((a, b) => b - a);
 	return (

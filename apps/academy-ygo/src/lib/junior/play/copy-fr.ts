@@ -548,6 +548,8 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 					if (event.step === "damage") return mine ? "Stop ! Kuriboh et les cartes qui changent l’ATK peuvent encore agir." : `${RIVAL} peut encore changer l’ATK.`;
 					if (!mine) return `${RIVAL} peut répondre.`;
 					if (event.kind === "summon") return "Stop ! Un Monstre vient d’être Invoqué : tu peux répondre maintenant.";
+					if (event.kind === "effect") return "Stop ! Un Monstre active son effet : tu peux répondre maintenant. Ta réponse se résoudra en premier.";
+					if (event.kind === "chain") return "Stop ! Un Contre-Piège peut répondre à cette réponse. La dernière carte de la Chaîne se résout en premier.";
 					return event.kind === "attack" ? "Stop ! Tu peux répondre maintenant." : "Stop ! Tu peux répondre maintenant. Ta réponse se résoudra en premier.";
 				case "sprung":
 					return `${mine ? "Tu retournes" : `${RIVAL} retourne`} un Piège : ${name(event.card)} !`;

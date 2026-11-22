@@ -270,5 +270,10 @@
 	"a-hero-lives": { "card": 8949584, "image": 8949584 },
 	"magicians-rod": { "card": 7084129, "image": 7084129 },
 	"elemental-hero-blazeman": { "card": 63060238, "image": 63060238 },
-	"elemental-hero-gaia": { "card": 16304628, "image": 16304628 }
+	"elemental-hero-gaia": { "card": 16304628, "image": 16304628 },
+	"ghost-ogre-snow-rabbit": { "card": 59438930, "image": 59438930 },
+	"infinite-impermanence": { "card": 10045474, "image": 10045474 },
+	"seven-tools-of-the-bandit": { "card": 3819470, "image": 3819470 },
+	"magic-jammer": { "card": 77414722, "image": 77414722 },
+	"solemn-strike": { "card": 40605147, "image": 40605147 }
 }

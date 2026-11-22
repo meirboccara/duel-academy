@@ -109,7 +109,14 @@ export type Effect =
 	/** Continuous Trap: "target 1 monster in your GY; Special Summon that target in Attack Position." Linked to it both ways. */
 	| { type: "haunt" }
 	/** Counter Trap, when an opponent's monster declares an attack: negate the attack, then end the Battle Phase. */
-	| { type: "negate-attack" };
+	| { type: "negate-attack" }
+	/**
+	 * Counter Trap: "When a Spell Card / a Trap Card / a monster effect is activated: negate the activation, and if you do,
+	 * destroy it." Spell Speed 3: only another Counter Trap can answer it.
+	 */
+	| { type: "counter"; negates: "spell" | "trap" | "monster" }
+	/** Infinite Impermanence: "Target 1 face-up monster your opponent controls; negate its effects (until the end of this turn)." From the hand if its owner controls no cards. */
+	| { type: "impermanence" };
 
 /** Monster Types, as printed on the Type line. */
 export const MONSTER_TYPES = ["aqua", "beast", "beast-warrior", "cyberse", "dinosaur", "divine-beast", "dragon", "fairy", "fiend", "fish", "insect", "machine", "plant", "psychic", "pyro", "reptile", "rock", "sea-serpent", "spellcaster", "thunder", "warrior", "winged-beast", "wyrm", "zombie"] as const;
@@ -152,7 +159,7 @@ export interface Trigger {
  * - "fader" (Battle Fader): on a direct attack, Special Summon it from the hand, then end the Battle Phase; banished when it leaves the field.
  * - "crow" (D.D. Crow): discard to banish 1 card in the opponent's GY.
  */
-export type HandEffect = "no-battle-damage" | "ash" | "veiler" | "scarecrow" | "fader" | "crow";
+export type HandEffect = "no-battle-damage" | "ash" | "veiler" | "scarecrow" | "fader" | "crow" | "ogre";
 /** The cards of the Deck an effect chooses among. */
 export type DeckPool = "low-warrior" | "elemental-hero" | "low-elemental-hero";
 /** Does this card of the Deck fit what an effect looks for? */
@@ -297,7 +304,9 @@ export type Cost =
 	/** "Pay half your LP;" */
 	| { type: "half-lp" }
 	/** "Banish 10 cards from the top of your Deck, face-down;" */
-	| { type: "banish-deck"; count: number };
+	| { type: "banish-deck"; count: number }
+	/** "Pay [n] LP;" */
+	| { type: "pay-lp"; amount: number };
 export interface EffectCard {
 	kind: "spell" | "trap";
 	effect: Effect;
@@ -583,6 +592,11 @@ export const CARDS = {
 	/* Hand traps, Traps that answer a Summon, and searchers. */
 	"ash-blossom-joyous-spring": real("ash-blossom-joyous-spring", { tuner: true, hand: "ash" }),
 	"effect-veiler": real("effect-veiler", { tuner: true, hand: "veiler" }),
+	"ghost-ogre-snow-rabbit": real("ghost-ogre-snow-rabbit", { tuner: true, hand: "ogre" }),
+	"infinite-impermanence": { kind: "trap", effect: { type: "impermanence" }, art: "♾️" },
+	"seven-tools-of-the-bandit": { kind: "trap", icon: "counter", cost: { type: "pay-lp", amount: 1000 }, effect: { type: "counter", negates: "trap" }, art: "🧰" },
+	"magic-jammer": { kind: "trap", icon: "counter", cost: { type: "discard" }, effect: { type: "counter", negates: "spell" }, art: "📵" },
+	"solemn-strike": { kind: "trap", icon: "counter", cost: { type: "pay-lp", amount: 1500 }, effect: { type: "counter", negates: "monster" }, art: "⚖️" },
 	"swift-scarecrow": real("swift-scarecrow", { hand: "scarecrow" }),
 	"battle-fader": real("battle-fader", { hand: "fader" }),
 	"dd-crow": real("dd-crow", { hand: "crow" }),

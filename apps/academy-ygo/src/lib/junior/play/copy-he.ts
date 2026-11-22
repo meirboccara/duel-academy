@@ -535,6 +535,8 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 					if (event.step === "damage") return mine ? `עצרו! ${L("Kuriboh")} וקלפים שמשנים ATK עוד יכולים לפעול.` : `${RIVAL} עוד יכול לשנות ATK.`;
 					if (!mine) return `${RIVAL} יכול לענות.`;
 					if (event.kind === "summon") return `עצרו! ${MONSTER} זומנה עכשיו: אפשר לענות.`;
+					if (event.kind === "effect") return `עצרו! ${MONSTER} הפעילה את האפקט שלה: אפשר לענות. התשובה שלכם תיפתר ראשונה.`;
+					if (event.kind === "chain") return `עצרו! ${w("מלכודת נגד", "Counter Trap")} יכולה לענות על התשובה. הקלף האחרון ב־${w("שרשרת", "Chain")} נפתר ראשון.`;
 					return event.kind === "attack" ? "עצור! עכשיו אפשר לענות." : "עצור! עכשיו אפשר לענות. התשובה שלכם תיפתר ראשונה.";
 				case "sprung":
 					return `${mine ? "הפכתם" : `${RIVAL} הופך`} ${w("מלכודת", "Trap")}: ${name(event.card)}!`;

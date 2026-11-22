@@ -541,6 +541,8 @@ export function englishCopy(RIVAL: string): PlayCopy {
 					if (event.step === "damage") return mine ? "Stop! Kuriboh and cards that change ATK can still act." : `${RIVAL} can still change ATK.`;
 					if (!mine) return `${RIVAL} can answer.`;
 					if (event.kind === "summon") return "Freeze! A Monster was just Summoned: you can answer now.";
+					if (event.kind === "effect") return "Freeze! A Monster activated its effect: you can answer now. Your answer will resolve first.";
+					if (event.kind === "chain") return "Freeze! A Counter Trap can answer that answer. The last card on the Chain resolves first.";
 					return event.kind === "attack" ? "Freeze! You can answer now." : "Freeze! You can answer now. Your answer will resolve first.";
 				case "sprung":
 					return `${who} flip${mine ? "" : "s"} a Trap: ${name(event.card)}!`;

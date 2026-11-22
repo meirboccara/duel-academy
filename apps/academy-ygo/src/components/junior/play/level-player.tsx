@@ -6,7 +6,7 @@ import type { Locale } from "@/lib/i18n/locales";
 import { cardOf, hasRulesText, inPool, isQuickPlay, mentions, monsterOf, spellTarget, tributesFor, type CardId } from "@/lib/junior/play/cards";
 import { PLAY_COPY, VOICE_LOCALE, narrateAll, phasesStarted, playCopyFor, stepsStarted, type PlayCopy } from "@/lib/junior/play/copy";
 import { MASTER_NAMES, masterPicture } from "@/lib/junior/play/masters";
-import { fusionFits, mainZones, scalesOf, type Board, type GameEvent, type Move, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
+import { actor, fusionFits, mainZones, scalesOf, type Board, type GameEvent, type Move, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
 import { WORLD_IDS, type Level } from "@/lib/junior/play/levels";
 import { hint as askHint, botTurn, forceWin, next, outcome, play, playOut, restart, start, undo, type Outcome, type Session } from "@/lib/junior/play/session";
 import { DevLevelBarSlot } from "../dev/dev-slot";
@@ -32,7 +32,8 @@ type Holding =
 	/** Junk Synchron's effect right after its Normal Summon, waiting for the monster in the child's Graveyard. */
 	| { kind: "revive"; zone: number }
 	/** A monster's effect paid with a card from the hand (Dark Paladin, a Dragon Knight, Thunder Giant), waiting for that card. */
-	| { kind: "act-cost"; zone: number; target?: number }
+	/** A card of the hand to discard as a cost: for a monster's effect, or (`trap`) for a Set Counter Trap such as Magic Jammer. */
+	| { kind: "act-cost"; zone: number; target?: number; trap?: true }
 	/** A Monster whose effect is being used, waiting for its target. */
 	| { kind: "ability"; zone: number }
 	/** A Spell with a cost, waiting for the card to discard; with `pick`, a Spell waiting for the monster of the hand it Special Summons. */
@@ -65,12 +66,17 @@ const isReviver = (card: CardId) => {
 };
 const handEffect = (card: CardId) => {
 	const info = cardOf(card);
-	return info.kind === "monster" && !!info.hand;
+	return (info.kind === "monster" && !!info.hand) || isImpermanence(card);
 };
-/** Effect Veiler: its effect from the hand waits for the rival's Monster it targets. */
+/** Infinite Impermanence: a Trap that can be activated from the hand. */
+const isImpermanence = (card: CardId) => {
+	const info = cardOf(card);
+	return info.kind === "trap" && info.effect.type === "impermanence";
+};
+/** Effect Veiler, Infinite Impermanence: used from the hand, they wait for the rival's Monster they target. */
 const handAims = (card: CardId) => {
 	const info = cardOf(card);
-	return info.kind === "monster" && info.hand === "veiler";
+	return (info.kind === "monster" && info.hand === "veiler") || isImpermanence(card);
 };
 /** The cards of the Deck a searching effect may take, each once. */
 const searchable = (board: Board, pick: { card?: CardId; zone: number }): CardId[] => {
@@ -201,7 +207,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	const act = (move: Move) => update(play(session, move));
 	/** A monster's effect: one paid with a card from the hand waits for that card; any other is used at once. */
 	const useAbility = (zone: number, target?: number) => {
-		const slot = session.board[session.board.pending ? (session.board.turn === "you" ? "rival" : "you") : "you"].monsters[zone];
+		const slot = session.board[actor(session.board)].monsters[zone];
 		const paid = slot ? monsterOf(slot.card).act : undefined;
 		if (paid && (paid.kind === "destroy" || paid.kind === "negate-spell")) return setPick({ kind: "act-cost", zone, ...(target === undefined ? {} : { target }) });
 		act({ type: "ability", zone, ...(target === undefined ? {} : { target }) });
@@ -238,6 +244,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	};
 	const onHand = (card: CardId, index: number) => {
 		/* In answer to an attack, a card with a Quick Effect in the hand can be picked to read it, then used. */
+		if (pick?.kind === "act-cost" && pick.trap) return act({ type: "spring", zone: pick.zone, discard: card });
 		if (pick?.kind === "act-cost") return act({ type: "ability", zone: pick.zone, ...(pick.target === undefined ? {} : { target: pick.target }), discard: card });
 		if (status === "answer") return handEffect(card) ? setPick(pick?.kind === "hand" && pick.card === card ? null : { kind: "hand", card }) : undefined;
 		if (!free) return;
@@ -303,6 +310,9 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 			/* A Trap that targets one of your Monsters, or a Quick-Play Spell, waits for its target to be tapped. */
 			const answers = info?.kind === "trap" && ((info.effect.type === "return-to-hand" && board.pending?.kind === "spell") || (info.effect.type === "reinforce" && board.pending?.kind === "attack"));
 			if (answers) return setPick({ kind: "trap", zone, aim: "you" });
+			/* Infinite Impermanence targets the rival's Monster; Magic Jammer is paid with a card of the hand. */
+			if (slot && isImpermanence(slot.card)) return setPick({ kind: "trap", zone, aim: "rival" });
+			if (info && info.kind === "trap" && info.cost?.type === "discard") return setPick({ kind: "act-cost", zone, trap: true });
 			if (slot && isQuickPlay(slot.card) && needsTarget(slot.card)) return setPick({ kind: "trap", zone, aim: aimsAt(slot.card) });
 			return act({ type: "spring", zone });
 		}
@@ -408,7 +418,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 		chosen.add(zoneKey("you", "monsters", pick.zone));
 		for (const zone of every) if (board.rival.monsters[zone]) glow.add(zoneKey("rival", "monsters", zone));
 	} else if (pick?.kind === "act-cost") {
-		chosen.add(zoneKey("you", "monsters", pick.zone));
+		chosen.add(zoneKey("you", pick.trap ? "backrow" : "monsters", pick.zone));
 		if (pick.target !== undefined) chosen.add(zoneKey("rival", "monsters", pick.target));
 	} else if (pick?.kind === "cost") {
 		chosen.add(zoneKey("you", "backrow", pick.zone));
