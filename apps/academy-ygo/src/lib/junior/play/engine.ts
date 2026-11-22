@@ -1,5 +1,5 @@
 import { ashCategories, cardCategories, categoriesOf, type Category, choiceOf, effectsOf, fits as fitsFilter, targetOf } from "./effects";
-import { FORBIDDEN_ONE, attributeOf, cardOf, fusionOnly, hasRulesText, inExtraDeck, inPool, isEffectMonster, isQuickPlay, mentions, monsterOf, named, spellTarget, staysOnField, tributesFor, type Action, type CardId, type DataEffect, type Effect, type FusionMaterial, type MonsterCard } from "./cards";
+import { FORBIDDEN_ONE, attributeOf, cardOf, fusionOnly, hasRulesText, inExtraDeck, inPool, isEffectMonster, isQuickPlay, mentions, monsterOf, named, spellTarget, staysOnField, tributesFor, type Action, type Arrow, type CardId, type DataEffect, type Effect, type FusionMaterial, type MonsterCard } from "./cards";
 
 /**
  * The Junior duel board. The small board has three Monster Zones and three Spell & Trap Zones per side; the whole
@@ -545,6 +545,36 @@ const QUICK_FREE: Effect["type"][] = ["coin-wipe", "curtain"];
 /** A Trap whose target is one of its owner's monsters needs one on the field. */
 const needsOwnMonster = (effect: Effect["type"]) => effect === "return-to-hand" || effect === "reinforce";
 
+/** Seen from its player, the Extra Monster Zone sits above Main Monster Zone 1 (the left one of the two, as on the mat). */
+const EXTRA_ABOVE = 1;
+/**
+ * The zone of the same player a Link Monster in `zone` points to with this arrow, or null (an arrow off the mat, or to
+ * the other player's side). Main Monster Zones 0 to 4 run from left to right.
+ */
+function arrowTarget(zone: number, arrow: Arrow): number | null {
+	if (zone === EXTRA_ZONE) {
+		const below: Partial<Record<Arrow, number>> = { "bottom-left": EXTRA_ABOVE - 1, bottom: EXTRA_ABOVE, "bottom-right": EXTRA_ABOVE + 1 };
+		return below[arrow] ?? null;
+	}
+	if (arrow === "left") return zone > 0 ? zone - 1 : null;
+	if (arrow === "right") return zone < FULL_ZONES - 1 ? zone + 1 : null;
+	const up: Partial<Record<Arrow, number>> = { "top-right": EXTRA_ABOVE - 1, top: EXTRA_ABOVE, "top-left": EXTRA_ABOVE + 1 };
+	return up[arrow] === zone ? EXTRA_ZONE : null;
+}
+/**
+ * Can these materials make this Link Rating? Each counts as 1; a Link Monster may count as its Link Rating instead
+ * (Rulebook: a Link Monster used as material counts as 1 material or as many as its Link Rating).
+ */
+function linkRatingFits(materials: readonly MonsterCard[], rating: number): boolean {
+	let sums = new Set([materials.length]);
+	for (const material of materials) {
+		const extra = (material.link ?? 1) - 1;
+		if (extra <= 0) continue;
+		sums = new Set([...sums, ...[...sums].map((sum) => sum + extra)]);
+	}
+	return sums.has(rating);
+}
+
 class Rejected extends Error {
 	constructor(readonly reason: Reason) {
 		super(reason);
@@ -698,13 +728,35 @@ class Play {
 		const found: Set<Category> = run.do === "add" ? new Set<Category>(["search"]) : categoriesOf(effectsOf(pending.card)[run.effect]?.actions ?? []);
 		return categories.some((category) => found.has(category));
 	}
+	/**
+	 * The zones of this player its Link Monsters point to. `leaving`: zones whose monsters are about to leave the field
+	 * (the materials of a Summon): they point to nothing any more.
+	 */
+	private pointed(who: Side, leaving: readonly number[] = []): Set<number> {
+		const out = new Set<number>();
+		if (!this.state.full) return out;
+		this.state[who].monsters.forEach((slot, zone) => {
+			if (!slot || slot.faceDown || leaving.includes(zone)) return;
+			for (const target of this.pointedBy(who, zone)) out.add(target);
+		});
+		return out;
+	}
+	/** The zones of its own player the monster in this zone points to: none unless it is a Link Monster. */
+	private pointedBy(who: Side, zone: number | undefined): number[] {
+		const slot = zone === undefined ? null : this.state[who].monsters[zone];
+		if (!slot || !this.state.full || zone === undefined) return [];
+		return (monsterOf(slot.card).arrows ?? []).flatMap((arrow) => {
+			const target = arrowTarget(zone, arrow);
+			return target === null ? [] : [target];
+		});
+	}
 	/** The first free Main Monster Zone of this player, or -1. */
 	private freeZone(who: Side): number {
 		const s = this.state;
 		return s[who].monsters.findIndex((slot, zone) => zone < mainZones(s) && !slot);
 	}
 	/** Can these steps start with this choice: the chosen card is where they look and fits, the target fits, there is room? */
-	private stepsReady(who: Side, actions: readonly Action[], pick: CardId | undefined, target: number | undefined, self: CardId): boolean {
+	private stepsReady(who: Side, actions: readonly Action[], pick: CardId | undefined, target: number | undefined, self: CardId, zone?: number): boolean {
 		const s = this.state;
 		const mine = s[who];
 		const choice = choiceOf(actions);
@@ -718,13 +770,16 @@ class Play {
 			const slot = target === undefined ? null : mine.monsters[target];
 			if (!slot || slot.faceDown || !fitsFilter(slot.card, aim)) return false;
 		}
+		/* "To your zone this card points to": one of them must be free. */
+		if (actions.some((action) => action.do === "special" && action.to === "pointed") && !this.pointedBy(who, zone).some((at) => !mine.monsters[at])) return false;
 		/* A Special Summon needs a free zone, unless a monster sent from the field just before makes one. */
 		if (actions.some((action) => action.do === "special") && this.freeZone(who) < 0 && !aim) return false;
 		return true;
 	}
 	/** The keys that say an effect was used this turn: "once per turn" by name, or 1 effect of the card per turn. */
-	private onceKeys(who: Side, card: CardId, index: number, effect: DataEffect): string[] {
+	private onceKeys(who: Side, card: CardId, index: number, effect: DataEffect, zone: number): string[] {
 		if (effect.once === "name") return [`${who}:${card}:effect-${index}`];
+		if (effect.once === "copy") return [`${who}:${card}:effect-${index}:zone-${zone}`];
 		if (effect.once === "shared") return [`${who}:${card}:effects`];
 		return [];
 	}
@@ -764,9 +819,9 @@ class Play {
 		const effect = effectsOf(card)[index];
 		if (!effect) return false;
 		const refuse = (reason: Reason): false => (auto ? false : reject(reason));
-		const keys = this.onceKeys(who, card, index, effect);
+		const keys = this.onceKeys(who, card, index, effect, zone);
 		if (keys.some((key) => s.used.includes(key))) return refuse("once-per-turn");
-		if (!this.stepsReady(who, effect.actions, pick, target, card)) return refuse("no-target");
+		if (!this.stepsReady(who, effect.actions, pick, target, card, zone)) return refuse("no-target");
 		if (this.deckLocked() && choiceOf(effect.actions)?.from.includes("deck") && categoriesOf(effect.actions).has("search")) return refuse("deck-locked");
 		const mine = s[who];
 		if (effect.cost === "discard-self" && !mine.hand.includes(card)) return refuse("not-in-hand");
@@ -840,16 +895,16 @@ class Play {
 		for (const pick of picks) for (const target of targets) if (this.activate(item.side, item.card, item.effect, item.zone ?? -1, pick, target, true)) return;
 	}
 	/** The steps of an effect, in order. A step that finds nothing to do stops the ones after it ("and if you do"). */
-	private runSteps(who: Side, actions: readonly Action[], source: CardId, pick?: CardId, target?: number): void {
+	private runSteps(who: Side, actions: readonly Action[], source: CardId, pick?: CardId, target?: number, zone?: number): void {
 		for (const action of actions) {
 			if (this.state.winner) return;
-			if (!this.runStep(who, action, pick, target)) {
+			if (!this.runStep(who, action, pick, target, zone)) {
 				this.events.push({ type: "no-effect", card: source });
 				return;
 			}
 		}
 	}
-	private runStep(who: Side, action: Action, pick?: CardId, target?: number): boolean {
+	private runStep(who: Side, action: Action, pick?: CardId, target?: number, source?: number): boolean {
 		const s = this.state;
 		const mine = s[who];
 		switch (action.do) {
@@ -875,7 +930,7 @@ class Play {
 			}
 			case "special": {
 				const place = pick && fitsFilter(pick, action.filter) ? action.from.find((at) => mine[at].includes(pick)) : undefined;
-				const zone = this.freeZone(who);
+				const zone = action.to === "pointed" ? (this.pointedBy(who, source).find((at) => !mine.monsters[at]) ?? -1) : this.freeZone(who);
 				if (!pick || !place || zone < 0) return false;
 				const list = mine[place];
 				list.splice(list.indexOf(pick), 1);
@@ -940,7 +995,7 @@ class Play {
 		else if (!pending.negated) {
 			const run = pending.run;
 			if (run.do === "add") this.addFromDeck(pending.side, run.card);
-			else this.runSteps(pending.side, effectsOf(pending.card)[run.effect]?.actions ?? [], pending.card, run.pick, run.target);
+			else this.runSteps(pending.side, effectsOf(pending.card)[run.effect]?.actions ?? [], pending.card, run.pick, run.target, pending.zone >= 0 ? pending.zone : undefined);
 		}
 		if (pending.then && isMain(this.state.phase)) this.openSummon(pending.then.zones, pending.then.how);
 	}
@@ -1746,22 +1801,47 @@ class Play {
 		/* Blue-Eyes Spirit Dragon: "Neither player can Special Summon 2 or more monsters at the same time." */
 		if (cards.length > 1 && [s.you, s.rival].some((who) => who.monsters.some((slot) => !!slot && !!live(slot)?.oneAtATime))) reject("one-at-a-time");
 		const pool = [...me.hand];
+		const up = [...me.extraUp];
+		/* From the hand first; a card not there comes face-up from the Extra Deck. */
+		const fromExtra: boolean[] = [];
 		if (cards.length === 0) reject("wrong-materials");
 		for (const card of cards) {
 			const at = pool.indexOf(card);
-			if (at < 0) reject("not-in-hand");
-			pool.splice(at, 1);
+			if (at >= 0) pool.splice(at, 1);
+			else {
+				const there = up.indexOf(card);
+				if (there < 0) reject("not-in-hand");
+				up.splice(there, 1);
+			}
+			fromExtra.push(at < 0);
 			const info = cardOf(card);
 			if (info.kind !== "monster") return reject("wrong-materials");
 			if (info.level <= scales.low || info.level >= scales.high) reject("level-not-between");
 		}
 		const main = mainZones(s);
 		const free = me.monsters.flatMap((slot, zone) => (zone < main && !slot ? [zone] : []));
-		if (free.length < cards.length) reject("no-free-zone");
+		/* Face-up from the Extra Deck: only to the Extra Monster Zone or to a zone a Link Monster points to (Master Rule, April 2020). */
+		const linked = s.full ? [EXTRA_ZONE, ...[...this.pointed(s.turn)].filter((zone) => zone !== EXTRA_ZONE).sort((a, b) => a - b)].filter((zone) => !me.monsters[zone]) : [];
+		const taken = new Set<number>();
+		const places = cards.map((_, index) => {
+			if (!fromExtra[index]) return -1;
+			const zone = linked.find((at) => !taken.has(at));
+			if (zone === undefined) return reject("no-free-zone");
+			taken.add(zone);
+			return zone;
+		});
+		cards.forEach((_, index) => {
+			if (fromExtra[index]) return;
+			const zone = free.find((at) => !taken.has(at));
+			if (zone === undefined) return reject("no-free-zone");
+			taken.add(zone);
+			places[index] = zone;
+		});
 		this.summoning();
 		cards.forEach((card, index) => {
-			me.hand.splice(me.hand.indexOf(card), 1);
-			me.monsters[free[index] ?? 0] = standing(card, { summoned: true });
+			const list = fromExtra[index] ? me.extraUp : me.hand;
+			list.splice(list.indexOf(card), 1);
+			me.monsters[places[index] ?? 0] = standing(card, { summoned: true });
 		});
 		s.pendulumUsed = true;
 		this.events.push({ type: "pendulum", side: s.turn, cards: [...cards], low: scales.low, high: scales.high });
@@ -1797,12 +1877,20 @@ class Play {
 			if (used.length !== recipe.count || used.some((item) => item.level !== recipe.level)) reject("wrong-levels");
 		} else if (info.frame === "link") {
 			if (!s.full) reject("wrong-zone");
-			if (used.length !== info.link) reject("link-count");
+			const rating = info.link ?? 0;
+			const rule = info.linkMaterials ?? { min: rating, max: rating };
+			if (used.length < rule.min || used.length > (rule.max ?? rating)) reject("link-count");
+			/* "1 Normal Monster", "2+ Effect Monsters". */
+			const filter = rule.filter;
+			if (filter && slots.some((slot) => !!slot && !fitsFilter(slot.card, filter))) reject("wrong-materials");
+			if (!linkRatingFits(used, rating)) reject("link-count");
 		} else reject("not-in-extra");
 		/* A Link Monster goes to the Extra Monster Zone. The others may go to any Main Monster Zone, or to the Extra Monster Zone. */
 		const freeAfter = (zone: number) => zone >= 0 && zone < me.monsters.length && (!me.monsters[zone] || zones.includes(zone));
-		const wanted = info.frame === "link" ? EXTRA_ZONE : (move.zone ?? this.landing(zones));
-		if (info.frame === "link" && move.zone !== undefined && move.zone !== EXTRA_ZONE) reject("extra-zone");
+		/* A Link Monster goes to the Extra Monster Zone, or to a Main Monster Zone a Link Monster points to (not one of its materials). */
+		const linked = info.frame === "link" ? [EXTRA_ZONE, ...[...this.pointed(s.turn, zones)].filter((zone) => zone !== EXTRA_ZONE).sort((a, b) => a - b)] : [];
+		if (info.frame === "link" && move.zone !== undefined && !linked.includes(move.zone)) reject("extra-zone");
+		const wanted = info.frame === "link" ? (move.zone ?? linked.find((zone) => freeAfter(zone)) ?? EXTRA_ZONE) : (move.zone ?? this.landing(zones));
 		if (wanted < 0) reject("no-free-zone");
 		if (!freeAfter(wanted)) reject("zone-taken");
 		const cards: CardId[] = [];
@@ -3139,7 +3227,7 @@ export function legalPlays(state: Board): { move: Move; board: Board; events: Ga
 		}
 		for (const card of new Set(who.extra)) for (const materials of picks(held, 1, MOST_MATERIALS)) candidates.push({ type: "extra", card, materials });
 		if (scalesOf(state, actor(state)) && !state.pendulumUsed) {
-			const monsters = who.hand.filter((card) => cardOf(card).kind === "monster");
+			const monsters = [...who.hand.filter((card) => cardOf(card).kind === "monster"), ...who.extraUp];
 			for (const cards of picks(monsters, 1, main)) candidates.push({ type: "pendulum", cards });
 		}
 		candidates.push(...effectMoves(state));

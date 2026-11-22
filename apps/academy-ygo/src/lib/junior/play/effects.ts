@@ -1,5 +1,5 @@
 import { CARD_ART } from "./card-art";
-import { type Action, type CardFilter, type CardId, cardOf, type DataEffect, isEffectMonster, monsterOf } from "./cards";
+import { type Action, type CardFilter, type CardId, cardOf, type DataEffect, hasRulesText, isEffectMonster, monsterOf } from "./cards";
 
 /**
  * The shared vocabulary of effects written as data: which cards a filter accepts, what an effect has to choose, and
@@ -18,9 +18,12 @@ export function fits(card: CardId, filter: CardFilter): boolean {
 	if (filter.kind !== undefined && info.kind !== filter.kind) return false;
 	if (filter.archetype !== undefined && !CARD_ART[card]?.name.includes(filter.archetype)) return false;
 	if (filter.icon !== undefined && (info.kind === "monster" || info.icon !== filter.icon)) return false;
-	if (filter.level !== undefined || filter.attribute !== undefined || filter.tuner || filter.effect) {
+	if (filter.level !== undefined || filter.maxLevel !== undefined || filter.attribute !== undefined || filter.tuner || filter.effect || filter.normal) {
 		if (info.kind !== "monster") return false;
 		if (filter.level !== undefined && info.level !== filter.level) return false;
+		/* A Rank or a Link Rating is not a Level. */
+		if (filter.maxLevel !== undefined && (info.level <= 0 || info.level > filter.maxLevel)) return false;
+		if (filter.normal && (hasRulesText(card) || !!info.frame)) return false;
 		if (filter.attribute !== undefined && CARD_ART[card]?.attribute !== filter.attribute) return false;
 		if (filter.tuner && !monsterOf(card).tuner) return false;
 		if (filter.effect && !isEffectMonster(card)) return false;

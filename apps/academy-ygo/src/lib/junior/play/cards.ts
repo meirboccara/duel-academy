@@ -138,7 +138,13 @@ export interface CardFilter {
 	effect?: true;
 	/** "except [this card]", by id. */
 	except?: string;
+	/** "Normal Monster": no effect, a yellow frame. */
+	normal?: true;
+	/** "Level [n] or lower". */
+	maxLevel?: number;
 }
+/** The eight arrows of a Link Monster, as seen by its controller. */
+export type Arrow = "top-left" | "top" | "top-right" | "left" | "right" | "bottom-left" | "bottom" | "bottom-right";
 /**
  * One step of an effect, done in order. A step that chooses a card uses the effect's one chosen card (`pick`); one that
  * targets uses its one target (`target`). When a step finds nothing to do, the steps after it do not happen ("and if you do").
@@ -146,8 +152,8 @@ export interface CardFilter {
 export type Action =
 	/** "Add 1 [filter] from your Deck to your hand." */
 	| { do: "search"; filter: CardFilter }
-	/** "Special Summon 1 [filter] from your hand / Deck / GY." */
-	| { do: "special"; from: readonly ("hand" | "deck" | "graveyard")[]; filter: CardFilter }
+	/** "Special Summon 1 [filter] from your hand / Deck / GY", with `to`: "to your zone this card points to". */
+	| { do: "special"; from: readonly ("hand" | "deck" | "graveyard")[]; filter: CardFilter; to?: "pointed" }
 	/** "Send 1 [filter] from your Deck to the GY." */
 	| { do: "mill"; filter: CardFilter }
 	/** "Target 1 [filter] you control; send it to the GY." */
@@ -168,8 +174,11 @@ export interface DataEffect {
 	/** Paid as it is activated: "You can discard this card", "You can banish this card from your GY". */
 	cost?: "discard-self" | "banish-self";
 	actions: readonly Action[];
-	/** "You can only use this effect of [card] once per turn" (`name`); "You can only use 1 [card] effect per turn" (`shared`). */
-	once?: "name" | "shared";
+	/**
+	 * "You can only use this effect of [card] once per turn" (`name`); "You can only use 1 [card] effect per turn"
+	 * (`shared`); "Once per turn", for each copy (`copy`).
+	 */
+	once?: "name" | "shared" | "copy";
 }
 
 /** Monster Types, as printed on the Type line. */
@@ -276,6 +285,13 @@ export interface MonsterCard {
 	rank?: number;
 	/** Link Monsters have a Link Rating instead of a Level, and no DEF; their `level` and `def` are 0. */
 	link?: number;
+	/** A Link Monster's arrows: the zones it points to. */
+	arrows?: readonly Arrow[];
+	/**
+	 * A Link Monster's materials, as printed: "2 monsters" (2 to 2), "2+ monsters" (2 or more), "1 Normal Monster".
+	 * A Link Monster used as material counts as 1 or as its Link Rating. Missing: as many monsters as its rating.
+	 */
+	linkMaterials?: { min: number; max?: number; filter?: CardFilter };
 	/** A Pendulum Monster: its Pendulum Scale. */
 	scale?: number;
 	/** Fusion Monster: its materials, by name, or described ("1 Dragon monster", "1 WIND monster", "1 Elemental HERO monster"). */
@@ -457,7 +473,7 @@ export const CARDS = {
 	"gaia-knight": { ...monster(6, 2600, 800, "🏇"), type: "warrior", frame: "synchro" },
 	"gem-knight-pearl": { ...monster(0, 2600, 1900, "⚪"), frame: "xyz", rank: 4, xyz: { level: 4, count: 2 } },
 	utopia: { ...monster(0, 2500, 2000, "🤺"), type: "warrior", frame: "xyz", rank: 4, xyz: { level: 4, count: 2 }, detach: "negate-attack" },
-	lanphorhynchus: { ...monster(0, 1200, 0, "🦕"), frame: "link", link: 2 },
+	lanphorhynchus: { ...monster(0, 1200, 0, "🦕"), frame: "link", link: 2, arrows: ["bottom-left", "bottom-right"], linkMaterials: { min: 2, max: 2 } },
 	"flash-knight": { ...monster(4, 1800, 600, "🌟"), type: "warrior", scale: 7 },
 	dragong: { ...monster(4, 500, 2100, "🔔"), scale: 7 },
 	mandragon: { ...monster(5, 2500, 1000, "🌱"), scale: 2 },
@@ -652,6 +668,14 @@ export const CARDS = {
 	"ash-blossom-joyous-spring": real("ash-blossom-joyous-spring", { tuner: true, hand: "ash" }),
 	"effect-veiler": real("effect-veiler", { tuner: true, hand: "veiler" }),
 	"droll-lock-bird": real("droll-lock-bird", { hand: "droll" }),
+	/* Link Monsters with their arrows (Konami's data, through YGOPRODeck). */
+	"gaia-saber-the-lightning-shadow": real("gaia-saber-the-lightning-shadow", { link: 3, arrows: ["left", "right", "bottom"], linkMaterials: { min: 2 } }),
+	"link-spider": real("link-spider", {
+		link: 1,
+		arrows: ["bottom"],
+		linkMaterials: { min: 1, max: 1, filter: { normal: true } },
+		effects: [{ when: "ignition", once: "copy", actions: [{ do: "special", from: ["hand"], filter: { normal: true, maxLevel: 4 }, to: "pointed" }] }],
+	}),
 	/* Cards written as data (effects.ts): their effects need no code of their own. */
 	terraforming: { kind: "spell", effect: { type: "data", actions: [{ do: "search", filter: { kind: "spell", icon: "field" } }] }, art: "🌍" },
 	"one-for-one": { kind: "spell", cost: { type: "discard", monster: true }, effect: { type: "data", actions: [{ do: "special", from: ["hand", "deck"], filter: { kind: "monster", level: 1 } }] }, art: "☝️" },
@@ -749,7 +773,7 @@ export function spellTarget(card: CardId): "own" | "foe" | null {
 /** An Effect Monster: a monster with an effect of its own (not a monster that only names its materials). */
 export function isEffectMonster(id: CardId): boolean {
 	const card = cardOf(id);
-	return card.kind === "monster" && hasRulesText(id) && !!Object.keys(card).some((key) => !["kind", "level", "atk", "def", "art", "type", "frame", "tuner", "rank", "link", "scale", "fusion", "xyz", "synchroTuner", "synchroNonTuner"].includes(key));
+	return card.kind === "monster" && hasRulesText(id) && !!Object.keys(card).some((key) => !["kind", "level", "atk", "def", "art", "type", "frame", "tuner", "rank", "link", "arrows", "linkMaterials", "scale", "fusion", "xyz", "synchroTuner", "synchroNonTuner"].includes(key));
 }
 /** A Spell or Trap that stays face-up on the field once it has resolved: Continuous, Equip and Field. */
 export function staysOnField(id: CardId): boolean {
