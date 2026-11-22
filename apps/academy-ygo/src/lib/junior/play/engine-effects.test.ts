@@ -102,3 +102,30 @@ describe("monsters written as data", () => {
 		expect(ogred.you.hand).toEqual(["the-white-stone-of-legend"]);
 	});
 });
+
+describe("filters by Type and Level, Flip Summons, and sending the card itself", () => {
+	it("Fossil Dig adds a Level 6 or lower Dinosaur monster, nothing else", () => {
+		const start = mat({ you: { hand: ["fossil-dig"], deck: ["two-headed-king-rex", "iron-boar", "bracchio-raidus"] } });
+		expect(reason(start, cast("fossil-dig", { pick: "iron-boar" }))).toBe("no-target");
+		expect(play(start, cast("fossil-dig", { pick: "two-headed-king-rex" })).you.hand).toEqual(["two-headed-king-rex"]);
+	});
+	it("Summoner's Art adds a Level 5 or higher Normal Monster", () => {
+		const start = mat({ you: { hand: ["summoners-art"], deck: ["iron-boar", "blue-eyes-white-dragon"] } });
+		expect(reason(start, cast("summoners-art", { pick: "iron-boar" }))).toBe("no-target");
+		expect(play(start, cast("summoners-art", { pick: "blue-eyes-white-dragon" })).you.hand).toEqual(["blue-eyes-white-dragon"]);
+	});
+	it("Armageddon Knight: when Summoned, a Flip Summon too, you can send a DARK monster from the Deck to the GY", () => {
+		const normal = play(mat({ you: { hand: ["armageddon-knight"], deck: ["dark-magician", "iron-boar"] } }), summon("armageddon-knight"));
+		expect(play(normal, use("armageddon-knight", 0, { zone: 0, pick: "dark-magician" })).you.graveyard).toEqual(["dark-magician"]);
+		const flipped = play(mat({ you: { monsters: [{ card: "armageddon-knight", faceDown: true }], deck: ["dark-magician"] } }), { type: "position", zone: 0 });
+		expect(flipped.triggered).toEqual([{ side: "you", card: "armageddon-knight", effect: 0, zone: 0 }]);
+		expect(reason(normal, use("armageddon-knight", 0, { zone: 0, pick: "iron-boar" }))).toBe("no-target");
+	});
+	it("Black Dragon's Chick: send it from the field to the GY; Special Summon Red-Eyes B. Dragon from the hand", () => {
+		const start = mat({ you: { hand: ["red-eyes-black-dragon"], monsters: ["black-dragons-chick"] } });
+		const done = play(start, use("black-dragons-chick", 0, { zone: 0, pick: "red-eyes-black-dragon" }));
+		expect(done.you.monsters.some((slot) => slot?.card === "red-eyes-black-dragon")).toBe(true);
+		expect(done.you.graveyard).toEqual(["black-dragons-chick"]);
+	});
+});
+

@@ -286,5 +286,9 @@
 	"destiny-hero-malicious": { "card": 9411399, "image": 9411399 },
 	"elemental-hero-shadow-mist": { "card": 50720316, "image": 50720316 },
 	"gaia-saber-the-lightning-shadow": { "card": 67598234, "image": 67598234 },
-	"link-spider": { "card": 98978921, "image": 98978921 }
+	"link-spider": { "card": 98978921, "image": 98978921 },
+	"fossil-dig": { "card": 47325505, "image": 47325505 },
+	"summoners-art": { "card": 79816536, "image": 79816536 },
+	"armageddon-knight": { "card": 28985331, "image": 28985331 },
+	"black-dragons-chick": { "card": 36262024, "image": 36262024 }
 }

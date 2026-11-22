@@ -142,6 +142,10 @@ export interface CardFilter {
 	normal?: true;
 	/** "Level [n] or lower". */
 	maxLevel?: number;
+	/** "Level [n] or higher". */
+	minLevel?: number;
+	/** A Monster Type, as printed ("Dinosaur", "Dragon"). */
+	type?: MonsterType;
 }
 /** The eight arrows of a Link Monster, as seen by its controller. */
 export type Arrow = "top-left" | "top" | "top-right" | "left" | "right" | "bottom-left" | "bottom" | "bottom-right";
@@ -171,8 +175,11 @@ export interface DataEffect {
 	from?: "field" | "hand" | "graveyard";
 	/** "You can…": its owner chooses to use it. Without it, the effect happens by itself. */
 	optional?: true;
-	/** Paid as it is activated: "You can discard this card", "You can banish this card from your GY". */
-	cost?: "discard-self" | "banish-self";
+	/**
+	 * Paid as it is activated: "You can discard this card", "You can banish this card from your GY", "You can send this
+	 * face-up card you control to the GY".
+	 */
+	cost?: "discard-self" | "banish-self" | "send-self";
 	actions: readonly Action[];
 	/**
 	 * "You can only use this effect of [card] once per turn" (`name`); "You can only use 1 [card] effect per turn"
@@ -677,6 +684,10 @@ export const CARDS = {
 		effects: [{ when: "ignition", once: "copy", actions: [{ do: "special", from: ["hand"], filter: { normal: true, maxLevel: 4 }, to: "pointed" }] }],
 	}),
 	/* Cards written as data (effects.ts): their effects need no code of their own. */
+	"fossil-dig": { kind: "spell", effect: { type: "data", actions: [{ do: "search", filter: { kind: "monster", type: "dinosaur", maxLevel: 6 } }] }, art: "🦴" },
+	"summoners-art": { kind: "spell", effect: { type: "data", actions: [{ do: "search", filter: { normal: true, minLevel: 5 } }] }, art: "📜" },
+	"armageddon-knight": real("armageddon-knight", { effects: [{ when: "summoned", optional: true, actions: [{ do: "mill", filter: { kind: "monster", attribute: "DARK" } }] }] }),
+	"black-dragons-chick": real("black-dragons-chick", { effects: [{ when: "ignition", cost: "send-self", actions: [{ do: "special", from: ["hand"], filter: { card: "red-eyes-black-dragon" } }] }] }),
 	terraforming: { kind: "spell", effect: { type: "data", actions: [{ do: "search", filter: { kind: "spell", icon: "field" } }] }, art: "🌍" },
 	"one-for-one": { kind: "spell", cost: { type: "discard", monster: true }, effect: { type: "data", actions: [{ do: "special", from: ["hand", "deck"], filter: { kind: "monster", level: 1 } }] }, art: "☝️" },
 	"toon-table-of-contents": { kind: "spell", effect: { type: "data", actions: [{ do: "search", filter: { archetype: "Toon" } }] }, art: "📖" },

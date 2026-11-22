@@ -828,6 +828,8 @@ class Play {
 		const mine = s[who];
 		if (effect.cost === "discard-self" && !mine.hand.includes(card)) return refuse("not-in-hand");
 		if (effect.cost === "banish-self" && !mine.graveyard.includes(card)) return refuse("no-ability");
+		const self = zone >= 0 ? mine.monsters[zone] : null;
+		if (effect.cost === "send-self" && (!self || self.card !== card || self.faceDown)) return refuse("no-ability");
 		s.used.push(...keys);
 		if (effect.cost === "discard-self") {
 			mine.hand.splice(mine.hand.indexOf(card), 1);
@@ -838,6 +840,10 @@ class Play {
 			mine.graveyard.splice(mine.graveyard.lastIndexOf(card), 1);
 			mine.banished.push({ card, faceDown: false });
 			this.events.push({ type: "banished", side: who, cards: [card], faceDown: false });
+		}
+		if (effect.cost === "send-self") {
+			this.events.push({ type: "sent", side: who, card, from: "field" });
+			this.leave(who, zone, "graveyard", "activation");
 		}
 		this.events.push({ type: "effect-used", side: who, card });
 		const run: EffectRun = { do: "data", effect: index, ...(pick ? { pick } : {}), ...(target === undefined ? {} : { target }) };
@@ -865,7 +871,9 @@ class Play {
 		for (let round = 0; round < 8 && !s.winner; round++) {
 			const started: Board["triggered"] = [];
 			for (const event of this.events.slice(scanned)) {
-				if ((event.type !== "summoned" && event.type !== "special") || event.zone === undefined) continue;
+				/* "When this card is Summoned" counts a Flip Summon too. */
+				const flip = event.type === "flipped" && event.how === "summon";
+				if ((event.type !== "summoned" && event.type !== "special" && !flip) || event.zone === undefined) continue;
 				const slot = s[event.side].monsters[event.zone];
 				if (!slot || slot.card !== event.card || !live(slot)) continue;
 				effectsOf(event.card).forEach((effect, index) => {

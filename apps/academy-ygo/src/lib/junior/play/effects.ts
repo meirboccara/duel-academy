@@ -1,5 +1,5 @@
 import { CARD_ART } from "./card-art";
-import { type Action, type CardFilter, type CardId, cardOf, type DataEffect, hasRulesText, isEffectMonster, monsterOf } from "./cards";
+import { type Action, type CardFilter, type CardId, cardOf, type DataEffect, hasRulesText, isEffectMonster, MONSTER_TYPES, type MonsterType, monsterOf } from "./cards";
 
 /**
  * The shared vocabulary of effects written as data: which cards a filter accepts, what an effect has to choose, and
@@ -18,17 +18,28 @@ export function fits(card: CardId, filter: CardFilter): boolean {
 	if (filter.kind !== undefined && info.kind !== filter.kind) return false;
 	if (filter.archetype !== undefined && !CARD_ART[card]?.name.includes(filter.archetype)) return false;
 	if (filter.icon !== undefined && (info.kind === "monster" || info.icon !== filter.icon)) return false;
-	if (filter.level !== undefined || filter.maxLevel !== undefined || filter.attribute !== undefined || filter.tuner || filter.effect || filter.normal) {
+	if (filter.level !== undefined || filter.maxLevel !== undefined || filter.minLevel !== undefined || filter.type !== undefined || filter.attribute !== undefined || filter.tuner || filter.effect || filter.normal) {
 		if (info.kind !== "monster") return false;
 		if (filter.level !== undefined && info.level !== filter.level) return false;
 		/* A Rank or a Link Rating is not a Level. */
 		if (filter.maxLevel !== undefined && (info.level <= 0 || info.level > filter.maxLevel)) return false;
+		if (filter.minLevel !== undefined && info.level < filter.minLevel) return false;
+		if (filter.type !== undefined && typeOf(card) !== filter.type) return false;
 		if (filter.normal && (hasRulesText(card) || !!info.frame)) return false;
 		if (filter.attribute !== undefined && CARD_ART[card]?.attribute !== filter.attribute) return false;
 		if (filter.tuner && !monsterOf(card).tuner) return false;
 		if (filter.effect && !isEffectMonster(card)) return false;
 	}
 	return true;
+}
+
+/** A monster's Type: written on the card in cards.ts, or else as printed (card-art.ts). */
+export function typeOf(card: CardId): MonsterType | undefined {
+	const info = cardOf(card);
+	if (info.kind !== "monster") return undefined;
+	if (info.type) return info.type;
+	const race = CARD_ART[card]?.race.toLowerCase().replace(/ /g, "-");
+	return MONSTER_TYPES.find((type) => type === race);
 }
 
 /** Where the one card an effect chooses comes from, and what it must be: the first step that picks a card. */
