@@ -371,6 +371,7 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 		},
 		reasons: {
 			"duel-over": "Le duel est fini.",
+			"deck-locked": "Plus aucune carte ne peut être ajoutée du Deck à la main jusqu’à la fin de ce tour.",
 			"answer-first": "Choisis d’abord : réponds, ou laisse faire.",
 			"not-in-hand": "Cette carte n’est pas dans ta main.",
 			"wrong-zone": "Mauvaise rangée ! Les Monstres vont dans les Zones Monstre. Les Magies et les Pièges vont dans la rangée derrière.",
@@ -578,6 +579,8 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 					return `${mine ? "Tu perds" : `${RIVAL} perd`} ${event.from - event.to} Points de Vie : il en reste ${event.to}.`;
 				case "deck-out":
 					return `${mine ? "Ton Deck est vide" : `Le Deck de ${RIVAL} est vide`} : plus de carte à piocher.`;
+				case "locked":
+					return `${name(event.card)} : jusqu’à la fin de ce tour, aucune carte ne peut être ajoutée d’un Deck à la main.`;
 				case "exodia":
 					return mine ? `Les cinq pièces d’${name("exodia-the-forbidden-one")} sont dans ta main : tu gagnes tout de suite, quels que soient les Points de Vie !` : `${RIVAL} a les cinq pièces d’${name("exodia-the-forbidden-one")} en main.`;
 				case "won":

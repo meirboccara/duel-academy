@@ -103,7 +103,11 @@ export type Pending =
 	 * A monster's effect was activated (Blazeman: "If this card is Summoned: You can add…"): the other player may answer
 	 * it (Ash Blossom, Ghost Ogre, Solemn Strike) before it resolves. `then`: the Summon moment that waits behind it.
 	 */
-	| { kind: "effect"; side: Side; card: CardId; zone: number; run: EffectRun; negated?: true; then?: { zones: number[]; how: "normal" | "flip" | "special" } };
+	| { kind: "effect"; side: Side; card: CardId; zone: number; run: EffectRun; negated?: true; then?: { zones: number[]; how: "normal" | "flip" | "special" } }
+	/** Cards were just added from the Deck to this player's hand outside the Draw Phase: the other player may answer (Droll & Lock Bird). */
+	| { kind: "added"; side: Side };
+/** "For the rest of this turn…": a rule a card set, until the turn ends. */
+export type TurnLock = { kind: "deck-to-hand"; by: CardId };
 /** What a monster's activated effect does when it resolves. */
 export type EffectRun = { do: "add"; card: CardId };
 /**
@@ -145,6 +149,8 @@ export interface Board {
 	chain: ChainLink[];
 	/** The most Chain Links a level allows (2: one answer, nothing on top of it); null for no limit. */
 	chainLimit: number | null;
+	/** Rules cards set "for the rest of this turn"; cleared when the turn ends. */
+	locks: TurnLock[];
 	winner: Side | null;
 	/** Once-per-turn effects already used this turn, as "side:card". */
 	used: string[];
@@ -193,6 +199,7 @@ export type Move =
 
 export type Reason =
 	| "duel-over"
+	| "deck-locked"
 	| "answer-first"
 	| "not-in-hand"
 	| "wrong-zone"
@@ -338,6 +345,8 @@ export type GameEvent =
 	| { type: "deck-out"; side: Side }
 	/** All five pieces of the Forbidden One are in this player's hand. */
 	| { type: "exodia"; side: Side }
+	/** A card set a rule for the rest of the turn (Droll & Lock Bird: nothing more is added from a Deck to a hand). */
+	| { type: "locked"; side: Side; card: CardId }
 	| { type: "won"; side: Side };
 
 /** What happened right after a card went to the Graveyard in the same action: the card it paid for was activated, or the monster it was used for was Summoned. */
@@ -404,7 +413,7 @@ function side(setup: SideSetup = {}, full: boolean): SideState {
 export function board(setup: Setup = {}): Board {
 	const phase = setup.phase ?? "main1";
 	const full = setup.full ?? false;
-	return { you: side(setup.you, full), rival: side(setup.rival, full), full, turn: setup.turn ?? "you", turnNumber: setup.turnNumber ?? 3, phase, strict: setup.strict ?? false, drawn: phase !== "draw", summonUsed: false, pendulumUsed: false, pending: null, chain: [], chainLimit: setup.chainLimit ?? null, winner: null, used: [], proper: [], triggers: [], standbyDone: phase !== "draw", summonTrigger: null, rng: (setup.seed ?? 1) >>> 0, summons: 0, summonLock: false };
+	return { you: side(setup.you, full), rival: side(setup.rival, full), full, turn: setup.turn ?? "you", turnNumber: setup.turnNumber ?? 3, phase, strict: setup.strict ?? false, drawn: phase !== "draw", summonUsed: false, pendulumUsed: false, pending: null, chain: [], chainLimit: setup.chainLimit ?? null, locks: [], winner: null, used: [], proper: [], triggers: [], standbyDone: phase !== "draw", summonTrigger: null, rng: (setup.seed ?? 1) >>> 0, summons: 0, summonLock: false };
 }
 
 export const other = (who: Side): Side => (who === "you" ? "rival" : "you");
@@ -510,7 +519,7 @@ export function actor(state: Board): Side {
 }
 const isMain = (phase: Phase) => phase === "main1" || phase === "main2";
 const after = (a: Phase, b: Phase) => PHASES.indexOf(a) > PHASES.indexOf(b);
-const TRAP_ANSWERS: Record<Pending["kind"], Effect["type"][]> = { attack: ["weaken-attacker", "stop-attack", "destroy-attacker", "banish-attacker", "reinforce", "negate-attack", "mirror-force", "magic-cylinder", "just-desserts", "clear-backrow", "recharge", "storm-force", "ruin"], spell: ["return-to-hand"], summon: ["trap-hole", "bottomless", "torrential"], effect: [] };
+const TRAP_ANSWERS: Record<Pending["kind"], Effect["type"][]> = { attack: ["weaken-attacker", "stop-attack", "destroy-attacker", "banish-attacker", "reinforce", "negate-attack", "mirror-force", "magic-cylinder", "just-desserts", "clear-backrow", "recharge", "storm-force", "ruin"], spell: ["return-to-hand"], summon: ["trap-hole", "bottomless", "torrential"], effect: [], added: [] };
 /** What Ash Blossom & Joyous Spring can negate: an effect that adds a card from the Deck to the hand or Special Summons from the Deck. */
 function ashHits(card: CardId): boolean {
 	const info = cardOf(card);
@@ -596,6 +605,7 @@ class Play {
 		else if (move.type === "ability" && move.pick) this.summonSearch(trigger, move.zone, move.pick);
 		else this.move(move);
 		this.afterSummons();
+		this.afterAdding();
 		/* The monster whose "When… Summoned" effect was waiting lost its effects in answer to its Summon (Effect Veiler). Destroyed (Trap Hole), its effect still happens. */
 		const waiting = this.state.summonTrigger;
 		const summoned = waiting ? this.state[waiting.side].monsters[waiting.zone] : null;
@@ -631,7 +641,7 @@ class Play {
 			const at = add ? s[event.side].deck.indexOf(add as CardId) : -1;
 			/* "You can only use 1 [Elemental HERO Blazeman] effect per turn, and only once that turn." */
 			const once = `${event.side}:${event.card}:add`;
-			if (add && at >= 0 && !s.used.includes(once)) {
+			if (add && at >= 0 && !s.used.includes(once) && !this.deckLocked()) {
 				s.used.push(once);
 				/* The effect is activated: the other player may answer it before the card is added (Ash Blossom, Solemn Strike). */
 				const effect: Extract<Pending, { kind: "effect" }> = { kind: "effect", side: event.side, card: event.card, zone: event.zone, run: { do: "add", card: add as CardId } };
@@ -666,8 +676,26 @@ class Play {
 		if (this.canAnswer()) this.events.push({ type: "window", side: other(s.turn), kind: "summon" });
 		else s.pending = null;
 	}
+	/** "Cards cannot be added from either player's Main Deck to the hand" this turn (Droll & Lock Bird). */
+	private deckLocked(): boolean {
+		return this.state.locks.some((lock) => lock.kind === "deck-to-hand");
+	}
+	/**
+	 * Once a move is done: cards were added from the Deck to the turn player's hand outside the Draw Phase (a search, a
+	 * draw), and the other player holds a card that answers that (Droll & Lock Bird): the moment to use it.
+	 */
+	private afterAdding(): void {
+		const s = this.state;
+		if (s.pending || s.winner || s.phase === "draw") return;
+		const added = this.events.some((event) => (event.type === "added" && event.from === "deck" && event.side === s.turn) || (event.type === "drew" && event.side === s.turn));
+		if (!added) return;
+		s.pending = { kind: "added", side: s.turn };
+		if (this.canAnswer()) this.events.push({ type: "window", side: other(s.turn), kind: "added" });
+		else s.pending = null;
+	}
 	/** A card is added from the Deck to the hand, and the Deck is shuffled. */
 	private addFromDeck(who: Side, card: CardId): void {
+		if (this.deckLocked()) return;
 		const deck = this.state[who].deck;
 		const at = deck.indexOf(card);
 		if (at < 0) return;
@@ -707,6 +735,8 @@ class Play {
 		if (effect === "no-battle-damage") return damageStep;
 		if (damageStep) return false;
 		if (effect === "ash") return ((pending.kind === "spell" && ashHits(pending.card)) || (pending.kind === "effect" && pending.run.do === "add")) && !s.used.includes(`${who}:ash`);
+		/* Droll & Lock Bird: "If a card(s) is added from the Main Deck to your opponent's hand, except during the Draw Phase". */
+		if (effect === "droll") return pending.kind === "added" && pending.side !== who && !this.deckLocked();
 		/* Ghost Ogre & Snow Rabbit: "When a monster on the field activates its effect": that monster is still there. */
 		if (effect === "ogre") return pending.kind === "effect" && s[pending.side].monsters[pending.zone]?.card === pending.card && !s.used.includes(`${who}:ogre`);
 		if (effect === "veiler") return pending.kind !== "attack" && isMain(s.phase) && s[s.turn].monsters.some((slot) => !!slot && !slot.faceDown && isEffectMonster(slot.card));
@@ -1119,6 +1149,7 @@ class Play {
 		s.summonLock = false;
 		s.standbyDone = false;
 		s.used = [];
+		s.locks = [];
 		this.events.push({ type: "turn", side: s.turn });
 		if (this.me.skipDraw) {
 			delete this.me.skipDraw;
@@ -1233,6 +1264,8 @@ class Play {
 			/* "You cannot Summon other monsters the turn you activate this card (but you can Set)." */
 			if (effect.lock && (s.summons > 0 || s.summonLock)) reject("summon-locked");
 		}
+		/* Under Droll & Lock Bird's lock, a card that could only add from the Deck to the hand cannot be activated. */
+		if (this.deckLocked() && (effect.type === "search" || effect.type === "search-pick" || effect.type === "draw" || effect.type === "draw-then-gift")) reject("deck-locked");
 		if (effect.type === "hand-summon") {
 			const pick = move.pick;
 			if (!pick || pick === move.card || !me.hand.includes(pick) || cardOf(pick).kind !== "monster" || monsterOf(pick).level < effect.minLevel || hasRulesText(pick)) return reject("no-target");
@@ -1394,6 +1427,7 @@ class Play {
 		if (!source || !name) return reject("nothing-to-answer");
 		const key = `${s.turn}:${source.card}:search`;
 		if (s.used.includes(key)) return reject("once-per-turn");
+		if (this.deckLocked()) return reject("deck-locked");
 		const at = this.me.deck.indexOf(pick);
 		if (at < 0 || cardOf(pick).kind === "monster" || !mentions(pick, name)) return reject("no-target");
 		s.used.push(key);
@@ -1908,7 +1942,7 @@ class Play {
 		/* "…you can add 1 Spell/Trap that mentions 'Dark Magician' from your Deck to your hand, except 'Dark Magical Curtain'." */
 		const side = s[by];
 		const found = side.deck.find((card) => card !== "dark-magical-curtain" && cardOf(card).kind !== "monster" && mentions(card, "Dark Magician"));
-		if (!found) return;
+		if (!found || this.deckLocked()) return;
 		side.deck.splice(side.deck.indexOf(found), 1);
 		this.shuffle(side.deck);
 		side.hand.push(found);
@@ -2030,6 +2064,11 @@ class Play {
 			s.used.push(`${who}:ash`);
 			pending.negated = true;
 			this.events.push({ type: "negated", side: who, card: pending.card, by: card });
+		}
+		if (effect === "droll") {
+			/* "For the rest of this turn, cards cannot be added from either player's Main Deck to the hand." */
+			s.locks.push({ kind: "deck-to-hand", by: card });
+			this.events.push({ type: "locked", side: who, card });
 		}
 		if (effect === "ogre" && pending.kind === "effect") {
 			/* "Destroy that card on the field." Its effect was already activated: it still resolves. */
@@ -2243,7 +2282,7 @@ class Play {
 			this.leave(owner, target, "hand");
 			this.events.push({ type: "returned", side: owner, card: saved.card });
 		}
-		this.events.push({ type: "resolve", link: 1, card: pending.card });
+		if (pending.kind !== "added") this.events.push({ type: "resolve", link: 1, card: pending.card });
 		this.resolvePending();
 	}
 
@@ -2345,6 +2384,7 @@ class Play {
 		if (pending.kind === "summon") return;
 		if (pending.kind === "spell") return this.resolveSpell(pending);
 		if (pending.kind === "effect") return this.resolveEffect(pending);
+		if (pending.kind === "added") return;
 		if (pending.step !== "damage" && this.me.monsters[pending.attacker]) {
 			/* The Battle Step is over: on to the Damage Step, where the defender may still act before damage is calculated. */
 			s.pending = { ...pending, step: "damage" };
@@ -2448,7 +2488,7 @@ class Play {
 		}
 		/* Nova Master: "If this card destroys an opponent's monster by battle: Draw 1 card." */
 		for (const [winner, loser, side] of [[attacker, defender, s.turn], [defender, attacker, other(s.turn)]] as const) {
-			if (s.winner || !live(winner)?.battleDraw) continue;
+			if (s.winner || !live(winner)?.battleDraw || this.deckLocked()) continue;
 			if (!destroyed.some((lost) => isAttacker(lost) === (loser === attacker))) continue;
 			const top = s[side].deck.shift();
 			if (!top) {
@@ -2525,7 +2565,7 @@ class Play {
 		if (effect.type === "search-pick" || effect.type === "deck-summon") {
 			const at = pending.pick ? this.me.deck.indexOf(pending.pick) : -1;
 			const zone = this.landing();
-			if (!pending.pick || at < 0 || (effect.type === "deck-summon" && zone < 0)) return nothing();
+			if (!pending.pick || at < 0 || (effect.type === "deck-summon" && zone < 0) || (effect.type === "search-pick" && this.deckLocked())) return nothing();
 			this.me.deck.splice(at, 1);
 			this.shuffle(this.me.deck);
 			if (effect.type === "search-pick") {
@@ -2578,7 +2618,7 @@ class Play {
 		}
 		if (effect.type === "search") {
 			const at = this.me.deck.indexOf(effect.card as CardId);
-			if (at < 0) return nothing();
+			if (at < 0 || this.deckLocked()) return nothing();
 			const [found] = this.me.deck.splice(at, 1);
 			if (!found) return nothing();
 			this.me.hand.push(found);
@@ -2599,6 +2639,7 @@ class Play {
 			this.events.push({ type: "gained", side: s.turn, amount: effect.amount, lp: this.me.lp });
 			return;
 		}
+		if ((effect.type === "draw" || effect.type === "draw-then-gift") && this.deckLocked()) return nothing();
 		if (effect.type === "draw" || effect.type === "draw-then-gift") {
 			const count = effect.type === "draw" ? effect.count : 1;
 			let drew = 0;

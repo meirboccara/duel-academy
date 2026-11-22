@@ -159,7 +159,7 @@ export interface Trigger {
  * - "fader" (Battle Fader): on a direct attack, Special Summon it from the hand, then end the Battle Phase; banished when it leaves the field.
  * - "crow" (D.D. Crow): discard to banish 1 card in the opponent's GY.
  */
-export type HandEffect = "no-battle-damage" | "ash" | "veiler" | "scarecrow" | "fader" | "crow" | "ogre";
+export type HandEffect = "no-battle-damage" | "ash" | "veiler" | "scarecrow" | "fader" | "crow" | "ogre" | "droll";
 /** The cards of the Deck an effect chooses among. */
 export type DeckPool = "low-warrior" | "elemental-hero" | "low-elemental-hero";
 /** Does this card of the Deck fit what an effect looks for? */
@@ -592,6 +592,7 @@ export const CARDS = {
 	/* Hand traps, Traps that answer a Summon, and searchers. */
 	"ash-blossom-joyous-spring": real("ash-blossom-joyous-spring", { tuner: true, hand: "ash" }),
 	"effect-veiler": real("effect-veiler", { tuner: true, hand: "veiler" }),
+	"droll-lock-bird": real("droll-lock-bird", { hand: "droll" }),
 	"ghost-ogre-snow-rabbit": real("ghost-ogre-snow-rabbit", { tuner: true, hand: "ogre" }),
 	"infinite-impermanence": { kind: "trap", effect: { type: "impermanence" }, art: "♾️" },
 	"seven-tools-of-the-bandit": { kind: "trap", icon: "counter", cost: { type: "pay-lp", amount: 1000 }, effect: { type: "counter", negates: "trap" }, art: "🧰" },

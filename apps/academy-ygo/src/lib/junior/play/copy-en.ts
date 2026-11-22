@@ -366,6 +366,7 @@ export function englishCopy(RIVAL: string): PlayCopy {
 		},
 		reasons: {
 			"duel-over": "The duel is over.",
+			"deck-locked": "No card can be added from the Deck to the hand for the rest of this turn.",
 			"answer-first": "First choose: answer, or let it happen.",
 			"not-in-hand": "That card is not in your hand.",
 			"wrong-zone": "Wrong row! Monsters go in Monster Zones. Spells and Traps go in the row behind.",
@@ -571,6 +572,8 @@ export function englishCopy(RIVAL: string): PlayCopy {
 					return `${who} lose${mine ? "" : "s"} ${event.from - event.to} Life Points: ${event.to} left.`;
 				case "deck-out":
 					return `${mine ? "Your" : `${RIVAL}'s`} Deck is empty: no card to draw.`;
+				case "locked":
+					return `${name(event.card)}: for the rest of this turn, no card can be added from either Deck to the hand.`;
 				case "exodia":
 					return mine ? `All five pieces of ${name("exodia-the-forbidden-one")} are in your hand: you win at once, whatever the Life Points!` : `${RIVAL} holds all five pieces of ${name("exodia-the-forbidden-one")}.`;
 				case "won":

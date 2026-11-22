@@ -357,6 +357,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 		},
 		reasons: {
 			"duel-over": "הדו־קרב נגמר.",
+			"deck-locked": `עד סוף התור אי אפשר להוסיף קלפים מה־${L("Deck")} ליד.`,
 			"answer-first": "קודם בחרו: לענות, או לתת לזה לקרות.",
 			"not-in-hand": "הקלף הזה לא ביד שלכם.",
 			"wrong-zone": `שורה לא נכונה! ${w("מפלצות", "Monsters")} הולכות לאזורי המפלצות. ${w("לחשים", "Spells")} ו${w("מלכודות", "Traps")} הולכים לשורה שמאחור.`,
@@ -566,6 +567,8 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 					return `${mine ? "איבדתם" : `${RIVAL} מאבד`} ${event.from - event.to} ${LP}: נשארו ${event.to}.`;
 				case "deck-out":
 					return `${mine ? "החפיסה שלכם ריקה" : `החפיסה של ${RIVAL} ריקה`}: אין קלף לשלוף.`;
+				case "locked":
+					return `${name(event.card)}: עד סוף התור אי אפשר להוסיף קלפים מאף ${L("Deck")} ליד.`;
 				case "exodia":
 					return mine ? `כל חמשת החלקים של ${name("exodia-the-forbidden-one")} ביד שלכם: ניצחתם מיד, לא משנה כמה ${LP} יש!` : `ל${RIVAL} יש ביד את כל חמשת החלקים של ${name("exodia-the-forbidden-one")}.`;
 				case "won":

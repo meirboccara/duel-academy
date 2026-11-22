@@ -56,7 +56,7 @@ const CHAINS: CardId[] = [
 	"solemn-strike",
 	"iron-boar",
 	"ash-blossom-joyous-spring",
-	"celtic-guardian",
+	"droll-lock-bird",
 	"elemental-hero-sparkman",
 ] as CardId[];
 
