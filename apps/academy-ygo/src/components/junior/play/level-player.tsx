@@ -15,7 +15,8 @@ import { BEAT, BoardStage } from "./board-stage";
 import type { HandItem } from "./board3d/board-3d-stage";
 import { BOARD3D_COPY, Board3dContext, useBoard3d, type Board3d } from "./board3d/support";
 import { DemoTheatre } from "./demo-theatre";
-import { CardFace, ChainTower, ClashBanner, PhaseBar, PileViewer, pileKey, printedText, zoneKey, type Pile } from "./mini-board";
+import { CardFace, ChainTower, ClashBanner, PhaseBar, PileViewer, TurnBanner, pileKey, printedText, zoneKey, type Pile } from "./mini-board";
+import { rivalPause } from "@/lib/junior/play/pacing";
 
 /** What the child is holding between two taps. */
 type Holding =
@@ -215,9 +216,8 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	/* Against a trainer of the masters' island, the trainer plays its turn by itself, one move at a time. */
 	useEffect(() => {
 		if (!level.duel || session.status !== "rival") return;
-		/* After the trainer activates a card or changes a monster's ATK, a longer pause: the child reads what changed. */
-		const telling = session.events.some((event) => (event.type === "activated" || event.type === "sprung" || event.type === "boosted") && event.side === "rival");
-		const timer = window.setTimeout(() => update(next(session)), telling ? 2200 : moving ? 700 : 250);
+		/* Paced as card games on screen pace the opponent's turn: a banner for its turn and each phase, the longest pause for a card it activates (pacing.ts). */
+		const timer = window.setTimeout(() => update(next(session)), rivalPause(session.events, moving));
 		return () => window.clearTimeout(timer);
 	}, [level.duel?.master, session, moving]);
 	const showHint = (from: Session) => {
@@ -553,6 +553,7 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 				<DemoTheatre rule={demoRule} copy={copy} locale={locale} moving={moving} sound={sound} onDone={closeDemo} />
 			) : (
 				<>
+					<TurnBanner events={session.events} copy={copy} moving={moving} answering={status === "answer"} />
 					<BoardStage board={board} events={session.events} copy={copy} moving={moving} glow={glow} chosen={chosen} onZone={onZone} onPile={onPile} {...(handItems ? { hand: handItems, handFocus } : {})} />
 					{opened && <PileViewer title={opened.title} copy={copy} cards={opened.cards} {...(pileTap ? { pickable: pileTap, onPick: onPileCard } : {})} onClose={() => setOpen(null)} />}
 					<ClashBanner events={session.events} copy={copy} moving={moving} />

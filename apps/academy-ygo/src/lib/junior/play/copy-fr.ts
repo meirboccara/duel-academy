@@ -289,6 +289,8 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 		atk: "ATK",
 		def: "DEF",
 		lifePoints: (side, lp) => (side === "you" ? `Tes Points de Vie : ${lp}` : `Points de Vie de ${RIVAL} : ${lp}`),
+		turnBanner: (side) => (side === "you" ? "À toi de jouer !" : `Tour de ${RIVAL}`),
+		yourChance: "À toi de répondre !",
 		handCount: (side, count) => `${side === "you" ? "Ta main" : `Main de ${RIVAL}`} : ${count} ${count === 1 ? "carte" : "cartes"}`,
 		monsterZone: (side, number) => (side === "you" ? `Ta Zone Monstre ${number}` : `Zone Monstre ${number} de ${RIVAL}`),
 		backZone: (side, number) => (side === "you" ? `Ta Zone Magie & Piège ${number}` : `Zone Magie & Piège ${number} de ${RIVAL}`),

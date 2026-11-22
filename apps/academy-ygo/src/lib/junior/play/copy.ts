@@ -53,6 +53,10 @@ export interface PlayCopy {
 	lifePoints: (side: Side, lp: number) => string;
 	/** How many cards a player holds: shown for the rival, whose hand is face-down. */
 	handCount: (side: Side, count: number) => string;
+	/** The banner of a new turn: "Your turn!", "Kaiba's turn". */
+	turnBanner: (side: Side) => string;
+	/** The banner when the child may answer what the rival does. */
+	yourChance: string;
 	monsterZone: (side: Side, number: number) => string;
 	backZone: (side: Side, number: number) => string;
 	/** The whole mat: a Main Monster Zone, the Extra Monster Zone, the Field Zone, a Pendulum Zone (1 left, 2 right). */

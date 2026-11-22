@@ -284,6 +284,8 @@ export function englishCopy(RIVAL: string): PlayCopy {
 		atk: "ATK",
 		def: "DEF",
 		lifePoints: (side, lp) => (side === "you" ? `Your Life Points: ${lp}` : `${RIVAL}'s Life Points: ${lp}`),
+		turnBanner: (side) => (side === "you" ? "Your turn!" : `${RIVAL}'s turn`),
+		yourChance: "Your chance!",
 		handCount: (side, count) => `${side === "you" ? "Your hand" : `${RIVAL}'s hand`}: ${count} ${count === 1 ? "card" : "cards"}`,
 		monsterZone: (side, number) => (side === "you" ? `Your Monster Zone ${number}` : `${RIVAL}'s Monster Zone ${number}`),
 		backZone: (side, number) => (side === "you" ? `Your Spell & Trap Zone ${number}` : `${RIVAL}'s Spell & Trap Zone ${number}`),

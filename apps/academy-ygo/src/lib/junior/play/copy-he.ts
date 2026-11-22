@@ -275,6 +275,8 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 		atk: "ATK",
 		def: "DEF",
 		lifePoints: (side, lp) => (side === "you" ? `${LP} שלכם: ${lp}` : `${LP} של ${RIVAL}: ${lp}`),
+		turnBanner: (side) => (side === "you" ? "התור שלכם!" : `התור של ${RIVAL}`),
+		yourChance: "ההזדמנות שלכם!",
 		handCount: (side, count) => `${side === "you" ? "היד שלכם" : `היד של ${RIVAL}`}: ${count} קלפים`,
 		monsterZone: (side, number) => (side === "you" ? `${w("אזור מפלצות", "Monster Zone")} ${number} שלכם` : `${w("אזור מפלצות", "Monster Zone")} ${number} של ${RIVAL}`),
 		backZone: (side, number) => (side === "you" ? `${w("אזור לחשים ומלכודות", "Spell & Trap Zone")} ${number} שלכם` : `${w("אזור לחשים ומלכודות", "Spell & Trap Zone")} ${number} של ${RIVAL}`),

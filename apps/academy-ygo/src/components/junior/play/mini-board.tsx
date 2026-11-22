@@ -8,6 +8,7 @@ import { CARDS } from "@duel-academy/cards";
 import { PLAY_COPY, cardType, type PlayCopy } from "@/lib/junior/play/copy";
 import { EXTRA_ZONE, PHASES, START_LP, atkOf, defOf, mainZones, type Board, type GameEvent, type Phase, type Row, type Side } from "@duel-academy/engine";
 import type { PhaseBar as PhaseBarKind } from "@/lib/junior/play/levels";
+import { turnBeat } from "@/lib/junior/play/pacing";
 
 const KIND_FRAME = { monster: "border-normal-monster bg-normal-monster/15", spell: "border-spell bg-spell/15", trap: "border-trap bg-trap/15" } as const;
 /** Ritual Monsters are blue, Fusion purple, Synchro white, Xyz black and Link dark blue. */
@@ -572,7 +573,8 @@ export function PhaseBar({ bar, board, copy, enabled, hinted, onDraw, onPhase }:
 	return (
 		<ol aria-label={copy.phaseBar} className="mx-auto flex max-w-md flex-wrap justify-center gap-2">
 			{BAR[bar].map((phase) => {
-				const current = mine && board.phase === phase;
+				/* The phase the turn is in, the rival's too (in its red), as Master Duel's phase button shows it. */
+				const current = board.phase === phase;
 				const drawNow = phase === "draw" && mustDraw;
 				const glow = hinted === phase || (drawNow && hinted === "draw-card");
 				return (
@@ -582,7 +584,7 @@ export function PhaseBar({ bar, board, copy, enabled, hinted, onDraw, onPhase }:
 							aria-current={current ? "step" : undefined}
 							disabled={!enabled || (current && !drawNow)}
 							onClick={() => (drawNow ? onDraw() : onPhase(phase))}
-							className={`min-h-12 rounded-full border-2 px-2.5 py-2 text-xs font-semibold ${current ? "border-gold-400 bg-gold-400 text-ink-950" : glow ? "border-gold-400 bg-gold-400/15 text-fg" : "border-white/25 bg-surface-raised text-fg"} disabled:opacity-100`}
+							className={`min-h-12 rounded-full border-2 px-2.5 py-2 text-xs font-semibold ${current && mine ? "border-gold-400 bg-gold-400 text-ink-950" : current ? "border-ember-400 bg-ember-500/30 text-fg" : glow ? "border-gold-400 bg-gold-400/15 text-fg" : "border-white/25 bg-surface-raised text-fg"} disabled:opacity-100`}
 						>
 							{drawNow ? `${copy.phases.draw}: ${copy.draw}` : copy.phases[phase]}
 						</button>
@@ -590,6 +592,34 @@ export function PhaseBar({ bar, board, copy, enabled, hinted, onDraw, onPhase }:
 				);
 			})}
 		</ol>
+	);
+}
+
+/**
+ * A banner across the board, as card games on screen announce the turn and its phases (pacing.ts): a new turn
+ * ("Kaiba's turn" in the rival's red, "Your turn!" in the child's blue), the phase the rival enters, or the child's
+ * chance to answer. It says what the narration below says: a picture for the eyes.
+ */
+export function TurnBanner({ events, copy, moving, answering }: { events: readonly GameEvent[]; copy: PlayCopy; moving: boolean; answering: boolean }) {
+	const beat = turnBeat(events);
+	const showPhase = beat?.kind === "phase" && beat.side === "rival";
+	const text = answering ? copy.yourChance : beat?.kind === "turn" ? copy.turnBanner(beat.side) : showPhase ? copy.phases[beat.phase] : null;
+	if (!text) return null;
+	const side = answering ? "chance" : beat?.side;
+	const colour = side === "chance" ? "border-gold-400 bg-gold-400/20 text-gold-400" : side === "rival" ? "border-ember-400 bg-ember-500/25 text-ember-400" : "border-arcane-400 bg-arcane-500/25 text-arcane-400";
+	const big = answering || beat?.kind === "turn";
+	return (
+		<motion.div
+			key={text}
+			aria-hidden
+			data-turn-banner={side}
+			initial={moving ? { scaleX: 0.2, opacity: 0 } : false}
+			animate={{ scaleX: 1, opacity: 1 }}
+			transition={{ duration: 0.25 }}
+			className={`mx-auto max-w-md rounded-xl border-2 px-4 py-1 text-center font-display ${big ? "text-2xl" : "text-lg"} ${colour}`}
+		>
+			{text}
+		</motion.div>
 	);
 }
 
