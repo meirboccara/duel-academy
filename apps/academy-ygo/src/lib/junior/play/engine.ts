@@ -1,4 +1,5 @@
-import { FORBIDDEN_ONE, attributeOf, cardOf, fusionOnly, hasRulesText, inExtraDeck, inPool, isEffectMonster, isQuickPlay, mentions, monsterOf, named, spellTarget, staysOnField, tributesFor, type CardId, type Effect, type FusionMaterial, type MonsterCard } from "./cards";
+import { ashCategories, cardCategories, categoriesOf, type Category, choiceOf, effectsOf, fits as fitsFilter, targetOf } from "./effects";
+import { FORBIDDEN_ONE, attributeOf, cardOf, fusionOnly, hasRulesText, inExtraDeck, inPool, isEffectMonster, isQuickPlay, mentions, monsterOf, named, spellTarget, staysOnField, tributesFor, type Action, type CardId, type DataEffect, type Effect, type FusionMaterial, type MonsterCard } from "./cards";
 
 /**
  * The Junior duel board. The small board has three Monster Zones and three Spell & Trap Zones per side; the whole
@@ -108,8 +109,8 @@ export type Pending =
 	| { kind: "added"; side: Side };
 /** "For the rest of this turn…": a rule a card set, until the turn ends. */
 export type TurnLock = { kind: "deck-to-hand"; by: CardId };
-/** What a monster's activated effect does when it resolves. */
-export type EffectRun = { do: "add"; card: CardId };
+/** What a monster's activated effect does when it resolves: add a card (Blazeman), or the steps of an effect written as data. */
+export type EffectRun = { do: "add"; card: CardId } | { do: "data"; effect: number; pick?: CardId; target?: number };
 /**
  * A card activated in answer that waits on the Chain while the other player may answer it in turn: the last one
  * activated resolves first (Rulebook v10 pp. 44-45). Chain Link 1 is what is pending; these are links 2 and up.
@@ -162,6 +163,8 @@ export interface Board {
 	standbyDone: boolean;
 	/** A monster just Normal Summoned whose "When this card is Normal Summoned: You can…" may be used now, and only now. */
 	summonTrigger: { side: Side; zone: number; card?: CardId } | null;
+	/** Effects written as data that something just started ("If this card is Summoned / sent to the GY: You can…"): their owner may use them now, and only now. */
+	triggered: { side: Side; card: CardId; effect: number; zone?: number }[];
 	/** The state of the duel's random numbers (coin tosses, shuffling a Deck after a search): the same seed gives the same duel. */
 	rng: number;
 	/** Monsters the turn player has Summoned this turn (a Set is not a Summon), and whether a card forbids any more ("You cannot Summon other monsters the turn you activate this card"). */
@@ -195,6 +198,11 @@ export type Move =
 	| { type: "pendulum"; cards: CardId[] }
 	/** Use a Quick Effect of a monster in your hand. */
 	| { type: "hand"; card: CardId; target?: number }
+	/**
+	 * Use an effect written as data: `effect` is its place on the card. The card is on the field (`zone`), in the hand,
+	 * or in the Graveyard. `pick` is the card it chooses, `target` the Monster Zone it targets.
+	 */
+	| { type: "effect"; card: CardId; effect: number; zone?: number; pick?: CardId; target?: number }
 	| { type: "pass" };
 
 export type Reason =
@@ -345,6 +353,10 @@ export type GameEvent =
 	| { type: "deck-out"; side: Side }
 	/** All five pieces of the Forbidden One are in this player's hand. */
 	| { type: "exodia"; side: Side }
+	/** A card was sent to the Graveyard by an effect, from the Deck or the field (not destroyed). */
+	| { type: "sent"; side: Side; card: CardId; from: "deck" | "field" }
+	/** An effect written as data was activated. */
+	| { type: "effect-used"; side: Side; card: CardId }
 	/** A card set a rule for the rest of the turn (Droll & Lock Bird: nothing more is added from a Deck to a hand). */
 	| { type: "locked"; side: Side; card: CardId }
 	| { type: "won"; side: Side };
@@ -413,7 +425,7 @@ function side(setup: SideSetup = {}, full: boolean): SideState {
 export function board(setup: Setup = {}): Board {
 	const phase = setup.phase ?? "main1";
 	const full = setup.full ?? false;
-	return { you: side(setup.you, full), rival: side(setup.rival, full), full, turn: setup.turn ?? "you", turnNumber: setup.turnNumber ?? 3, phase, strict: setup.strict ?? false, drawn: phase !== "draw", summonUsed: false, pendulumUsed: false, pending: null, chain: [], chainLimit: setup.chainLimit ?? null, locks: [], winner: null, used: [], proper: [], triggers: [], standbyDone: phase !== "draw", summonTrigger: null, rng: (setup.seed ?? 1) >>> 0, summons: 0, summonLock: false };
+	return { you: side(setup.you, full), rival: side(setup.rival, full), full, turn: setup.turn ?? "you", turnNumber: setup.turnNumber ?? 3, phase, strict: setup.strict ?? false, drawn: phase !== "draw", summonUsed: false, pendulumUsed: false, pending: null, chain: [], chainLimit: setup.chainLimit ?? null, locks: [], winner: null, used: [], proper: [], triggers: [], standbyDone: phase !== "draw", summonTrigger: null, triggered: [], rng: (setup.seed ?? 1) >>> 0, summons: 0, summonLock: false };
 }
 
 export const other = (who: Side): Side => (who === "you" ? "rival" : "you");
@@ -522,10 +534,8 @@ const after = (a: Phase, b: Phase) => PHASES.indexOf(a) > PHASES.indexOf(b);
 const TRAP_ANSWERS: Record<Pending["kind"], Effect["type"][]> = { attack: ["weaken-attacker", "stop-attack", "destroy-attacker", "banish-attacker", "reinforce", "negate-attack", "mirror-force", "magic-cylinder", "just-desserts", "clear-backrow", "recharge", "storm-force", "ruin"], spell: ["return-to-hand"], summon: ["trap-hole", "bottomless", "torrential"], effect: [], added: [] };
 /** What Ash Blossom & Joyous Spring can negate: an effect that adds a card from the Deck to the hand or Special Summons from the Deck. */
 function ashHits(card: CardId): boolean {
-	const info = cardOf(card);
-	if (info.kind === "monster") return false;
-	const effect = info.effect;
-	return ["search", "search-pick", "deck-summon", "draw", "draw-then-gift", "curtain"].includes(effect.type) || (effect.type === "call" && effect.from.includes("deck"));
+	const categories = cardCategories(card);
+	return ashCategories.some((category) => categories.has(category));
 }
 /** What a Set Quick-Play Spell can do in answer, on a monster it targets; the ones that change ATK also in the Damage Step. */
 const QUICK_ANSWERS: Effect["type"][] = ["boost", "destroy", "shrink", "chalice", "book", "switch"];
@@ -550,6 +560,8 @@ class Play {
 	readonly events: GameEvent[] = [];
 	/** Set while an answer that waited on the Chain resolves: it is played at once, not put on the Chain again. */
 	resolving = false;
+	/** Every card that went to a Graveyard during this move, in order: for "If this card is sent to the GY" effects. */
+	private readonly sentToGraveyard: { side: Side; card: CardId }[] = [];
 	constructor(
 		source: Board,
 		private readonly forced: { coin?: boolean } = {},
@@ -601,10 +613,14 @@ class Play {
 		const trigger = this.state.summonTrigger;
 		/* While the other player answers the Summon itself, the monster's own "When… Summoned" effect still waits. */
 		if (this.state.pending?.kind !== "summon") this.state.summonTrigger = null;
-		if (move.type === "ability" && move.grave) this.summonRevive(trigger, move.zone, move.grave);
+		const triggered = this.state.triggered;
+		if (!this.state.pending) this.state.triggered = [];
+		if (move.type === "effect") this.useEffect(move, triggered);
+		else if (move.type === "ability" && move.grave) this.summonRevive(trigger, move.zone, move.grave);
 		else if (move.type === "ability" && move.pick) this.summonSearch(trigger, move.zone, move.pick);
 		else this.move(move);
 		this.afterSummons();
+		this.afterTriggers();
 		this.afterAdding();
 		/* The monster whose "When… Summoned" effect was waiting lost its effects in answer to its Summon (Effect Veiler). Destroyed (Trap Hole), its effect still happens. */
 		const waiting = this.state.summonTrigger;
@@ -676,6 +692,215 @@ class Play {
 		if (this.canAnswer()) this.events.push({ type: "window", side: other(s.turn), kind: "summon" });
 		else s.pending = null;
 	}
+	/** Does the monster's effect that is pending do one of these things? */
+	private effectHits(pending: Extract<Pending, { kind: "effect" }>, categories: readonly Category[]): boolean {
+		const run = pending.run;
+		const found: Set<Category> = run.do === "add" ? new Set<Category>(["search"]) : categoriesOf(effectsOf(pending.card)[run.effect]?.actions ?? []);
+		return categories.some((category) => found.has(category));
+	}
+	/** The first free Main Monster Zone of this player, or -1. */
+	private freeZone(who: Side): number {
+		const s = this.state;
+		return s[who].monsters.findIndex((slot, zone) => zone < mainZones(s) && !slot);
+	}
+	/** Can these steps start with this choice: the chosen card is where they look and fits, the target fits, there is room? */
+	private stepsReady(who: Side, actions: readonly Action[], pick: CardId | undefined, target: number | undefined, self: CardId): boolean {
+		const s = this.state;
+		const mine = s[who];
+		const choice = choiceOf(actions);
+		if (choice) {
+			/* "except [this card]" is in the filter when the card says so: Destiny HERO - Malicious calls another copy of itself. */
+			if (!pick || !fitsFilter(pick, choice.filter)) return false;
+			if (!choice.from.some((place) => mine[place].includes(pick))) return false;
+		}
+		const aim = targetOf(actions);
+		if (aim) {
+			const slot = target === undefined ? null : mine.monsters[target];
+			if (!slot || slot.faceDown || !fitsFilter(slot.card, aim)) return false;
+		}
+		/* A Special Summon needs a free zone, unless a monster sent from the field just before makes one. */
+		if (actions.some((action) => action.do === "special") && this.freeZone(who) < 0 && !aim) return false;
+		return true;
+	}
+	/** The keys that say an effect was used this turn: "once per turn" by name, or 1 effect of the card per turn. */
+	private onceKeys(who: Side, card: CardId, index: number, effect: DataEffect): string[] {
+		if (effect.once === "name") return [`${who}:${card}:effect-${index}`];
+		if (effect.once === "shared") return [`${who}:${card}:effects`];
+		return [];
+	}
+	/** The player uses an effect written as data: an ignition effect in their Main Phase, or one that something just started. */
+	private useEffect(move: Extract<Move, { type: "effect" }>, triggered: Board["triggered"]): void {
+		const s = this.state;
+		if (s.winner) reject("duel-over");
+		if (s.pending) reject("answer-first");
+		const who = s.turn;
+		const effect = effectsOf(move.card)[move.effect];
+		if (!effect) return reject("no-ability");
+		const mine = s[who];
+		let zone = -1;
+		if (effect.when === "ignition") {
+			this.needMain();
+			const from = effect.from ?? "field";
+			if (from === "field") {
+				const slot = move.zone === undefined ? null : mine.monsters[move.zone];
+				if (!slot || slot.card !== move.card || !live(slot)) return reject("no-ability");
+				zone = move.zone as number;
+			} else if (!mine[from].includes(move.card)) return reject(from === "hand" ? "not-in-hand" : "no-ability");
+		} else {
+			const ready = triggered.find((item) => item.side === who && item.card === move.card && item.effect === move.effect);
+			if (!ready) return reject("nothing-to-answer");
+			zone = ready.zone ?? -1;
+			/* The other effects started at the same time may still be used next. */
+			s.triggered = triggered.filter((item) => item !== ready);
+		}
+		this.activate(who, move.card, move.effect, zone, move.pick, move.target, false);
+	}
+	/**
+	 * An effect written as data is activated: it counts as used and its cost is paid, then the other player may answer
+	 * it, or it resolves at once. With `auto`, an effect that cannot start with this choice is skipped instead of refused.
+	 */
+	private activate(who: Side, card: CardId, index: number, zone: number, pick: CardId | undefined, target: number | undefined, auto: boolean): boolean {
+		const s = this.state;
+		const effect = effectsOf(card)[index];
+		if (!effect) return false;
+		const refuse = (reason: Reason): false => (auto ? false : reject(reason));
+		const keys = this.onceKeys(who, card, index, effect);
+		if (keys.some((key) => s.used.includes(key))) return refuse("once-per-turn");
+		if (!this.stepsReady(who, effect.actions, pick, target, card)) return refuse("no-target");
+		if (this.deckLocked() && choiceOf(effect.actions)?.from.includes("deck") && categoriesOf(effect.actions).has("search")) return refuse("deck-locked");
+		const mine = s[who];
+		if (effect.cost === "discard-self" && !mine.hand.includes(card)) return refuse("not-in-hand");
+		if (effect.cost === "banish-self" && !mine.graveyard.includes(card)) return refuse("no-ability");
+		s.used.push(...keys);
+		if (effect.cost === "discard-self") {
+			mine.hand.splice(mine.hand.indexOf(card), 1);
+			this.toGraveyard(who, card, "activation");
+			this.events.push({ type: "discarded", side: who, card });
+		}
+		if (effect.cost === "banish-self") {
+			mine.graveyard.splice(mine.graveyard.lastIndexOf(card), 1);
+			mine.banished.push({ card, faceDown: false });
+			this.events.push({ type: "banished", side: who, cards: [card], faceDown: false });
+		}
+		this.events.push({ type: "effect-used", side: who, card });
+		const run: EffectRun = { do: "data", effect: index, ...(pick ? { pick } : {}), ...(target === undefined ? {} : { target }) };
+		const pending: Extract<Pending, { kind: "effect" }> = { kind: "effect", side: who, card, zone, run };
+		/* The turn player's effect: the other player may answer it (Ash Blossom, Ghost Ogre, Solemn Strike) before it resolves. */
+		if (who === s.turn && !s.pending && !this.resolving) {
+			s.pending = pending;
+			if (this.canAnswer()) {
+				this.events.push({ type: "window", side: other(who), kind: "effect" });
+				return true;
+			}
+			s.pending = null;
+		}
+		this.resolveEffect(pending);
+		return true;
+	}
+	/**
+	 * Once a move is done: effects written as data that what happened started ("If this card is Summoned", "If this card
+	 * is sent to the GY"). The turn player may use an optional one now; any other happens by itself, with the first card
+	 * that fits. What those effects do may start more.
+	 */
+	private afterTriggers(): void {
+		const s = this.state;
+		let scanned = 0;
+		for (let round = 0; round < 8 && !s.winner; round++) {
+			const started: Board["triggered"] = [];
+			for (const event of this.events.slice(scanned)) {
+				if ((event.type !== "summoned" && event.type !== "special") || event.zone === undefined) continue;
+				const slot = s[event.side].monsters[event.zone];
+				if (!slot || slot.card !== event.card || !live(slot)) continue;
+				effectsOf(event.card).forEach((effect, index) => {
+					const when = effect.when === "summoned" || (effect.when === "normal-summoned" && event.type === "summoned") || (effect.when === "special-summoned" && event.type === "special");
+					if (when) started.push({ side: event.side, card: event.card, effect: index, zone: event.zone });
+				});
+			}
+			scanned = this.events.length;
+			for (const sent of this.sentToGraveyard.splice(0)) effectsOf(sent.card).forEach((effect, index) => effect.when === "sent-to-gy" && started.push({ side: sent.side, card: sent.card, effect: index }));
+			if (started.length === 0) return;
+			for (const item of started) {
+				const effect = effectsOf(item.card)[item.effect];
+				if (!effect) continue;
+				if (effect.optional && item.side === s.turn) s.triggered.push(item);
+				else this.autoActivate(item);
+			}
+		}
+	}
+	/** A started effect that happens by itself: with the first card that fits its choice and its target. */
+	private autoActivate(item: Board["triggered"][number]): void {
+		const s = this.state;
+		const effect = effectsOf(item.card)[item.effect];
+		if (!effect) return;
+		const mine = s[item.side];
+		const choice = choiceOf(effect.actions);
+		const aim = targetOf(effect.actions);
+		const picks: (CardId | undefined)[] = choice ? [...new Set(choice.from.flatMap((place) => mine[place]))].filter((card) => fitsFilter(card, choice.filter)) : [undefined];
+		const targets: (number | undefined)[] = aim ? mine.monsters.flatMap((slot, zone) => (slot && fitsFilter(slot.card, aim) ? [zone] : [])) : [undefined];
+		for (const pick of picks) for (const target of targets) if (this.activate(item.side, item.card, item.effect, item.zone ?? -1, pick, target, true)) return;
+	}
+	/** The steps of an effect, in order. A step that finds nothing to do stops the ones after it ("and if you do"). */
+	private runSteps(who: Side, actions: readonly Action[], source: CardId, pick?: CardId, target?: number): void {
+		for (const action of actions) {
+			if (this.state.winner) return;
+			if (!this.runStep(who, action, pick, target)) {
+				this.events.push({ type: "no-effect", card: source });
+				return;
+			}
+		}
+	}
+	private runStep(who: Side, action: Action, pick?: CardId, target?: number): boolean {
+		const s = this.state;
+		const mine = s[who];
+		switch (action.do) {
+			case "search": {
+				if (!pick || !fitsFilter(pick, action.filter) || !mine.deck.includes(pick) || this.deckLocked()) return false;
+				this.addFromDeck(who, pick);
+				return true;
+			}
+			case "mill": {
+				const at = pick && fitsFilter(pick, action.filter) ? mine.deck.indexOf(pick) : -1;
+				if (at < 0) return false;
+				mine.deck.splice(at, 1);
+				this.toGraveyard(who, pick as CardId, null);
+				this.events.push({ type: "sent", side: who, card: pick as CardId, from: "deck" });
+				return true;
+			}
+			case "send-target": {
+				const slot = target === undefined ? null : mine.monsters[target];
+				if (!slot || slot.faceDown || !fitsFilter(slot.card, action.filter)) return false;
+				this.events.push({ type: "sent", side: who, card: slot.card, from: "field" });
+				this.leave(who, target as number, "graveyard");
+				return true;
+			}
+			case "special": {
+				const place = pick && fitsFilter(pick, action.filter) ? action.from.find((at) => mine[at].includes(pick)) : undefined;
+				const zone = this.freeZone(who);
+				if (!pick || !place || zone < 0) return false;
+				const list = mine[place];
+				list.splice(list.indexOf(pick), 1);
+				if (place === "deck") this.shuffle(mine.deck);
+				mine.monsters[zone] = standing(pick, { summoned: true });
+				if (who === s.turn) s.summons += 1;
+				this.events.push({ type: "special", side: who, card: pick, zone, how: "own", materials: [] });
+				return true;
+			}
+			case "draw": {
+				if (this.deckLocked()) return false;
+				for (let count = 0; count < action.count; count++) {
+					const top = mine.deck.shift();
+					if (!top) {
+						this.events.push({ type: "deck-out", side: who });
+						this.win(other(who));
+						return false;
+					}
+					mine.hand.push(top);
+					this.events.push({ type: "drew", side: who, card: top });
+				}
+				return true;
+			}
+		}
+	}
 	/** "Cards cannot be added from either player's Main Deck to the hand" this turn (Droll & Lock Bird). */
 	private deckLocked(): boolean {
 		return this.state.locks.some((lock) => lock.kind === "deck-to-hand");
@@ -709,10 +934,14 @@ class Play {
 	 * it resolved (Effect Veiler, Infinite Impermanence). Destroyed in answer (Ghost Ogre), its effect still resolves.
 	 */
 	private resolveEffect(pending: Extract<Pending, { kind: "effect" }>): void {
-		const slot = this.state[pending.side].monsters[pending.zone];
+		const slot = pending.zone >= 0 ? this.state[pending.side].monsters[pending.zone] : null;
 		const lost = !!slot && slot.card === pending.card && !live(slot);
 		if (lost) this.events.push({ type: "no-effect", card: pending.card });
-		else if (!pending.negated) this.addFromDeck(pending.side, pending.run.card);
+		else if (!pending.negated) {
+			const run = pending.run;
+			if (run.do === "add") this.addFromDeck(pending.side, run.card);
+			else this.runSteps(pending.side, effectsOf(pending.card)[run.effect]?.actions ?? [], pending.card, run.pick, run.target);
+		}
 		if (pending.then && isMain(this.state.phase)) this.openSummon(pending.then.zones, pending.then.how);
 	}
 	/** The Battle Phase ends at once, as a card said. */
@@ -734,7 +963,7 @@ class Play {
 		if (!pending || !effect) return false;
 		if (effect === "no-battle-damage") return damageStep;
 		if (damageStep) return false;
-		if (effect === "ash") return ((pending.kind === "spell" && ashHits(pending.card)) || (pending.kind === "effect" && pending.run.do === "add")) && !s.used.includes(`${who}:ash`);
+		if (effect === "ash") return ((pending.kind === "spell" && ashHits(pending.card)) || (pending.kind === "effect" && this.effectHits(pending, ashCategories))) && !s.used.includes(`${who}:ash`);
 		/* Droll & Lock Bird: "If a card(s) is added from the Main Deck to your opponent's hand, except during the Draw Phase". */
 		if (effect === "droll") return pending.kind === "added" && pending.side !== who && !this.deckLocked();
 		/* Ghost Ogre & Snow Rabbit: "When a monster on the field activates its effect": that monster is still there. */
@@ -748,6 +977,7 @@ class Play {
 	/** A card goes to its owner's Graveyard. `followedBy` is what happens right after it in the same action, if anything. */
 	private toGraveyard(who: Side, card: CardId, followedBy: After | null): void {
 		this.state[who].graveyard.push(card);
+		this.sentToGraveyard.push({ side: who, card });
 		const info = cardOf(card);
 		if (info.kind === "monster" && info.trigger) this.state.triggers.push({ side: who, card, after: followedBy });
 	}
@@ -1264,6 +1494,12 @@ class Play {
 			/* "You cannot Summon other monsters the turn you activate this card (but you can Set)." */
 			if (effect.lock && (s.summons > 0 || s.summonLock)) reject("summon-locked");
 		}
+		if (effect.type === "data") {
+			/* "If you control no monsters in your Main Monster Zone:" */
+			if (effect.needs === "no-main-monsters" && me.monsters.some((held, zone) => zone < mainZones(s) && !!held)) reject("condition-not-met");
+			if (!this.stepsReady(s.turn, effect.actions, move.pick, move.target, move.card)) reject("no-target");
+			if (this.deckLocked() && choiceOf(effect.actions)?.from.length === 1 && cardCategories(move.card).has("search")) reject("deck-locked");
+		}
 		/* Under Droll & Lock Bird's lock, a card that could only add from the Deck to the hand cannot be activated. */
 		if (this.deckLocked() && (effect.type === "search" || effect.type === "search-pick" || effect.type === "draw" || effect.type === "draw-then-gift")) reject("deck-locked");
 		if (effect.type === "hand-summon") {
@@ -1316,6 +1552,7 @@ class Play {
 		if (card.cost?.type === "discard" && (!move.discard || !rest.includes(move.discard))) reject("cost-needed");
 		/* "Discard 1 Level 8 monster;" */
 		if (card.cost?.type === "discard" && card.cost.level !== undefined && move.discard && (cardOf(move.discard).kind !== "monster" || monsterOf(move.discard).level !== card.cost.level)) reject("cost-needed");
+		if (card.cost?.type === "discard" && card.cost.monster && move.discard && cardOf(move.discard).kind !== "monster") reject("cost-needed");
 		if (summons) this.summoning();
 		/* The whole cost, and room for what the effect does after it. */
 		if (card.cost?.type === "banish-deck" && me.deck.length < card.cost.count + (effect.type === "draw" ? effect.count : 0)) reject("deck-too-small");
@@ -2639,6 +2876,7 @@ class Play {
 			this.events.push({ type: "gained", side: s.turn, amount: effect.amount, lp: this.me.lp });
 			return;
 		}
+		if (effect.type === "data") return this.runSteps(s.turn, effect.actions, pending.card, pending.pick, pending.target);
 		if ((effect.type === "draw" || effect.type === "draw-then-gift") && this.deckLocked()) return nothing();
 		if (effect.type === "draw" || effect.type === "draw-then-gift") {
 			const count = effect.type === "draw" ? effect.count : 1;
@@ -2787,6 +3025,30 @@ export function apply(state: Board, move: Move, forced: { coin?: boolean } = {})
 	return { ok: true, board: play.state, events: play.events };
 }
 
+/** Every way the turn player could use an effect written as data now: each choice of card and target that fits. */
+export function effectMoves(state: Board): Move[] {
+	const who = state.turn;
+	const mine = state[who];
+	const out: Move[] = [];
+	const ways = (base: Extract<Move, { type: "effect" }>, actions: readonly Action[]) => {
+		const choice = choiceOf(actions);
+		const aim = targetOf(actions);
+		const picks: (CardId | undefined)[] = choice ? [...new Set(choice.from.flatMap((place) => mine[place]))].filter((card) => fitsFilter(card, choice.filter)) : [undefined];
+		const targets: (number | undefined)[] = aim ? mine.monsters.flatMap((slot, zone) => (slot && fitsFilter(slot.card, aim) ? [zone] : [])) : [undefined];
+		for (const pick of picks) for (const target of targets) out.push({ ...base, ...(pick ? { pick } : {}), ...(target === undefined ? {} : { target }) });
+	};
+	mine.monsters.forEach((slot, zone) => {
+		if (slot) effectsOf(slot.card).forEach((effect, index) => effect.when === "ignition" && (effect.from ?? "field") === "field" && ways({ type: "effect", card: slot.card, effect: index, zone }, effect.actions));
+	});
+	for (const place of ["hand", "graveyard"] as const) {
+		for (const card of new Set(mine[place])) effectsOf(card).forEach((effect, index) => effect.when === "ignition" && effect.from === place && ways({ type: "effect", card, effect: index }, effect.actions));
+	}
+	for (const item of state.triggered) {
+		const effect = effectsOf(item.card)[item.effect];
+		if (item.side === who && effect) ways({ type: "effect", card: item.card, effect: item.effect, ...(item.zone === undefined ? {} : { zone: item.zone }) }, effect.actions);
+	}
+	return out;
+}
 /** The most monsters one Summon is tried with when every move is listed. No card in Junior play needs more. */
 const MOST_MATERIALS = 3;
 /** Every way to pick between `min` and `max` of these items, in order. */
@@ -2859,6 +3121,10 @@ export function legalPlays(state: Board): { move: Move; board: Board; events: Ga
 				if (info.effect.type === "revive") for (const side of ["you", "rival"] as const) state[side].graveyard.forEach((_, index) => ways.push({ ...base, grave: { side, index } }));
 				if (info.effect.type === "recover") who.graveyard.forEach((_, index) => ways.push({ ...base, grave: { side: actor(state), index } }));
 				if (info.effect.type === "hand-summon") for (const pick of new Set(others)) ways.push({ ...base, pick });
+				if (info.effect.type === "data") {
+					const choice = choiceOf(info.effect.actions);
+					if (choice) for (const pick of new Set(choice.from.flatMap((place) => who[place]))) if (pick !== card) ways.push({ ...base, pick });
+				}
 				if (info.effect.type === "search-pick" || info.effect.type === "deck-summon") for (const pick of new Set(who.deck)) ways.push({ ...base, pick });
 				if (info.effect.type === "ritual") for (const materials of picks(fodder, 1, MOST_MATERIALS)) ways.push({ ...base, materials });
 				if (info.effect.type === "fusion") for (const summon of new Set(who.extra)) for (const materials of picks(fodder, 2, MOST_MATERIALS)) ways.push({ ...base, summon, materials });
@@ -2876,6 +3142,7 @@ export function legalPlays(state: Board): { move: Move; board: Board; events: Ga
 			const monsters = who.hand.filter((card) => cardOf(card).kind === "monster");
 			for (const cards of picks(monsters, 1, main)) candidates.push({ type: "pendulum", cards });
 		}
+		candidates.push(...effectMoves(state));
 		const trigger = state.summonTrigger;
 		if (trigger && trigger.side === actor(state)) {
 			who.graveyard.forEach((_, index) => candidates.push({ type: "ability", zone: trigger.zone, grave: { side: trigger.side, index } }));

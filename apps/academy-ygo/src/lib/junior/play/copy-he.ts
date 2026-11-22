@@ -490,6 +490,10 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 					return `${mine ? w("הפעלתם", "activate") : `${RIVAL} ${w("מפעיל", "activates")}`} את ה${w("לחש", "Spell")} ${name(event.card)}${event.target ? ` ${w(mine ? "ובחרתם כמטרה" : "ובוחר כמטרה", "target")} את ${name(event.target)}` : ""}.`;
 				case "discarded":
 					return `${mine ? w("השלכתם", "discard") : `${RIVAL} ${w("משליך", "discards")}`} את ${name(event.card)} כדי לשלם את ה${w("מחיר", "cost")}.`;
+				case "effect-used":
+					return `${mine ? "השתמשתם" : `${RIVAL} משתמש`} באפקט של ${name(event.card)}.`;
+				case "sent":
+					return `${name(event.card)} נשלח ${event.from === "deck" ? `מה־${L("Deck")}` : "מהשדה"} ל${GY}.`;
 				case "ability":
 					return `${mine ? "השתמשתם באפקט של" : `${RIVAL} משתמש באפקט של`} ${name(event.card)} ${w(mine ? "ובחרתם כמטרה" : "ובוחר כמטרה", "target")} את ${name(event.target)}.`;
 				case "trigger":
@@ -607,6 +611,8 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 					if (!attacker) return "";
 					return target ? `תקפו את ${name(target.card)} עם ${name(attacker.card)} (${L(`${atkOf(attacker, board)} ATK`)}).` : `תקפו ישירות עם ${name(attacker.card)}.`;
 				}
+				case "effect":
+					return `להשתמש באפקט של ${name(move.card)}${move.pick ? `: ${name(move.pick)}` : ""}.`;
 				case "ability": {
 					const slot = mine.monsters[move.zone];
 					const target = move.target === undefined ? null : theirs.monsters[move.target];

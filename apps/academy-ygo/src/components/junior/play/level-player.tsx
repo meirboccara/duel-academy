@@ -6,7 +6,7 @@ import type { Locale } from "@/lib/i18n/locales";
 import { cardOf, hasRulesText, inPool, isQuickPlay, mentions, monsterOf, spellTarget, tributesFor, type CardId } from "@/lib/junior/play/cards";
 import { PLAY_COPY, VOICE_LOCALE, narrateAll, phasesStarted, playCopyFor, stepsStarted, type PlayCopy } from "@/lib/junior/play/copy";
 import { MASTER_NAMES, masterPicture } from "@/lib/junior/play/masters";
-import { actor, fusionFits, mainZones, scalesOf, type Board, type GameEvent, type Move, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
+import { actor, apply, effectMoves, fusionFits, mainZones, scalesOf, type Board, type GameEvent, type Move, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
 import { WORLD_IDS, type Level } from "@/lib/junior/play/levels";
 import { hint as askHint, botTurn, forceWin, next, outcome, play, playOut, restart, start, undo, type Outcome, type Session } from "@/lib/junior/play/session";
 import { DevLevelBarSlot } from "../dev/dev-slot";
@@ -231,6 +231,8 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 	const comeBack = (again: Session) => (again.stats.tries > 3 && (again.status === "playing" || again.status === "answer") ? showHint(again) : update(again));
 
 	const free = status === "playing";
+	/* Effects written as data (Sage with Eyes of Blue, Destiny HERO - Malicious…): each way to use one now is a button. */
+	const effectChoices = useMemo(() => (free ? effectMoves(board).filter((move) => apply(board, move).ok) : []), [free, board]);
 	/** Activating a Spell: one with a cost first waits for the card to discard. */
 	const placeSpell = (card: CardId, zone: number, target?: number) => {
 		const extra = target === undefined ? {} : { target };
@@ -615,6 +617,13 @@ export function LevelPlayer({ dev = false, level, number, total, copy, locale, m
 										className={quiet}
 									>
 										<bdi lang={copy.englishCards ? "en" : undefined}>{copy.cards[card].name}</bdi>
+									</button>
+								))}
+							{free &&
+								!pick &&
+								effectChoices.map((move) => (
+									<button key={JSON.stringify(move)} type="button" data-effect={move.type === "effect" ? move.card : undefined} onClick={() => act(move)} className={quiet}>
+										{copy.describeMove(move, board)}
 									</button>
 								))}
 							{status === "answer" && pick?.kind === "hand" && !handAims(pick.card) && (

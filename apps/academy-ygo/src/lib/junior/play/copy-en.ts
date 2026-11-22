@@ -496,6 +496,10 @@ export function englishCopy(RIVAL: string): PlayCopy {
 					return `${who} activate${mine ? "" : "s"} the Spell ${name(event.card)}${event.target ? ` and target${mine ? "" : "s"} ${name(event.target)}` : ""}.`;
 				case "discarded":
 					return `${who} discard${mine ? "" : "s"} ${name(event.card)} to pay the cost.`;
+				case "effect-used":
+					return `${who} use${mine ? "" : "s"} the effect of ${name(event.card)}.`;
+				case "sent":
+					return `${name(event.card)} is sent from ${event.from === "deck" ? "the Deck" : "the field"} to the Graveyard.`;
 				case "ability":
 					return `${who} use${mine ? "" : "s"} the effect of ${name(event.card)} and target${mine ? "" : "s"} ${name(event.target)}.`;
 				case "trigger":
@@ -611,6 +615,8 @@ export function englishCopy(RIVAL: string): PlayCopy {
 					if (!attacker) return "";
 					return target ? `Attack ${name(target.card)} with ${name(attacker.card)} (${atkOf(attacker, board)} ATK).` : `Attack directly with ${name(attacker.card)}.`;
 				}
+				case "effect":
+					return `Use the effect of ${name(move.card)}${move.pick ? `: ${name(move.pick)}` : ""}.`;
 				case "ability": {
 					const slot = mine.monsters[move.zone];
 					const target = move.target === undefined ? null : theirs.monsters[move.target];

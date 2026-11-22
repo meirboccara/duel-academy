@@ -116,7 +116,61 @@ export type Effect =
 	 */
 	| { type: "counter"; negates: "spell" | "trap" | "monster" }
 	/** Infinite Impermanence: "Target 1 face-up monster your opponent controls; negate its effects (until the end of this turn)." From the hand if its owner controls no cards. */
-	| { type: "impermanence" };
+	| { type: "impermanence" }
+	/**
+	 * A card written as data: what it does, step by step, from the shared vocabulary (effects.ts). `needs`: "If you
+	 * control no monsters in your Main Monster Zone:".
+	 */
+	| { type: "data"; actions: readonly Action[]; needs?: "no-main-monsters" };
+
+/** Which cards an effect looks for, as printed: "1 Level 1 LIGHT Tuner", "1 "Toon" card", "1 Field Spell". */
+export interface CardFilter {
+	/** Exactly this card, by id. */
+	card?: string;
+	/** An archetype: the card's printed name contains these words ("Blue-Eyes", "Toon", "HERO"). */
+	archetype?: string;
+	kind?: "monster" | "spell" | "trap";
+	icon?: Icon;
+	level?: number;
+	attribute?: Attribute;
+	tuner?: true;
+	/** "Effect Monster". */
+	effect?: true;
+	/** "except [this card]", by id. */
+	except?: string;
+}
+/**
+ * One step of an effect, done in order. A step that chooses a card uses the effect's one chosen card (`pick`); one that
+ * targets uses its one target (`target`). When a step finds nothing to do, the steps after it do not happen ("and if you do").
+ */
+export type Action =
+	/** "Add 1 [filter] from your Deck to your hand." */
+	| { do: "search"; filter: CardFilter }
+	/** "Special Summon 1 [filter] from your hand / Deck / GY." */
+	| { do: "special"; from: readonly ("hand" | "deck" | "graveyard")[]; filter: CardFilter }
+	/** "Send 1 [filter] from your Deck to the GY." */
+	| { do: "mill"; filter: CardFilter }
+	/** "Target 1 [filter] you control; send it to the GY." */
+	| { do: "send-target"; filter: CardFilter }
+	/** "Draw [n] card(s)." */
+	| { do: "draw"; count: number };
+/** A monster's effect written as data. */
+export interface DataEffect {
+	/**
+	 * How it starts. "ignition": its owner uses it in their own Main Phase. The others start right after something
+	 * happened to this card: it was Summoned (Normal or Special, or only one of them), or sent to the GY.
+	 */
+	when: "ignition" | "summoned" | "normal-summoned" | "special-summoned" | "sent-to-gy";
+	/** Where the card is when an ignition effect is used: on the field (default), in the hand, or in the GY. */
+	from?: "field" | "hand" | "graveyard";
+	/** "You can…": its owner chooses to use it. Without it, the effect happens by itself. */
+	optional?: true;
+	/** Paid as it is activated: "You can discard this card", "You can banish this card from your GY". */
+	cost?: "discard-self" | "banish-self";
+	actions: readonly Action[];
+	/** "You can only use this effect of [card] once per turn" (`name`); "You can only use 1 [card] effect per turn" (`shared`). */
+	once?: "name" | "shared";
+}
 
 /** Monster Types, as printed on the Type line. */
 export const MONSTER_TYPES = ["aqua", "beast", "beast-warrior", "cyberse", "dinosaur", "divine-beast", "dragon", "fairy", "fiend", "fish", "insect", "machine", "plant", "psychic", "pyro", "reptile", "rock", "sea-serpent", "spellcaster", "thunder", "warrior", "winged-beast", "wyrm", "zombie"] as const;
@@ -293,14 +347,19 @@ export interface MonsterCard {
 	onFusion?: "halve-foes" | "gaia";
 	/** Rampart Blaster: "can attack while in face-up Defense Position, but only if your opponent controls no monsters", its ATK halved. */
 	defenseAttack?: true;
+	/** Its effects written as data (effects.ts), in the order they are printed. */
+	effects?: readonly DataEffect[];
 	/** Blue-Eyes Spirit Dragon: "Neither player can Special Summon 2 or more monsters at the same time." */
 	oneAtATime?: true;
 	/** Blue-Eyes Spirit Dragon: "Once per turn, when an effect of a card in the Graveyard is activated: You can negate the activation" (the opponent's). */
 	negatesGraveyard?: true;
 }
 export type Cost =
-	/** "Discard 1 card;": paid when the card is activated, before anything else happens. `level`: "Discard 1 Level 8 monster". */
-	| { type: "discard"; level?: number }
+	/**
+	 * "Discard 1 card;": paid when the card is activated, before anything else happens. `level`: "Discard 1 Level 8
+	 * monster". `monster`: "Send 1 monster from your hand to the GY".
+	 */
+	| { type: "discard"; level?: number; monster?: true }
 	/** "Pay half your LP;" */
 	| { type: "half-lp" }
 	/** "Banish 10 cards from the top of your Deck, face-down;" */
@@ -593,6 +652,26 @@ export const CARDS = {
 	"ash-blossom-joyous-spring": real("ash-blossom-joyous-spring", { tuner: true, hand: "ash" }),
 	"effect-veiler": real("effect-veiler", { tuner: true, hand: "veiler" }),
 	"droll-lock-bird": real("droll-lock-bird", { hand: "droll" }),
+	/* Cards written as data (effects.ts): their effects need no code of their own. */
+	terraforming: { kind: "spell", effect: { type: "data", actions: [{ do: "search", filter: { kind: "spell", icon: "field" } }] }, art: "🌍" },
+	"one-for-one": { kind: "spell", cost: { type: "discard", monster: true }, effect: { type: "data", actions: [{ do: "special", from: ["hand", "deck"], filter: { kind: "monster", level: 1 } }] }, art: "☝️" },
+	"toon-table-of-contents": { kind: "spell", effect: { type: "data", actions: [{ do: "search", filter: { archetype: "Toon" } }] }, art: "📖" },
+	"foolish-burial": { kind: "spell", effect: { type: "data", actions: [{ do: "mill", filter: { kind: "monster" } }] }, art: "⚰️" },
+	"sage-with-eyes-of-blue": real("sage-with-eyes-of-blue", {
+		tuner: true,
+		effects: [
+			{ when: "normal-summoned", optional: true, actions: [{ do: "search", filter: { level: 1, attribute: "LIGHT", tuner: true, except: "sage-with-eyes-of-blue" } }] },
+			{ when: "ignition", from: "hand", cost: "discard-self", once: "name", actions: [{ do: "send-target", filter: { effect: true } }, { do: "special", from: ["deck"], filter: { kind: "monster", archetype: "Blue-Eyes" } }] },
+		],
+	}),
+	"the-white-stone-of-legend": real("the-white-stone-of-legend", { tuner: true, effects: [{ when: "sent-to-gy", actions: [{ do: "search", filter: { card: "blue-eyes-white-dragon" } }] }] }),
+	"destiny-hero-malicious": real("destiny-hero-malicious", { effects: [{ when: "ignition", from: "graveyard", cost: "banish-self", actions: [{ do: "special", from: ["deck"], filter: { card: "destiny-hero-malicious" } }] }] }),
+	"elemental-hero-shadow-mist": real("elemental-hero-shadow-mist", {
+		effects: [
+			{ when: "special-summoned", optional: true, once: "shared", actions: [{ do: "search", filter: { kind: "spell", icon: "quick-play", archetype: "Change" } }] },
+			{ when: "sent-to-gy", optional: true, once: "shared", actions: [{ do: "search", filter: { kind: "monster", archetype: "HERO", except: "elemental-hero-shadow-mist" } }] },
+		],
+	}),
 	"ghost-ogre-snow-rabbit": real("ghost-ogre-snow-rabbit", { tuner: true, hand: "ogre" }),
 	"infinite-impermanence": { kind: "trap", effect: { type: "impermanence" }, art: "♾️" },
 	"seven-tools-of-the-bandit": { kind: "trap", icon: "counter", cost: { type: "pay-lp", amount: 1000 }, effect: { type: "counter", negates: "trap" }, art: "🧰" },
@@ -690,7 +769,7 @@ export function trapTargetsOwn(id: CardId): boolean {
 /** Does the card carry rules text? A Normal Monster only carries a description that does not affect the game. */
 export function hasRulesText(id: CardId): boolean {
 	const card = cardOf(id);
-	return card.kind !== "monster" || !!(card.ability || card.trigger || card.frame || card.special || card.hand || card.wins || card.detach || card.gains || card.direct || card.pierce || card.attacks || card.noTraps || card.battleImmune || card.noBattleDamage || card.attackBonus || card.standby || card.battleBurn || card.summonRevive || card.act || card.nameAs || card.defenseAttack || card.rocket || card.shields || card.noNormal || card.summonSearch || card.summonAdd);
+	return card.kind !== "monster" || !!(card.ability || card.trigger || card.frame || card.special || card.hand || card.wins || card.detach || card.gains || card.direct || card.pierce || card.attacks || card.noTraps || card.battleImmune || card.noBattleDamage || card.attackBonus || card.standby || card.battleBurn || card.summonRevive || card.act || card.nameAs || card.defenseAttack || card.rocket || card.shields || card.noNormal || card.summonSearch || card.summonAdd || card.effects?.length);
 }
 /** The four limbs of the Forbidden One. */
 export const FORBIDDEN_LIMBS: readonly CardId[] = ["right-arm-of-the-forbidden-one", "left-arm-of-the-forbidden-one", "right-leg-of-the-forbidden-one", "left-leg-of-the-forbidden-one"];

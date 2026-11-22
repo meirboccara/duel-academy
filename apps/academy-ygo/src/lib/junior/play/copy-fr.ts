@@ -503,6 +503,10 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 					return `${mine ? "Tu actives" : `${RIVAL} active`} la Magie ${name(event.card)}${event.target ? ` et ${mine ? "cibles" : "cible"} ${name(event.target)}` : ""}.`;
 				case "discarded":
 					return `${mine ? "Tu défausses" : `${RIVAL} défausse`} ${name(event.card)} pour payer le coût.`;
+				case "effect-used":
+					return `${mine ? "Tu utilises" : `${RIVAL} utilise`} l’effet de ${name(event.card)}.`;
+				case "sent":
+					return `${name(event.card)} est envoyé ${event.from === "deck" ? "du Deck" : "du Terrain"} au Cimetière.`;
 				case "ability":
 					return `${mine ? "Tu utilises" : `${RIVAL} utilise`} l’effet de ${name(event.card)} et ${mine ? "cibles" : "cible"} ${name(event.target)}.`;
 				case "trigger":
@@ -618,6 +622,8 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 					if (!attacker) return "";
 					return target ? `Attaque ${name(target.card)} avec ${name(attacker.card)} (${atkOf(attacker, board)} ATK).` : `Attaque directement avec ${name(attacker.card)}.`;
 				}
+				case "effect":
+					return `Utiliser l’effet de ${name(move.card)}${move.pick ? ` : ${name(move.pick)}` : ""}.`;
 				case "ability": {
 					const slot = mine.monsters[move.zone];
 					const target = move.target === undefined ? null : theirs.monsters[move.target];
