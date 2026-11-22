@@ -377,6 +377,8 @@ export interface SideSetup {
 	backrow?: readonly (CardId | null)[];
 	graveyard?: readonly CardId[];
 	extra?: readonly CardId[];
+	/** Pendulum Monsters face-up in the Extra Deck, ready to be Pendulum Summoned from there. */
+	extraUp?: readonly CardId[];
 	field?: CardId;
 }
 export interface Setup {
@@ -419,7 +421,7 @@ function side(setup: SideSetup = {}, full: boolean): SideState {
 		field: setup.field ?? null,
 		banished: [],
 		extra: [...(setup.extra ?? [])],
-		extraUp: [],
+		extraUp: [...(setup.extraUp ?? [])],
 	};
 }
 export function board(setup: Setup = {}): Board {

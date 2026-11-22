@@ -71,6 +71,8 @@ export const ISLAND_TRAINERS: Record<WorldId, IslandTrainer> = {
 	words: { trainers: ["zane-truesdale"], cards: ["cyber-dragon"] },
 	legends: { trainers: ["yami-yugi", "seto-kaiba"], cards: ["exodia-the-forbidden-one", "blue-eyes-ultimate-dragon"] },
 	steps: { trainers: ["yugi-muto"], cards: ["kuriboh"] },
+	/* Today's duels: Playmaker comes back with the hand trap every tournament Deck plays. */
+	today: { trainers: ["playmaker"], cards: ["ash-blossom-joyous-spring"] },
 	final: { trainers: ["yami-yugi", "seto-kaiba"], cards: [] },
 	masters: { trainers: ["yami-yugi", "seto-kaiba"], cards: [] },
 };
@@ -195,6 +197,7 @@ export const TRAINER_LINES: Record<Locale, TrainerLines> = {
 		words: { hello: "I am Zane Truesdale. Every word on a card counts. Cyber Dragon says “If only your opponent controls a monster”.", done: "Respect. Cyber Dragon is yours." },
 		legends: { hello: "Yugi and Kaiba are here. Meet the legends: Exodia the Forbidden One and Blue-Eyes Ultimate Dragon.", done: "You met the legends! Both cards join your binder." },
 		steps: { hello: "Yugi again! An attack has steps. My Kuriboh waits for the Damage Step, just as its card says.", done: "You know every step now. Kuriboh is yours!" },
+		today: { hello: "Playmaker again. Today's duelists answer from the hand, and answer the answers. Let me show you how.", done: "You duel like today's players now. Ash Blossom is yours." },
 		final: { hello: "The final duel, with your own Extra Deck. We are watching!", done: "You are a real duelist now!" },
 		masters: { hello: "Every master of the anime is here, each with their own Deck. Choose your Deck, and beat them all!", done: "You beat every master. You are the champion of the Academy!" },
 	},
@@ -219,6 +222,7 @@ export const TRAINER_LINES: Record<Locale, TrainerLines> = {
 		words: { hello: "Je suis Zane Truesdale. Chaque mot d’une carte compte. Cyber Dragon dit « Si seul votre adversaire contrôle un monstre ».", done: "Respect. Cyber Dragon est à toi." },
 		legends: { hello: "Yugi et Kaiba sont là. Voici les légendes : Éxodia l’Interdit et Dragon Ultime aux Yeux Bleus.", done: "Tu as rencontré les légendes ! Les deux cartes rejoignent ton classeur." },
 		steps: { hello: "Encore moi, Yugi ! Une attaque a des étapes. Mon Kuriboh attend la Damage Step, comme le dit sa carte.", done: "Tu connais chaque étape maintenant. Kuriboh est à toi !" },
+		today: { hello: "Encore Playmaker. Les duellistes d’aujourd’hui répondent depuis la main, et répondent aux réponses. Je te montre.", done: "Tu joues comme les duellistes d’aujourd’hui. Floraison de Cendres est à toi." },
 		final: { hello: "Le duel final, avec ton propre Extra Deck. Nous te regardons !", done: "Tu es maintenant un vrai duelliste !" },
 		masters: { hello: "Tous les maîtres sont là, chacun avec son propre Deck. Choisis ton Deck, et bats-les tous !", done: "Tu as battu tous les maîtres. Tu es le champion de l’Académie !" },
 	},
@@ -243,6 +247,7 @@ export const TRAINER_LINES: Record<Locale, TrainerLines> = {
 		words: { hello: `אני ${L("Zane Truesdale")}. כל מילה על קלף חשובה. על ${L("Cyber Dragon")} כתוב ${L("“If only your opponent controls a monster”")}.`, done: `כבוד. ${L("Cyber Dragon")} שלכם.` },
 		legends: { hello: `${L("Yugi")} ו־${L("Kaiba")} כאן. הכירו את האגדות: ${L("Exodia the Forbidden One")} ו־${L("Blue-Eyes Ultimate Dragon")}.`, done: "פגשתם את האגדות! שני הקלפים מצטרפים לאלבום שלכם." },
 		steps: { hello: `שוב אני, ${L("Yugi")}! להתקפה יש שלבים. ה־${L("Kuriboh")} שלי מחכה ל־${L("Damage Step")}, בדיוק כמו שכתוב על הקלף.`, done: `עכשיו אתם מכירים כל שלב. ${L("Kuriboh")} שלכם!` },
+		today: { hello: `שוב ${L("Playmaker")}. הדואליסטים של היום עונים מהיד, ועונים גם לתשובות. אני אראה לכם.`, done: `עכשיו אתם משחקים כמו הדואליסטים של היום. ${L("Ash Blossom & Joyous Spring")} שלכם.` },
 		final: { hello: `הדו־קרב האחרון, עם ה־${L("Extra Deck")} שלכם. אנחנו צופים!`, done: "עכשיו אתם דואליסטים אמיתיים!" },
 		masters: { hello: "כל המאסטרים כאן, כל אחד עם החפיסה שלו. בחרו חפיסה, ונצחו את כולם!", done: "ניצחתם את כל המאסטרים. אתם האלופים של האקדמיה!" },
 	},

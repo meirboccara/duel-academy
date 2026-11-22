@@ -4,10 +4,10 @@ import type { Persona } from "./bot";
 import { MASTERS, masterLevelId, type MasterId } from "./masters";
 
 /** The rules of the Junior course, in teaching order. Each is taught by one level and used again by later ones. */
-export const RULE_IDS = ["zones", "battle", "defense", "direct", "summon", "tribute", "phases", "spell", "trap", "chain", "cost", "target", "quick", "once", "timing", "graveyard", "field", "banish", "quickplay", "counter", "continuous", "equip", "ritual", "fusion", "synchro", "xyz", "detach", "link", "pendulum", "notarget", "then", "condition", "exodia", "steps", "set"] as const;
+export const RULE_IDS = ["zones", "battle", "defense", "direct", "summon", "tribute", "phases", "spell", "trap", "chain", "cost", "target", "quick", "once", "timing", "graveyard", "field", "banish", "quickplay", "counter", "continuous", "equip", "ritual", "fusion", "synchro", "xyz", "detach", "link", "pendulum", "notarget", "then", "condition", "exodia", "steps", "set", "search", "handtrap", "speed", "lock", "arrows"] as const;
 export type RuleId = (typeof RULE_IDS)[number];
 
-export const WORLD_IDS = ["wake", "shield", "friend", "magic", "puzzles", "tower", "rival", "reading", "mat", "icons", "ritual", "fusion", "synchro", "xyz", "link", "pendulum", "words", "legends", "steps", "final", "masters"] as const;
+export const WORLD_IDS = ["wake", "shield", "friend", "magic", "puzzles", "tower", "rival", "reading", "mat", "icons", "ritual", "fusion", "synchro", "xyz", "link", "pendulum", "words", "legends", "steps", "today", "final", "masters"] as const;
 export type WorldId = (typeof WORLD_IDS)[number];
 
 /** What the scripted rival does on its turn. A step that is no longer possible is skipped. */
@@ -16,6 +16,8 @@ export type RivalStep =
 	/** Attack with this monster. If the target has left the field, it attacks directly when nothing is in the way. */
 	| { do: "attack"; attacker: CardId; target: CardId }
 	| { do: "spell"; card: CardId; target: CardId }
+	/** Activate this Spell, which targets nothing; `pick` is the card it chooses (Reinforcement of the Army's Warrior). */
+	| { do: "cast"; card: CardId; pick?: CardId }
 	/** Every monster attacks the strongest monster it can beat, or directly when the field is empty. */
 	| { do: "auto-attack" }
 	/** Synchro, Xyz or Link Summon this Extra Deck monster with these monsters. */
@@ -86,6 +88,10 @@ const inField = (card: CardId): Move => ({ type: "place", card, row: "field", zo
 const scale = (card: CardId, zone: 0 | 4): Move => ({ type: "place", card, row: "backrow", zone });
 const special = (card: CardId, zone = 0): Move => ({ type: "place", card, row: "monsters", zone, special: true });
 const reborn = (side: Side, index: number, zone = 0): Move => ({ type: "place", card: "monster-reborn", row: "backrow", zone, grave: { side, index } });
+/** Activate a Spell that targets nothing, with the card it chooses (Reinforcement of the Army, Foolish Burial). */
+const cast = (card: CardId, zone: number, pick: CardId): Move => ({ type: "place", card, row: "backrow", zone, pick });
+/** Use an effect written as data: the `index`th effect of the card (cards.ts). */
+const activate = (card: CardId, index: number, extra: { zone?: number; target?: number; pick?: CardId } = {}): Move => ({ type: "effect", card, effect: index, ...extra });
 const onField = (zone: number): Material => ({ from: "field", zone });
 const inHand = (card: CardId): Material => ({ from: "hand", card });
 const ritual = (...materials: Material[]): Move => ({ type: "place", card: "black-luster-ritual", row: "backrow", zone: 0, materials });
@@ -103,6 +109,8 @@ const puzzle = { strict: true, phase: "main1" } as const;
 /** A "win this turn" board on the whole mat. */
 const mat = { ...puzzle, full: true } as const;
 /** One Exodia lesson board: the four limbs in the hand, the head on top of the Deck. */
+/** Link Spider in the Extra Monster Zone points down to Main Monster Zone 1, which is free: where Gaia Saber can go. */
+const ARROWS = { monsters: ["stone-golem", null, "pebble-crab", "mud-toad"], emz: "link-spider", extra: ["gaia-saber-the-lightning-shadow"] } as const;
 const FIFTH_PIECE: Setup = { ...strict, full: true, you: { hand: [...LIMBS], deck: ["exodia-the-forbidden-one"] }, rival: { monsters: ["blue-eyes-white-dragon"] } };
 
 const LEVELS_ALL: Level[] = [
@@ -251,7 +259,119 @@ const LEVELS_ALL: Level[] = [
 	{ id: "st-set", world: "steps", teaches: "set", uses: ["defense", "phases"], bar: "six", goal: { type: "hold", lp: 4000, keep: [] }, setup: { ...mat, you: { hand: ["pebble-crab"] }, rival: { monsters: ["shadow-wolf"] } }, rival: [[{ do: "auto-attack" }]], solution: [setMonster("pebble-crab"), phase("end")] },
 	{ id: "st-flip", world: "steps", uses: ["set", "battle", "phases"], bar: "six", goal: { type: "win" }, setup: { ...mat, you: { monsters: [{ card: "lantern-owl", faceDown: true }] }, rival: { lp: 400, monsters: ["thorn-fox"] } }, solution: [turn(0), phase("battle"), attack(0, 0)] },
 
-	/* World 19: the last duel, on the whole mat. Nox uses its Extra Deck too. */
+	/*
+	 * World 19: today's duels. What tournament players do now, one idea at a time: a card from the hand that answers an
+	 * effect, a Counter Trap that answers the answer, a lock for the rest of the turn, effects that search the Deck, Link
+	 * Arrows, and a Pendulum Monster coming back from the Extra Deck.
+	 */
+	{
+		id: "td-sage",
+		world: "today",
+		teaches: "search",
+		uses: ["summon", "cost", "graveyard", "phases", "direct"],
+		bar: "six",
+		goal: { type: "win" },
+		setup: { ...mat, you: { hand: ["sage-with-eyes-of-blue", "one-for-one", "ancient-rules"], deck: ["the-white-stone-of-legend", "blue-eyes-white-dragon", "effect-veiler"] }, rival: { lp: 3000 } },
+		solution: [
+			place("sage-with-eyes-of-blue"),
+			activate("sage-with-eyes-of-blue", 0, { zone: 0, pick: "the-white-stone-of-legend" }),
+			{ type: "place", card: "one-for-one", row: "backrow", zone: 0, discard: "the-white-stone-of-legend", pick: "effect-veiler" },
+			cast("ancient-rules", 1, "blue-eyes-white-dragon"),
+			phase("battle"),
+			attack(2, "direct"),
+		],
+	},
+	{
+		id: "td-stone",
+		world: "today",
+		uses: ["search", "graveyard", "phases", "direct"],
+		bar: "six",
+		goal: { type: "win" },
+		setup: { ...mat, you: { hand: ["foolish-burial", "ancient-rules"], deck: ["the-white-stone-of-legend", "blue-eyes-white-dragon"] }, rival: { lp: 3000 } },
+		solution: [cast("foolish-burial", 0, "the-white-stone-of-legend"), cast("ancient-rules", 1, "blue-eyes-white-dragon"), phase("battle"), attack(0, "direct")],
+	},
+	{
+		id: "td-ash",
+		world: "today",
+		teaches: "handtrap",
+		uses: ["search", "chain", "quick", "defense"],
+		bar: "six",
+		goal: { type: "hold", lp: 4000, keep: ["moss-beetle"] },
+		setup: { full: true, strict: true, turn: "rival", you: { hand: ["ash-blossom-joyous-spring"], monsters: [{ card: "moss-beetle", position: "defense" }] }, rival: { hand: ["elemental-hero-blazeman", "elemental-hero-avian", "elemental-hero-burstinatrix"], deck: ["polymerization"], extra: ["elemental-hero-flame-wingman"] } },
+		rival: [[{ do: "summon", card: "elemental-hero-blazeman" }, { do: "fusion", card: "elemental-hero-flame-wingman", spell: "polymerization", materials: ["elemental-hero-avian", "elemental-hero-burstinatrix"] }, { do: "auto-attack" }]],
+		solution: [fromHand("ash-blossom-joyous-spring")],
+	},
+	{
+		id: "td-ogre",
+		world: "today",
+		uses: ["handtrap", "direct"],
+		bar: "six",
+		goal: { type: "hold", lp: 4000, keep: [] },
+		setup: { full: true, strict: true, turn: "rival", you: { hand: ["ghost-ogre-snow-rabbit"] }, rival: { hand: ["elemental-hero-blazeman"], deck: ["polymerization"] } },
+		rival: [[{ do: "summon", card: "elemental-hero-blazeman" }, { do: "auto-attack" }]],
+		solution: [fromHand("ghost-ogre-snow-rabbit")],
+	},
+	{
+		id: "td-solemn",
+		world: "today",
+		teaches: "speed",
+		uses: ["search", "handtrap", "counter", "chain", "phases", "direct"],
+		bar: "six",
+		goal: { type: "win" },
+		setup: { ...mat, you: { hand: ["reinforcement-of-the-army"], deck: ["elemental-hero-sparkman", "mud-toad"], backrow: ["solemn-strike"] }, rival: { lp: 1600, hand: ["ash-blossom-joyous-spring"] } },
+		solution: [cast("reinforcement-of-the-army", 1, "elemental-hero-sparkman"), spring(0), place("elemental-hero-sparkman"), phase("battle"), attack(0, "direct")],
+	},
+	{
+		id: "td-jammer",
+		world: "today",
+		uses: ["speed", "counter", "cost"],
+		bar: "six",
+		goal: { type: "hold", lp: 4000, keep: ["river-otter"] },
+		setup: { full: true, strict: true, turn: "rival", you: { hand: ["mud-toad"], monsters: ["river-otter"], backrow: ["magic-jammer"] }, rival: { hand: ["thunder-clap"] } },
+		rival: [[{ do: "spell", card: "thunder-clap", target: "river-otter" }]],
+		solution: [{ type: "spring", zone: 0, discard: "mud-toad" }],
+	},
+	{
+		id: "td-droll",
+		world: "today",
+		teaches: "lock",
+		uses: ["search", "handtrap", "defense"],
+		bar: "six",
+		goal: { type: "hold", lp: 4000, keep: ["pebble-crab"] },
+		setup: { full: true, strict: true, turn: "rival", you: { hand: ["droll-lock-bird"], monsters: [{ card: "pebble-crab", position: "defense" }] }, rival: { hand: ["reinforcement-of-the-army", "e-emergency-call"], deck: ["celtic-guardian", "elemental-hero-sparkman"] } },
+		rival: [[{ do: "cast", card: "reinforcement-of-the-army", pick: "celtic-guardian" }, { do: "cast", card: "e-emergency-call", pick: "elemental-hero-sparkman" }, { do: "summon", card: "elemental-hero-sparkman" }, { do: "summon", card: "celtic-guardian" }, { do: "auto-attack" }]],
+		solution: [fromHand("droll-lock-bird")],
+	},
+	{
+		id: "td-arrows",
+		world: "today",
+		teaches: "arrows",
+		uses: ["link", "phases", "direct"],
+		bar: "six",
+		goal: { type: "win" },
+		setup: { ...mat, you: ARROWS, rival: { lp: 3600 } },
+		solution: [{ type: "extra", card: "gaia-saber-the-lightning-shadow", materials: [0, 2, 3], zone: 1 }, phase("battle"), attack(1, "direct"), attack(EXTRA_ZONE, "direct")],
+	},
+	{
+		id: "td-spider",
+		world: "today",
+		uses: ["arrows", "summon", "once", "phases", "direct"],
+		bar: "six",
+		goal: { type: "win" },
+		setup: { ...mat, you: { hand: ["iron-boar", "lantern-owl"], emz: "link-spider" }, rival: { lp: 4500 } },
+		solution: [place("iron-boar"), activate("link-spider", 0, { zone: EXTRA_ZONE, pick: "lantern-owl" }), phase("battle"), attack(0, "direct"), attack(1, "direct"), attack(EXTRA_ZONE, "direct")],
+	},
+	{
+		id: "td-pendulum",
+		world: "today",
+		uses: ["pendulum", "arrows", "phases", "direct"],
+		bar: "six",
+		goal: { type: "win" },
+		setup: { ...mat, you: { hand: ["mandragon", "dragong", "storm-stag"], extraUp: ["flash-knight"] }, rival: { lp: 4100 } },
+		solution: [scale("mandragon", 0), scale("dragong", 4), { type: "pendulum", cards: ["flash-knight", "storm-stag"] }, phase("battle"), attack(0, "direct"), attack(EXTRA_ZONE, "direct")],
+	},
+
+	/* World 20: the last duel, on the whole mat. Nox uses its Extra Deck too. */
 	{
 		id: "x-duel",
 		world: "final",
@@ -279,7 +399,7 @@ const LEVELS_ALL: Level[] = [
 	},
 ];
 
-/** World 20: the masters' island. One duel per trainer; the board is dealt when the duel starts (masters.ts). */
+/** World 21: the masters' island. One duel per trainer; the board is dealt when the duel starts (masters.ts). */
 const MASTER_LEVELS: readonly Level[] = MASTERS.map((master) => ({
 	id: masterLevelId(master),
 	world: "masters",
@@ -338,4 +458,9 @@ export const DEMOS: Record<RuleId, Demo> = {
 	exodia: { setup: FIFTH_PIECE, moves: [draw] },
 	steps: { setup: { full: true, turn: "rival", you: { hand: ["kuriboh"] }, rival: { monsters: ["iron-boar"] } }, moves: [attack(0, "direct"), fromHand("kuriboh")] },
 	set: { setup: { full: true, you: { hand: ["pebble-crab"] }, rival: { monsters: ["shadow-wolf"] } }, moves: [setMonster("pebble-crab", 1), phase("end"), attack(0, 1)] },
+	handtrap: { setup: { full: true, turn: "rival", you: { hand: ["ash-blossom-joyous-spring"] }, rival: { hand: ["elemental-hero-blazeman"], deck: ["polymerization"] } }, moves: [place("elemental-hero-blazeman"), fromHand("ash-blossom-joyous-spring")] },
+	speed: { setup: { full: true, you: { hand: ["reinforcement-of-the-army"], deck: ["elemental-hero-sparkman"], backrow: ["solemn-strike"] }, rival: { hand: ["ash-blossom-joyous-spring"] } }, moves: [cast("reinforcement-of-the-army", 1, "elemental-hero-sparkman"), fromHand("ash-blossom-joyous-spring"), spring(0)] },
+	lock: { setup: { full: true, you: { hand: ["reinforcement-of-the-army", "upstart-goblin"], deck: ["celtic-guardian", "pocket-cub"] }, rival: { hand: ["droll-lock-bird"] } }, moves: [cast("reinforcement-of-the-army", 0, "celtic-guardian"), fromHand("droll-lock-bird")] },
+	search: { setup: { full: true, you: { hand: ["sage-with-eyes-of-blue"], deck: ["the-white-stone-of-legend", "effect-veiler"] } }, moves: [place("sage-with-eyes-of-blue", 1), activate("sage-with-eyes-of-blue", 0, { zone: 1, pick: "the-white-stone-of-legend" })] },
+	arrows: { setup: { full: true, you: ARROWS }, moves: [{ type: "extra", card: "gaia-saber-the-lightning-shadow", materials: [0, 2, 3], zone: 1 }] },
 };

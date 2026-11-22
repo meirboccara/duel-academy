@@ -133,6 +133,10 @@ function rivalMove(state: Board, step: RivalStep): Move | null {
 		});
 		return zone < 0 || !state.rival.hand.includes(step.spell) ? null : { type: "place", card: step.spell, row: "backrow", zone, summon: step.card, materials };
 	}
+	if (step.do === "cast") {
+		const zone = state.rival.backrow.findIndex((slot) => !slot);
+		return zone < 0 || !state.rival.hand.includes(step.card) || cardOf(step.card).kind !== "spell" ? null : { type: "place", card: step.card, row: "backrow", zone, ...(step.pick ? { pick: step.pick } : {}) };
+	}
 	if (step.do === "spell") {
 		const target = zoneOf(state, "you", step.target);
 		const zone = state.rival.backrow.findIndex((slot) => !slot);
@@ -180,7 +184,9 @@ function rivalAnswer(state: Board): Move {
 	return (
 		answers.find((move) => move.type === "spring" && destroys(move) && move.target === attacker) ??
 		answers.find((move) => move.type === "spring" && !destroys(move) && move.target === wanted) ??
-		answers.find((move) => move.type === "spring" && !destroys(move)) ?? { type: "pass" }
+		answers.find((move) => move.type === "spring" && !destroys(move)) ??
+		/* A card from the hand that answers (Ash Blossom & Joyous Spring): Nox uses it as well. */
+		answers.find((move) => move.type === "hand") ?? { type: "pass" }
 	);
 }
 

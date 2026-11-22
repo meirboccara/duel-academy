@@ -32,7 +32,9 @@ Monster and then its target, and the board plays the rule out.
 | 15 Pendulum | 3 | two Scales in the Pendulum Zones, a Pendulum Summon from the hand of Levels between them, a destroyed Pendulum Monster going face-up to the Extra Deck |
 | 16 Every word counts | 5 | real cards where one word decides: a cost that fills the Graveyard, no "Target" (Fissure), "then" (Upstart Goblin), a condition with no colon (Cyber Dragon), a Quick Effect in the hand (Kuriboh) |
 | 17 Legends | 3 | three Blue-Eyes White Dragons fused into Blue-Eyes Ultimate Dragon; Exodia the Forbidden One: the five pieces in the hand win the Duel, whatever the Life Points |
-| 18 The Extra Deck duel | 1 | a whole duel on the whole mat against a rival that Fusion and Xyz Summons, then a second certificate |
+| 18 The island of steps | 4 | the Battle Step, then the Damage Step (Kuriboh waits for damage calculation); Setting a Monster face-down, then the Flip Summon |
+| 19 Today's duels | 10 | answering from the hand (Ash Blossom against a search, Ghost Ogre & Snow Rabbit against a monster's effect), a Counter Trap that answers the answer (Solemn Strike, Magic Jammer: only a Counter Trap answers a Counter Trap), Droll & Lock Bird's lock for the rest of the turn, effects that search the Deck (Sage with Eyes of Blue, The White Stone of Legend), Link Arrows (Gaia Saber, Link Spider), a Pendulum Summon from the Extra Deck |
+| 20 The Extra Deck duel | 1 | a whole duel on the whole mat against a rival that Fusion and Xyz Summons, then a second certificate |
 
 - **Show, then do.** The level that introduces a rule opens on a stepped demonstration ("Watch first") made by the
   same rules engine; it waits for a tap after each step and is on "Show me" afterwards.

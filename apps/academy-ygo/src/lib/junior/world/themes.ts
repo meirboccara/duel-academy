@@ -38,6 +38,7 @@ export const THEMES: Record<WorldId, IslandTheme> = {
 	words: { color: "green", landmark: "building_tower_A_yellow", buildings: ["building_home_A_green", "building_home_B_green", "building_well_green", "building_tavern_green", "building_church_blue"], village: [] },
 	legends: { color: "yellow", landmark: "building_castle_yellow", buildings: ["building_tower_A_yellow", "building_archeryrange_yellow", "building_mine_yellow"], village: [] },
 	steps: { color: "green", landmark: "building_archeryrange_yellow", buildings: ["building_home_A_green", "building_well_green", "target"], village: [] },
+	today: { color: "red", landmark: "building_stage_A", buildings: ["building_tower_A_red", "building_home_A_red", "building_market_green"], village: ["barrel", "crate_A_big"] },
 	final: { color: "blue", landmark: "building_castle_blue", buildings: ["building_stage_A"], village: [] },
 	masters: { color: "yellow", landmark: "building_castle_yellow", buildings: ["building_stage_A", "building_tower_A_yellow", "building_archeryrange_yellow", "building_tower_B_blue", "building_castle_red", "building_stage_A"], village: ["barrel", "crate_A_big"] },
 };

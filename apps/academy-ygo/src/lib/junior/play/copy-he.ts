@@ -96,6 +96,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 			words: { title: "כל מילה חשובה", blurb: "קלפים אמיתיים. מילה אחת קובעת מי מנצח." },
 			legends: { title: "אגדות", blurb: `הקלפים המפורסמים ביותר של הדו־קרבים הראשונים: שלושה דרקונים באחד, ו${name("exodia-the-forbidden-one")}.` },
 			steps: { title: "אי השלבים", blurb: `התקפה בשני שלבים: ה־${L("Battle Step")}, ואז ה־${L("Damage Step")}.` },
+			today: { title: "אי הדו־קרבות של היום", blurb: `${L("Hand traps")}, ${w("מלכודות נגד", "Counter Traps")}, חיפושים ו${w("חיצי קישור", "Link Arrows")}: ככה משחקים היום.` },
 			final: { title: `הדו־קרב של ${EXTRA}`, blurb: `דו־קרב שלם על המשטח כולו. גם לנוקס יש ${L("Extra Deck")}.` },
 			masters: { title: "טורניר המאסטרים", blurb: "כל המאסטרים מחכים, כל אחד עם החפיסה שלו. נצחו את כולם!" },
 		},
@@ -189,6 +190,16 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 			"st-damage": { title: L("Damage Step"), goal: `שתי התקפות מגיעות. תנו ל־${L("Battle Step")} לעבור, ופעלו ב־${L("Damage Step")}. שמרו על 1000 ${LP}.` },
 			"st-set": { title: w("עם הפנים למטה", "face-down"), goal: `${name("shadow-wolf")} יתקוף. ${w("הניחו", "Set")} את ה${MONSTER} ${DOWN}: לא תאבדו ${LP}.` },
 			"st-flip": { title: L("Flip Summon"), goal: `ה${MONSTER} שהנחתם (${L("Set")}) חיכתה תור. הפכו אותה ל${w("מצב התקפה", "Attack Position")}, ונצחו.` },
+			"td-ash": { title: "אפר ביד", goal: `${name("elemental-hero-blazeman")} מחפש ${name("polymerization")}. ${w("השליכו", "Discard")} את ${name("ash-blossom-joyous-spring")} מהיד כדי לבטל.` },
+			"td-ogre": { title: name("ghost-ogre-snow-rabbit"), goal: `${MONSTER} ${w("מפעילה", "activates")} אפקט. שלחו את ${name("ghost-ogre-snow-rabbit")}: ${w("השמידו", "destroy")} אותה. החיפוש שלה קורה בכל זאת!` },
+			"td-solemn": { title: "עונים לתשובה", goal: `נוקס יענה לחיפוש עם ${name("ash-blossom-joyous-spring")}. ענו עם ה${w("מלכודת נגד", "Counter Trap")}, ונצחו.` },
+			"td-jammer": { title: name("magic-jammer"), goal: `נוקס ${w("מפעיל", "activates")} ${w("לחש", "Spell")} על ה${MONSTER}. ${w("השליכו", "Discard")} קלף ובטלו עם ה${w("מלכודת נגד", "Counter Trap")}.` },
+			"td-droll": { title: `נועלים את ה־${L("Deck")}`, goal: `נוקס מחפש פעמיים. אחרי החיפוש הראשון, ${name("droll-lock-bird")} עוצר את השני.` },
+			"td-sage": { title: "עיניים כחולות", goal: `${w("זמנו", "Summon")} את ה־${L("Sage")} וחפשו את ה־${L("White Stone")}. ${name("one-for-one")} שולח אותה, והיא מביאה ${L("Blue-Eyes")}. נצחו!` },
+			"td-stone": { title: "האבן הלבנה", goal: `שלחו את ${name("the-white-stone-of-legend")} ל${w("בית הקברות", "Graveyard")}: היא מביאה ${L("Blue-Eyes")}. ${w("זמנו", "Summon")} ונצחו.` },
+			"td-arrows": { title: "בעקבות החץ", goal: `${name("link-spider")} מצביע למטה. ${w("זימון לינק", "Link Summon")} ל־${name("gaia-saber-the-lightning-shadow")} שם, ותקפו עם שניהם.` },
+			"td-spider": { title: "קורי העכביש", goal: `${w("זמנו", "Summon")} ${MONSTER}, ואז ${name("link-spider")} מביא ${w("מפלצת רגילה", "Normal Monster")} מהיד מתחת לחץ. נצחו!` },
+			"td-pendulum": { title: `חזרה מה־${L("Extra Deck")}`, goal: `${name("flash-knight")} מחכה ${UP} ב־${L("Extra Deck")}. ${w("זימון מטוטלת", "Pendulum Summon")} ל־${L("Extra Monster Zone")}. נצחו!` },
 			"x-duel": { title: `הדו־קרב של ${EXTRA}`, goal: `דו־קרב שלם על המשטח כולו. השתמשו ב${EXTRA}. הורידו את ${LP} של נוקס ל־0!` },
 			...Object.fromEntries(MASTERS.map((master) => [masterLevelId(master), { title: `דו־קרב: ${L(MASTER_NAMES[master])} · ${TIER_WORDS[MASTER_TIER[master]]}`, goal: `דו־קרב שלם מול ${L(MASTER_NAMES[master])}: 40 קלפים מעורבבים ו־8000 ${LP}. הורידו אותו ל־0!` }])),
 		},
@@ -239,6 +250,11 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 			exodia: `${name("exodia-the-forbidden-one")}: חמישה חלקים ביד מנצחים`,
 			steps: `${L("Battle Step")}, ואז ${L("Damage Step")}`,
 			set: `${w("להניח", "Set")} ${MONSTER} ${DOWN}, ואז ${L("Flip Summon")}`,
+			handtrap: `${L("Hand traps")}: ${MONSTER} ביד שעונה`,
+			speed: `${w("מהירות", "Spell Speed")}: רק ${w("מלכודת נגד", "Counter Trap")} עונה ל${w("מלכודת נגד", "Counter Trap")}`,
+			lock: `"עד סוף התור": נעילה`,
+			search: `חיפוש ב־${L("Deck")}: אפקט מביא את הקלף`,
+			arrows: `${w("חיצי קישור", "Link Arrows")}: האזורים ש${MONSTER} ${L("Link")} מצביעה עליהם`,
 		},
 		mastery: { new: "עוד לא פגשתם", met: "פגשתם", mastered: "השתמשתם שוב בלי עזרה" },
 		phases,
@@ -540,7 +556,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 					if (event.step === "damage") return mine ? `עצרו! ${L("Kuriboh")} וקלפים שמשנים ATK עוד יכולים לפעול.` : `${RIVAL} עוד יכול לשנות ATK.`;
 					if (!mine) return `${RIVAL} יכול לענות.`;
 					if (event.kind === "summon") return `עצרו! ${MONSTER} זומנה עכשיו: אפשר לענות.`;
-					if (event.kind === "effect") return `עצרו! ${MONSTER} הפעילה את האפקט שלה: אפשר לענות. התשובה שלכם תיפתר ראשונה.`;
+					if (event.kind === "effect") return `עצרו! ${MONSTER} ${w("הפעילה", "activated")} את האפקט שלה: אפשר לענות. התשובה שלכם תיפתר ראשונה.`;
 					if (event.kind === "chain") return `עצרו! ${w("מלכודת נגד", "Counter Trap")} יכולה לענות על התשובה. הקלף האחרון ב־${w("שרשרת", "Chain")} נפתר ראשון.`;
 					return event.kind === "attack" ? "עצור! עכשיו אפשר לענות." : "עצור! עכשיו אפשר לענות. התשובה שלכם תיפתר ראשונה.";
 				case "sprung":
