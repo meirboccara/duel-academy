@@ -26,9 +26,7 @@ export interface Starter {
 const TRAPS = [
 	["mirror-force", 1],
 	["bottomless-trap-hole", 1],
-	["trap-hole", 1],
 	["torrential-tribute", 1],
-	["sakuretsu-armor", 1],
 ] as const;
 
 export const STARTERS: Record<StarterId, Starter> = {
@@ -36,24 +34,24 @@ export const STARTERS: Record<StarterId, Starter> = {
 	warrior: {
 		cover: "dark-magician",
 		deck: {
-			main: build(["dark-magician", 3], ["dark-magician-girl", 2], ["magicians-rod", 3], ["magicians-valkyria", 1], ["buster-blader", 2], ["curse-of-dragon", 1], ["gaia-the-fierce-knight", 1], ["summoned-skull", 1], ["red-eyes-black-dragon", 1], ["tune-warrior", 2], ["ash-blossom-joyous-spring", 2], ["effect-veiler", 1], ["polymerization", 3], ["dark-magical-curtain", 2], ["sages-stone", 1], ["dark-magic-attack", 1], ["thousand-knives", 2], ["monster-reborn", 1], ["dark-hole", 1], ["swords-of-revealing-light", 1], ["spark-dash", 1], ["magic-cylinder", 1], ["negate-attack", 1], ...TRAPS),
-			extra: build(["dark-paladin", 3], ["dark-magician-the-dragon-knight", 2], ["dark-magician-girl-the-dragon-knight", 2], ["gaia-the-dragon-champion", 1], ["black-skull-dragon", 1], ["gaia-dragon-the-thunder-charger", 1], ["gaia-knight", 2], ["lanphorhynchus", 1]),
+			main: build(["dark-magician", 3], ["dark-magician-girl", 2], ["magicians-rod", 3], ["magicians-valkyria", 1], ["buster-blader", 2], ["curse-of-dragon", 1], ["gaia-the-fierce-knight", 1], ["summoned-skull", 1], ["red-eyes-black-dragon", 1], ["tune-warrior", 2], ["ash-blossom-joyous-spring", 2], ["effect-veiler", 1], ["ghost-ogre-snow-rabbit", 2], ["polymerization", 3], ["dark-magical-curtain", 2], ["sages-stone", 1], ["dark-magic-attack", 1], ["thousand-knives", 2], ["monster-reborn", 1], ["dark-hole", 1], ["swords-of-revealing-light", 1], ["magic-cylinder", 1], ["negate-attack", 1], ...TRAPS, ["infinite-impermanence", 1]),
+			extra: build(["dark-paladin", 3], ["dark-magician-the-dragon-knight", 2], ["dark-magician-girl-the-dragon-knight", 2], ["gaia-the-dragon-champion", 1], ["black-skull-dragon", 1], ["gaia-dragon-the-thunder-charger", 1], ["gaia-knight", 2], ["scrap-archfiend", 1], ["lanphorhynchus", 1], ["gaia-saber-the-lightning-shadow", 1]),
 		},
 	},
-	/* Blue-Eyes White Dragon: Blue-Eyes Ultimate Dragon, Twin Burst Dragon, Spirit Dragon (with Effect Veiler or Flamvell Guard, Level 1 Tuners). */
+	/* Blue-Eyes White Dragon: Blue-Eyes Ultimate Dragon, Twin Burst Dragon, Spirit Dragon (with Sage with Eyes of Blue, The White Stone of Legend, Protector with Eyes of Blue or Effect Veiler, Level 1 Tuners). */
 	dragon: {
 		cover: "blue-eyes-white-dragon",
 		deck: {
-			main: build(["blue-eyes-white-dragon", 3], ["blue-eyes-alternative-white-dragon", 2], ["flamvell-guard", 2], ["effect-veiler", 2], ["ash-blossom-joyous-spring", 2], ["battle-fader", 1], ["vorse-raider", 3], ["la-jinn-the-mystical-genie-of-the-lamp", 2], ["x-head-cannon", 1], ["luster-dragon-2", 2], ["polymerization", 2], ["ancient-rules", 1], ["trade-in", 2], ["burst-stream-of-destruction", 1], ["silvers-cry", 1], ["monster-reborn", 1], ["raigeki", 1], ["dark-hole", 1], ["spark-dash", 2], ["thunder-clap", 1], ["negate-attack", 1], ["magic-cylinder", 1], ...TRAPS),
-			extra: build(["blue-eyes-ultimate-dragon", 2], ["blue-eyes-twin-burst-dragon", 2], ["blue-eyes-spirit-dragon", 3], ["gem-knight-pearl", 2], ["utopia", 1], ["lanphorhynchus", 1]),
+			main: build(["blue-eyes-white-dragon", 3], ["blue-eyes-alternative-white-dragon", 2], ["sage-with-eyes-of-blue", 3], ["the-white-stone-of-legend", 2], ["protector-with-eyes-of-blue", 1], ["effect-veiler", 2], ["ash-blossom-joyous-spring", 2], ["ghost-ogre-snow-rabbit", 1], ["vorse-raider", 3], ["la-jinn-the-mystical-genie-of-the-lamp", 2], ["luster-dragon-2", 2], ["polymerization", 2], ["ancient-rules", 1], ["trade-in", 2], ["burst-stream-of-destruction", 1], ["silvers-cry", 1], ["monster-reborn", 1], ["raigeki", 1], ["dark-hole", 1], ["negate-attack", 1], ["magic-cylinder", 1], ...TRAPS, ["trap-hole", 1], ["sakuretsu-armor", 1]),
+			extra: build(["blue-eyes-ultimate-dragon", 2], ["blue-eyes-twin-burst-dragon", 2], ["blue-eyes-spirit-dragon", 3], ["gem-knight-pearl", 2], ["utopia", 1], ["gagagigo-the-risen", 1], ["scrap-archfiend", 1], ["lanphorhynchus", 1], ["gaia-saber-the-lightning-shadow", 1], ["traffic-ghost", 1]),
 		},
 	},
 	/* Elemental HEROes: A Hero Lives and Blazeman bring the Fusion together; Flame Wingman, Shining Flare Wingman, Thunder Giant, Great Tornado, Nova Master, Gaia, Rampart Blaster. */
 	hero: {
 		cover: "elemental-hero-flame-wingman",
 		deck: {
-			main: build(["elemental-hero-avian", 2], ["elemental-hero-burstinatrix", 3], ["elemental-hero-clayman", 2], ["elemental-hero-sparkman", 3], ["elemental-hero-blazeman", 3], ["elemental-hero-bladedge", 1], ["elemental-hero-neos", 1], ["ash-blossom-joyous-spring", 2], ["effect-veiler", 1], ["polymerization", 3], ["a-hero-lives", 2], ["e-emergency-call", 2], ["reinforcement-of-the-army", 1], ["fusion-sage", 1], ["monster-reborn", 1], ["dark-hole", 1], ["raigeki", 1], ["the-warrior-returning-alive", 1], ["forbidden-chalice", 1], ["book-of-moon", 1], ["hero-barrier", 1], ["magic-cylinder", 1], ...TRAPS),
-			extra: build(["elemental-hero-flame-wingman", 3], ["elemental-hero-shining-flare-wingman", 1], ["elemental-hero-thunder-giant", 2], ["elemental-hero-great-tornado", 2], ["elemental-hero-nova-master", 2], ["elemental-hero-gaia", 2], ["elemental-hero-rampart-blaster", 1], ["gem-knight-pearl", 1], ["utopia", 1]),
+			main: build(["elemental-hero-avian", 2], ["elemental-hero-burstinatrix", 3], ["elemental-hero-clayman", 2], ["elemental-hero-sparkman", 3], ["elemental-hero-blazeman", 3], ["elemental-hero-bladedge", 1], ["elemental-hero-neos", 1], ["elemental-hero-shadow-mist", 3], ["ash-blossom-joyous-spring", 2], ["ghost-ogre-snow-rabbit", 2], ["effect-veiler", 2], ["polymerization", 3], ["a-hero-lives", 2], ["e-emergency-call", 2], ["reinforcement-of-the-army", 1], ["fusion-sage", 1], ["monster-reborn", 1], ["dark-hole", 1], ["raigeki", 1], ["the-warrior-returning-alive", 1], ...TRAPS),
+			extra: build(["elemental-hero-flame-wingman", 3], ["elemental-hero-shining-flare-wingman", 1], ["elemental-hero-thunder-giant", 2], ["elemental-hero-great-tornado", 2], ["elemental-hero-nova-master", 2], ["elemental-hero-gaia", 2], ["elemental-hero-rampart-blaster", 1], ["gem-knight-pearl", 1], ["scrap-archfiend", 1]),
 		},
 	},
 };

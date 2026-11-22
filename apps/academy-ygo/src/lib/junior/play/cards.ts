@@ -743,6 +743,10 @@ export const CARDS = {
 		linkMaterials: { min: 1, max: 1, filter: { normal: true } },
 		effects: [{ when: "ignition", once: "copy", actions: [{ do: "special", from: ["hand"], filter: { normal: true, maxLevel: 4 }, to: "pointed" }] }],
 	}),
+	"traffic-ghost": real("traffic-ghost", { link: 3, arrows: ["bottom-left", "bottom", "bottom-right"], linkMaterials: { min: 2, max: 3 } }),
+	/* Generic Synchro and Xyz Monsters: "1 Tuner + 1 or more non-Tuner monsters", "3 Level 4 monsters". */
+	"scrap-archfiend": real("scrap-archfiend"),
+	"gagagigo-the-risen": real("gagagigo-the-risen", { level: 0, rank: 4, xyz: { level: 4, count: 3 } }),
 	/* Cards written as data (effects.ts): their effects need no code of their own. */
 	/* MAMS (Magnificent Maestros, TCG 2026-11-12). Kaibaman the Legend is a reprint there. */
 	"kaibaman-the-legend": real("kaibaman-the-legend", {
@@ -796,6 +800,13 @@ export const CARDS = {
 		effects: [
 			{ when: "normal-summoned", optional: true, actions: [{ do: "search", filter: { level: 1, attribute: "LIGHT", tuner: true, except: "sage-with-eyes-of-blue" } }] },
 			{ when: "ignition", from: "hand", cost: "discard-self", once: "name", actions: [{ do: "send-target", filter: { effect: true } }, { do: "special", from: ["deck"], filter: { kind: "monster", archetype: "Blue-Eyes" } }] },
+		],
+	}),
+	"protector-with-eyes-of-blue": real("protector-with-eyes-of-blue", {
+		tuner: true,
+		effects: [
+			{ when: "normal-summoned", optional: true, actions: [{ do: "special", from: ["hand"], filter: { level: 1, attribute: "LIGHT", tuner: true } }] },
+			{ when: "ignition", once: "name", actions: [{ do: "send-target", filter: { effect: true } }, { do: "special", from: ["hand"], filter: { kind: "monster", archetype: "Blue-Eyes" } }] },
 		],
 	}),
 	"the-white-stone-of-legend": real("the-white-stone-of-legend", { tuner: true, effects: [{ when: "sent-to-gy", actions: [{ do: "search", filter: { card: "blue-eyes-white-dragon" } }] }] }),
