@@ -131,11 +131,11 @@ only Normal Spells and Normal Traps exist.
 
 Left out on the whole mat as well:
 
-- **Link Arrows.** Only one Link Monster exists and it always goes to the Extra Monster Zone, so the arrow rule never
-  comes up. A second Link Monster, and a Pendulum Summon from the Extra Deck (which needs a zone a Link Monster
-  points to), are not in Junior.
-- **Pendulum:** Pendulum Summons come from the hand only; Pendulum Effects (the three Pendulum Monsters used have
-  none); a Scale being destroyed.
+- **Link Arrows** are in (2026-11-23): a Link Monster goes to the Extra Monster Zone or to a Main Monster Zone a Link
+  Monster points to, and so does a Pendulum Monster Summoned face-up from the Extra Deck. Each player has one Extra
+  Monster Zone, above their Main Monster Zone 1; arrows that point at the other player's side are left out (no
+  co-links, no Extra Link).
+- **Pendulum:** Pendulum Effects (the three Pendulum Monsters used have none); a Scale being destroyed.
 - **Choices:** a Special Summoned monster always arrives in Attack Position; the zone it lands in is chosen for the
   child; the Spell & Trap Zone a Ritual Spell, Polymerization or Monster Reborn uses is chosen for the child.
 - **A Ritual Spell that says "exactly".** Only Black Luster Ritual ("8 or more") is in; "exactly" is taught by the
@@ -145,8 +145,12 @@ Left out on the whole mat as well:
   attacked with no material and destroyed, the attack goes on as a direct attack only if nothing else is in the
   way; otherwise it ends (a full replay is not played).
 - **Kuriboh** is offered in the Damage Step, as its text says ("During damage calculation").
-- **Chains** stay at two links. A Synchro, Xyz, Link or Pendulum Summon starts no Chain; placing a Scale is not
-  offered an answer. A Field Spell can be answered like any Spell, and only counts once it has resolved.
+- **Chains** (since 2026-11-23) grow past two links when an answer can itself be answered: a Counter Trap (Spell
+  Speed 3) answers an answer, and only a Counter Trap answers a Counter Trap. A level can cap the length
+  (`chainLimit`). An answer is played as it always was once nobody answers it; only Counter Traps resolve as links of
+  their own. A Synchro, Xyz, Link or Pendulum Summon starts no Chain; placing a Scale is not offered an answer. A
+  Field Spell can be answered like any Spell, and only counts once it has resolved. Effect Veiler is used in answer
+  to a moment (a Summon, an effect, a Spell), not at any time of the opponent's Main Phase.
 - The Extra Deck is never sorted by the child before a duel. Decks are shuffled only on the masters' island.
 - **Exodia the Forbidden One** wins only from the hand, checked once a move is done; pieces on the field or in the
   Graveyard do not count. No other alternative win condition is in Junior.

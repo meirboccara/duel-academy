@@ -323,6 +323,18 @@ mechanisms appear on the masters' island and in a later "meta" island. Each step
 
 ---
 
+### Status (2026-11-23)
+
+What was built from this plan, on `main`:
+
+| Step | Done | Left out, for later |
+| --- | --- | --- |
+| 1 | Chain links above what is pending, Spell Speed 3 Counter Traps (Solemn Strike, Seven Tools of the Bandit, Magic Jammer), a moment for a monster's activated effect, Ash Blossom against monster effects, Ghost Ogre & Snow Rabbit, Infinite Impermanence, a per-level `chainLimit`. | Effect Veiler at any time of the opponent's Main Phase (no open priority without a moment); Solemn Strike's "would be Special Summoned" half; Impermanence's column lock. |
+| 2 | The "added from the Deck" moment and Droll & Lock Bird; "for the rest of this turn" locks (`Board.locks`). | The older `fireTriggers`/`summonTrigger` code is not folded into the new trigger handling. |
+| 3 | `effects.ts` vocabulary (filters, choice, target, categories), data Spells and monster effects (ignition from field/hand/GY, Summon and sent-to-GY triggers), Ash judged by categories; Terraforming, One for One, Toon Table of Contents, Foolish Burial, Sage with Eyes of Blue, The White Stone of Legend, Destiny HERO - Malicious, Elemental HERO Shadow Mist. | Migrating the older tags; one choice per effect; conditional "then, if…" steps (Sky Striker Mobilize - Engage!). |
+| 4 | Link Arrows and placement, Link material rules (count as 1 or the rating), Pendulum from the Extra Deck; Gaia Saber, Link Spider. | Arrows toward the other player (co-links), Fusion/Synchro/Xyz material filters as data. |
+| 5 | `packs/` with a folder per archetype (Blue-Eyes, HERO meta-lite): deck, engine cards, persona; legality and pack-against-pack tests. | Wiring packs into an island or the trainers; Angelechy, Ars Magna and the other tournament engines; move pruning (not needed yet: a pack duel takes seconds). |
+
 ## 7. Unverified / could not confirm
 
 - **Archetype tally of YCS Orlando.** Konami's Top 32 page lists cards, not deck names; the archetypes were inferred from
