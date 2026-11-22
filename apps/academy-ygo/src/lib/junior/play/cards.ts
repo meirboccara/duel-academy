@@ -186,7 +186,9 @@ export type Action =
 	 * "Special Summon this card" from where it is (hand or GY). `atkOfThat`: "its ATK becomes that monster's" (the card
 	 * that started the effect); `banishOnLeave`: "banish it when it leaves the field".
 	 */
-	| { do: "special-self"; atkOfThat?: true; banishOnLeave?: true };
+	| { do: "special-self"; atkOfThat?: true; banishOnLeave?: true }
+	/** "Negate that effect": the activation it answers does nothing. */
+	| { do: "negate" };
 /** Something that happens to other cards, or to this one in the hand, that starts an effect. */
 export type Watch =
 	/** "When this card is added from the Deck to your hand". */
@@ -196,7 +198,9 @@ export type Watch =
 	/** "If a [filter] is sent to your GY (except during the Damage Step)". */
 	| { sentToGy: CardFilter }
 	/** "If you Special Summon [filter] (except during the Damage Step)". */
-	| { specialSummoned: CardFilter };
+	| { specialSummoned: CardFilter }
+	/** "When a card or effect is activated that targets this card on the field (Quick Effect)": used in answer. */
+	| { targeted: "self" };
 /** What must be true for an effect to be activated. */
 export type Condition =
 	/** "If a [filter] monster is on the field": face-up, on either side. */
@@ -215,7 +219,9 @@ export interface DataEffect {
 	 * How it starts. "ignition": its owner uses it in their own Main Phase. The others start right after something
 	 * happened to this card: it was Summoned (Normal or Special, or only one of them), or sent to the GY.
 	 */
-	when: "ignition" | "summoned" | "normal-summoned" | "special-summoned" | "normal-or-special-summoned" | "sent-to-gy" | Watch;
+	when: "ignition" | "summoned" | "normal-summoned" | "special-summoned" | "normal-or-special-summoned" | "sent-to-gy" | Watch | readonly Watch[];
+	/** "If this card is Special Summoned from the hand or Deck": where it must have come from. */
+	summonedFrom?: readonly ("hand" | "deck" | "graveyard")[];
 	/**
 	 * Where the card is when the effect is used: on the field (default), in the hand, in the GY, or either of those two
 	 * ("from your GY (if it was there when the monster was sent) or hand").
@@ -227,7 +233,7 @@ export interface DataEffect {
 	 * Paid as it is activated: "You can discard this card", "You can banish this card from your GY", "You can send this
 	 * face-up card you control to the GY".
 	 */
-	cost?: "discard-self" | "banish-self" | "send-self";
+	cost?: "discard-self" | "banish-self" | "send-self" | "discard";
 	/** What must be true for it to be activated. */
 	conditions?: readonly Condition[];
 	actions: readonly Action[];
@@ -744,6 +750,13 @@ export const CARDS = {
 		effects: [
 			{ when: "normal-or-special-summoned", optional: true, once: "name", conditions: [{ show: "blue-eyes-white-dragon", count: 3 }], actions: [{ do: "special", from: ["hand", "deck", "graveyard"], filter: { card: "blue-eyes-white-dragon" } }] },
 			{ when: { specialSummoned: { card: "blue-eyes-white-dragon" } }, from: "graveyard", optional: true, cost: "banish-self", once: "name", actions: [{ do: "search", filter: { kind: "monster", archetype: "Blue-Eyes" } }] },
+		],
+	}),
+	"blue-eyes-white-dragon-the-white-phantom-beast": real("blue-eyes-white-dragon-the-white-phantom-beast", {
+		effects: [
+			{ when: [{ added: "self" }, { destroyedByBattle: "ally" }], from: "hand", optional: true, once: "name", actions: [{ do: "special-self" }] },
+			{ when: "special-summoned", summonedFrom: ["hand", "deck"], optional: true, once: "name", conditions: [{ foeMonsters: 1 }], actions: [{ do: "lock", direct: "Blue-Eyes" }, { do: "destroy-foes" }] },
+			{ when: { targeted: "self" }, cost: "discard", actions: [{ do: "negate" }] },
 		],
 	}),
 	"deep-eyes-white-dragon-the-blue-abyss": real("deep-eyes-white-dragon-the-blue-abyss", {

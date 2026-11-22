@@ -209,7 +209,7 @@ export type Move =
 	 * Use an effect written as data: `effect` is its place on the card. The card is on the field (`zone`), in the hand,
 	 * or in the Graveyard. `pick` is the card it chooses, `target` the Monster Zone it targets.
 	 */
-	| { type: "effect"; card: CardId; effect: number; zone?: number; pick?: CardId; target?: number }
+	| { type: "effect"; card: CardId; effect: number; zone?: number; pick?: CardId; target?: number; discard?: CardId }
 	| { type: "pass" };
 
 export type Reason =
@@ -288,7 +288,7 @@ export type GameEvent =
 	| { type: "turn"; side: Side }
 	| { type: "summoned"; side: Side; card: CardId; zone: number; tributes: CardId[] }
 	/** A Special Summon. `materials` are the cards used; `from` is whose Graveyard it came from. */
-	| { type: "special"; side: Side; card: CardId; zone: number; how: SummonWay; materials: CardId[]; from?: Side }
+	| { type: "special"; side: Side; card: CardId; zone: number; how: SummonWay; materials: CardId[]; from?: Side; origin?: "hand" | "deck" | "graveyard" }
 	| { type: "activated"; side: Side; card: CardId; target?: CardId }
 	| { type: "discarded"; side: Side; card: CardId }
 	| { type: "ability"; side: Side; card: CardId; target: CardId }
@@ -799,7 +799,7 @@ class Play {
 	private useEffect(move: Extract<Move, { type: "effect" }>, triggered: Board["triggered"]): void {
 		const s = this.state;
 		if (s.winner) reject("duel-over");
-		if (s.pending) reject("answer-first");
+		if (s.pending) return this.quickAnswer(move);
 		const who = s.turn;
 		const effect = effectsOf(move.card)[move.effect];
 		if (!effect) return reject("no-ability");
@@ -822,6 +822,42 @@ class Play {
 		}
 		const about = effect.when === "ignition" ? undefined : triggered.find((item) => item.side === who && item.card === move.card && item.effect === move.effect)?.about;
 		this.activate(who, move.card, move.effect, zone, move.pick, move.target, false, about);
+	}
+	/** Is this the monster in `zone` of `who` that what is pending targets? */
+	private targeted(who: Side, zone: number): boolean {
+		const pending = this.state.pending;
+		/* A Spell of the turn player that targets one of the other player's monsters (Quick-Play answers are left out). */
+		return who !== this.state.turn && pending?.kind === "spell" && pending.target === zone && spellTarget(pending.card) === "foe" && this.state.chain.length === 0;
+	}
+	/** Can this monster's Quick Effect written as data answer what is pending now? */
+	private quickReady(who: Side, zone: number, index: number): boolean {
+		const s = this.state;
+		const slot = s[who].monsters[zone];
+		const effect = slot && live(slot) ? effectsOf(slot.card)[index] : undefined;
+		if (!effect || typeof effect.when !== "object" || Array.isArray(effect.when) || !("targeted" in effect.when)) return false;
+		if (effect.cost === "discard" && s[who].hand.length === 0) return false;
+		if (this.onceKeys(who, slot!.card, index, effect, zone).some((key) => s.used.includes(key))) return false;
+		return this.targeted(who, zone);
+	}
+	/** A monster's Quick Effect written as data, used in answer: it resolves at once, then what was pending. */
+	private quickAnswer(move: Extract<Move, { type: "effect" }>): void {
+		const s = this.state;
+		const who = other(s.turn);
+		const zone = move.zone ?? -1;
+		if (zone < 0 || s[who].monsters[zone]?.card !== move.card || !this.quickReady(who, zone, move.effect)) return reject("cannot-answer-that");
+		const effect = effectsOf(move.card)[move.effect] as DataEffect;
+		const mine = s[who];
+		if (effect.cost === "discard") {
+			const at = move.discard === undefined ? -1 : mine.hand.indexOf(move.discard);
+			if (at < 0) return reject("cost-needed");
+			mine.hand.splice(at, 1);
+			this.toGraveyard(who, move.discard as CardId, "activation");
+			this.events.push({ type: "discarded", side: who, card: move.discard as CardId });
+		}
+		s.used.push(...this.onceKeys(who, move.card, move.effect, effect, zone));
+		this.events.push({ type: "effect-used", side: who, card: move.card }, { type: "chain", link: 2, side: who, card: move.card }, { type: "resolve", link: 2, card: move.card });
+		this.runSteps(who, effect.actions, move.card, move.pick, move.target, zone);
+		this.resolvePending();
 	}
 	/**
 	 * An effect written as data is activated: it counts as used and its cost is paid, then the other player may answer
@@ -895,6 +931,8 @@ class Play {
 						(effect.when === "normal-summoned" && event.type === "summoned") ||
 						(effect.when === "special-summoned" && event.type === "special") ||
 						(effect.when === "normal-or-special-summoned" && event.type !== "flipped");
+					const origin = event.type === "special" ? event.origin : undefined;
+					if (effect.summonedFrom && (!origin || !effect.summonedFrom.includes(origin))) return;
 					if (when) started.push({ side: event.side, card: event.card, effect: index, zone: event.zone });
 				});
 			}
@@ -926,7 +964,8 @@ class Play {
 						if (typeof effect.when !== "object") return;
 						const from = effect.from ?? "field";
 						if (from !== place && !(from === "hand-or-graveyard")) return;
-						const hit = test(effect.when, place, card);
+						const watches: readonly Watch[] = Array.isArray(effect.when) ? effect.when : [effect.when as Watch];
+						const hit = watches.map((watch) => test(watch, place, card)).find((found) => found !== false) ?? false;
 						if (hit === false) return;
 						if (out.some((item) => item.side === who && item.card === card && item.effect === index)) return;
 						out.push({ side: who, card, effect: index, ...(hit === true ? {} : { about: hit }) });
@@ -1030,7 +1069,7 @@ class Play {
 				mine.monsters[zone] = standing(pick, { summoned: true });
 				if (who === s.turn) s.summons += 1;
 				this.lastSummoned = pick;
-				this.events.push({ type: "special", side: who, card: pick, zone, how: "own", materials: [] });
+				this.events.push({ type: "special", side: who, card: pick, zone, how: "own", materials: [], origin: place });
 				return true;
 			}
 			case "special-self": {
@@ -1047,7 +1086,14 @@ class Play {
 				mine.monsters[zone] = standing(self, { summoned: true, ...(bonus ? { bonus } : {}), ...(action.banishOnLeave ? { banishOnLeave: true } : {}) });
 				if (who === s.turn) s.summons += 1;
 				this.lastSummoned = self;
-				this.events.push({ type: "special", side: who, card: self, zone, how: "own", materials: [] });
+				this.events.push({ type: "special", side: who, card: self, zone, how: "own", materials: [], origin: place });
+				return true;
+			}
+			case "negate": {
+				const pending = s.pending;
+				if (pending?.kind !== "spell" && pending?.kind !== "effect") return false;
+				pending.negated = true;
+				this.events.push({ type: "negated", side: who, card: pending.card, by: card as CardId });
 				return true;
 			}
 			case "special-same": {
@@ -1059,7 +1105,7 @@ class Play {
 				this.shuffle(mine.deck);
 				mine.monsters[zone] = standing(same, { summoned: true });
 				if (who === s.turn) s.summons += 1;
-				this.events.push({ type: "special", side: who, card: same, zone, how: "own", materials: [] });
+				this.events.push({ type: "special", side: who, card: same, zone, how: "own", materials: [], origin: "deck" });
 				return true;
 			}
 			case "recover": {
@@ -1272,7 +1318,7 @@ class Play {
 			const link = this.linkOf(move);
 			if (link) return this.addLink(link, move);
 		}
-		if (s.pending && move.type !== "spring" && move.type !== "ability" && move.type !== "hand" && move.type !== "pass") reject("answer-first");
+		if (s.pending && move.type !== "spring" && move.type !== "ability" && move.type !== "hand" && move.type !== "pass" && move.type !== "effect") reject("answer-first");
 		switch (move.type) {
 			case "draw":
 				return this.draw();
@@ -1939,7 +1985,7 @@ class Play {
 		this.summoning();
 		me.hand.splice(at, 1);
 		me.monsters[move.zone] = standing(move.card, { summoned: true });
-		this.events.push({ type: "special", side: s.turn, card: move.card, zone: move.zone, how: "own", materials: [] });
+		this.events.push({ type: "special", side: s.turn, card: move.card, zone: move.zone, how: "own", materials: [], origin: "hand" });
 	}
 	/** A Pendulum Monster played as a Spell into the leftmost or rightmost Spell & Trap Zone: that zone becomes a Pendulum Zone. */
 	private setScale(move: Extract<Move, { type: "place" }>, at: number, scale: number): void {
@@ -2240,9 +2286,11 @@ class Play {
 			});
 		const detach = !damageStep && pending.kind === "attack" && mine.monsters.some((slot) => !!slot && !!live(slot)?.detach && (slot.materials?.length ?? 0) > 0);
 		const hand = mine.hand.some((card) => this.handReady(who, card));
+		/* A monster's Quick Effect written as data ("When a card or effect is activated that targets this card"). */
+		const quickData = !damageStep && mine.monsters.some((slot, zone) => !!slot && effectsOf(slot.card).some((_, index) => this.quickReady(who, zone, index)));
 		/* A Counter Trap that negates what is pending: a Spell, or a monster's effect. */
 		const counter = !damageStep && this.counterReady(who, null, 2);
-		return trap || quick || detach || hand || acts || counter;
+		return trap || quick || detach || hand || acts || counter || quickData;
 	}
 	private spent(who: Side, card: CardId): boolean {
 		return monsterOf(card).ability?.oncePerTurn === true && this.state.used.includes(`${who}:${card}`);
@@ -3348,6 +3396,17 @@ export function legalPlays(state: Board): { move: Move; board: Board; events: Ga
 			const info = cardOf(card);
 			return (info.kind === "monster" && info.hand === "veiler") || (info.kind === "trap" && info.effect.type === "impermanence");
 		};
+		/* Quick Effects written as data, paid with a card from the hand. */
+		for (const zone of held) {
+			const slot = who.monsters[zone];
+			if (!slot) continue;
+			effectsOf(slot.card).forEach((effect, index) => {
+				if (typeof effect.when !== "object" || Array.isArray(effect.when) || !("targeted" in effect.when)) return;
+				const base: Move = { type: "effect", card: slot.card, effect: index, zone };
+				if (effect.cost === "discard") for (const discard of new Set(who.hand)) candidates.push({ ...base, discard });
+				else candidates.push(base);
+			});
+		}
 		for (const card of new Set(who.hand)) candidates.push({ type: "hand", card }, ...(targets(card) ? monsterZones.map((target): Move => ({ type: "hand", card, target })) : []));
 	} else {
 		candidates.push({ type: "draw" }, ...PHASES.map((to): Move => ({ type: "phase", to })));

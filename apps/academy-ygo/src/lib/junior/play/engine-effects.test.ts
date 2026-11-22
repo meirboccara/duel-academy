@@ -193,3 +193,35 @@ describe("effects that watch other cards", () => {
 	});
 });
 
+describe("Blue-Eyes White Dragon, the White Phantom Beast", () => {
+	const PHANTOM = "blue-eyes-white-dragon-the-white-phantom-beast";
+	it("added from the Deck, it Special Summons itself; then it destroys the opponent's monsters, and only Blue-Eyes attack directly", () => {
+		const start = mat({ you: { hand: ["monster-reborn"], graveyard: ["kaibaman-the-legend", "blue-eyes-white-dragon"], deck: [PHANTOM], monsters: [null, null, "iron-boar"] }, rival: { monsters: ["mud-toad", "celtic-guardian"] } });
+		const reborn = play(start, cast("monster-reborn", { grave: { side: "you", index: 1 } }));
+		const added = play(reborn, use("kaibaman-the-legend", 1, { pick: PHANTOM }));
+		expect(added.triggered).toEqual([{ side: "you", card: PHANTOM, effect: 0, about: PHANTOM }]);
+		const called = play(added, use(PHANTOM, 0));
+		const at = called.you.monsters.findIndex((slot) => slot?.card === PHANTOM);
+		expect(called.triggered).toEqual([{ side: "you", card: PHANTOM, effect: 1, zone: at }]);
+		const cleared = play(called, use(PHANTOM, 1, { zone: at }));
+		expect(cleared.rival.monsters.some(Boolean)).toBe(false);
+		const battle = play(cleared, { type: "phase", to: "battle" });
+		expect(reason(battle, { type: "attack", attacker: 2, target: "direct" })).toBe("card-locked");
+		expect(reason(battle, { type: "attack", attacker: at, target: "direct" })).toBe("accepted");
+	});
+	it("when a monster its owner controls is destroyed by battle, it comes from the hand", () => {
+		const start = mat({ turn: "rival", phase: "battle", you: { hand: [PHANTOM], monsters: ["iron-boar"] }, rival: { monsters: ["blue-eyes-ultimate-dragon"] } });
+		const done = play(start, { type: "attack", attacker: 0, target: 0 });
+		expect(done.you.monsters.some((slot) => slot?.card === PHANTOM)).toBe(true);
+	});
+	it("Quick Effect: when a Spell targets it, discard 1 card to negate that effect", () => {
+		const start = mat({ turn: "rival", you: { hand: ["mud-toad"], monsters: [PHANTOM] }, rival: { hand: ["thunder-clap"] } });
+		const aimed = ok(start, cast("thunder-clap", { target: 0 }));
+		expect(aimed.board.pending).toMatchObject({ kind: "spell", card: "thunder-clap" });
+		expect(reason(aimed.board, use(PHANTOM, 2, { zone: 0 }))).toBe("cost-needed");
+		const saved = play(aimed.board, use(PHANTOM, 2, { zone: 0, discard: "mud-toad" }));
+		expect(saved.you.monsters[0]?.card).toBe(PHANTOM);
+		expect(saved.you.graveyard).toEqual(["mud-toad"]);
+	});
+});
+
