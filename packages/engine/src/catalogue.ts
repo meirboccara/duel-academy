@@ -324,7 +324,7 @@ export interface Trigger {
  * - "fader" (Battle Fader): on a direct attack, Special Summon it from the hand, then end the Battle Phase; banished when it leaves the field.
  * - "crow" (D.D. Crow): discard to banish 1 card in the opponent's GY.
  */
-export type HandEffect = "no-battle-damage" | "ash" | "veiler" | "scarecrow" | "fader" | "crow" | "ogre" | "droll";
+export type HandEffect = "no-battle-damage" | "ash" | "veiler" | "scarecrow" | "fader" | "crow" | "ogre" | "droll" | "fuwalos";
 /** The cards of the Deck an effect chooses among. */
 export type DeckPool = "low-warrior" | "elemental-hero" | "low-elemental-hero";
 /** Does this card of the Deck fit what an effect looks for? */

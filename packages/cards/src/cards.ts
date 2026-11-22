@@ -268,6 +268,7 @@ export const CARDS = {
 	"ash-blossom-joyous-spring": real("ash-blossom-joyous-spring", { tuner: true, hand: "ash" }),
 	"effect-veiler": real("effect-veiler", { tuner: true, hand: "veiler" }),
 	"droll-lock-bird": real("droll-lock-bird", { hand: "droll" }),
+	"mulcharmy-fuwalos": real("mulcharmy-fuwalos", { hand: "fuwalos" }),
 	/* Link Monsters with their arrows (Konami's data, through YGOPRODeck). */
 	"gaia-saber-the-lightning-shadow": real("gaia-saber-the-lightning-shadow", { link: 3, arrows: ["left", "right", "bottom"], linkMaterials: { min: 2 } }),
 	"link-spider": real("link-spider", {

@@ -573,6 +573,7 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 					if (!mine) return `${RIVAL} peut répondre.`;
 					if (event.kind === "summon") return "Stop ! Un Monstre vient d’être Invoqué : tu peux répondre maintenant.";
 					if (event.kind === "effect") return "Stop ! Un Monstre active son effet : tu peux répondre maintenant. Ta réponse se résoudra en premier.";
+					if (event.kind === "open") return "À toi : tu peux utiliser une Magie Jeu-Rapide ou un Effet Rapide maintenant, ou laisser le tour continuer.";
 					if (event.kind === "chain") return "Stop ! Un Contre-Piège peut répondre à cette réponse. La dernière carte de la Chaîne se résout en premier.";
 					return event.kind === "attack" ? "Stop ! Tu peux répondre maintenant." : "Stop ! Tu peux répondre maintenant. Ta réponse se résoudra en premier.";
 				case "sprung":
@@ -602,6 +603,8 @@ export function frenchCopy(RIVAL: string): PlayCopy {
 					return `${mine ? "Tu perds" : `${RIVAL} perd`} ${event.from - event.to} Points de Vie : il en reste ${event.to}.`;
 				case "deck-out":
 					return `${mine ? "Ton Deck est vide" : `Le Deck de ${RIVAL} est vide`} : plus de carte à piocher.`;
+				case "hand-to-deck":
+					return `${mine ? "Tu mélanges" : `${RIVAL} mélange`} ${event.count} ${event.count === 1 ? "carte" : "cartes"} de la main dans le Deck.`;
 				case "locked":
 					if (event.what === "special") return `${name(event.card)} : jusqu’à la fin de ce tour, ${mine ? "tu ne peux" : `${RIVAL} ne peut`} Invoquer Spécialement que les Monstres qu’elle permet.`;
 					if (event.what === "direct") return `${name(event.card)} : jusqu’à la fin de ce tour, seuls les Monstres qu’elle nomme peuvent attaquer directement.`;

@@ -560,6 +560,7 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 					if (!mine) return `${RIVAL} יכול לענות.`;
 					if (event.kind === "summon") return `עצרו! ${MONSTER} זומנה עכשיו: אפשר לענות.`;
 					if (event.kind === "effect") return `עצרו! ${MONSTER} ${w("הפעילה", "activated")} את האפקט שלה: אפשר לענות. התשובה שלכם תיפתר ראשונה.`;
+					if (event.kind === "open") return `ההזדמנות שלכם: אפשר להשתמש עכשיו ב${w("לחש משחק מהיר", "Quick-Play Spell")} או ב${w("אפקט מהיר", "Quick Effect")}, או לתת לתור להמשיך.`;
 					if (event.kind === "chain") return `עצרו! ${w("מלכודת נגד", "Counter Trap")} יכולה לענות על התשובה. הקלף האחרון ב־${w("שרשרת", "Chain")} נפתר ראשון.`;
 					return event.kind === "attack" ? "עצור! עכשיו אפשר לענות." : "עצור! עכשיו אפשר לענות. התשובה שלכם תיפתר ראשונה.";
 				case "sprung":
@@ -590,6 +591,8 @@ export function hebrewCopy(RIVAL: string): PlayCopy {
 					return `${mine ? "איבדתם" : `${RIVAL} מאבד`} ${event.from - event.to} ${LP}: נשארו ${event.to}.`;
 				case "deck-out":
 					return `${mine ? "החפיסה שלכם ריקה" : `החפיסה של ${RIVAL} ריקה`}: אין קלף לשלוף.`;
+				case "hand-to-deck":
+					return `${mine ? "ערבבתם" : `${RIVAL} מערבב`} ${event.count} קלפים מהיד חזרה ל־${L("Deck")}.`;
 				case "locked":
 					if (event.what === "special") return `${name(event.card)}: עד סוף התור ${mine ? "אתם יכולים" : `${RIVAL} יכול`} ${w("לזמן באופן מיוחד", "Special Summon")} רק את ה${MONSTERS} שהוא מרשה.`;
 					if (event.what === "direct") return `${name(event.card)}: עד סוף התור רק ה${MONSTERS} שהוא מזכיר יכולות ${w("לתקוף ישירות", "attack directly")}.`;

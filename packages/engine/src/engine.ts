@@ -106,14 +106,21 @@ export type Pending =
 	 */
 	| { kind: "effect"; side: Side; card: CardId; zone: number; run: EffectRun; negated?: true; then?: { zones: number[]; how: "normal" | "flip" | "special" } }
 	/** Cards were just added from the Deck to this player's hand outside the Draw Phase: the other player may answer (Droll & Lock Bird). */
-	| { kind: "added"; side: Side };
+	| { kind: "added"; side: Side }
+	/**
+	 * The turn player has drawn, or entered a phase: the other player may use a card that needs no reason ("at any time"):
+	 * a Set Quick-Play Spell, a Quick Effect, Infinite Impermanence, Mulcharmy Fuwalos, Effect Veiler in a Main Phase.
+	 */
+	| { kind: "open"; phase: Phase };
 /** "For the rest of this turn…": a rule a card set, until the turn ends. */
 export type TurnLock =
 	| { kind: "deck-to-hand"; by: CardId }
 	/** "You cannot Special Summon for the rest of this turn, except [Types] monsters." */
 	| { kind: "special-only"; side: Side; types: readonly MonsterType[]; by: CardId }
 	/** "You can only attack directly with [archetype] monsters for the rest of this turn." */
-	| { kind: "direct-only"; side: Side; archetype: string; by: CardId };
+	| { kind: "direct-only"; side: Side; archetype: string; by: CardId }
+	/** Mulcharmy Fuwalos applies this turn: its owner draws on the opponent's Special Summons from the Deck or Extra Deck, and trims the hand in the End Phase. */
+	| { kind: "fuwalos"; side: Side; by: CardId };
 /** What a monster's activated effect does when it resolves: add a card (Blazeman), or the steps of an effect written as data. */
 export type EffectRun = { do: "add"; card: CardId } | { do: "data"; effect: number; pick?: CardId; target?: number; about?: CardId };
 /**
@@ -365,6 +372,8 @@ export type GameEvent =
 	| { type: "sent"; side: Side; card: CardId; from: "deck" | "field" }
 	/** An effect written as data was activated. */
 	| { type: "effect-used"; side: Side; card: CardId }
+	/** Cards went back from the hand to the Deck, shuffled (Mulcharmy Fuwalos in the End Phase). */
+	| { type: "hand-to-deck"; side: Side; count: number }
 	/** A card set a rule for the rest of the turn (Droll & Lock Bird: nothing more is added from a Deck to a hand). */
 	| { type: "locked"; side: Side; card: CardId; what?: "special" | "direct" }
 	| { type: "won"; side: Side };
@@ -541,7 +550,7 @@ export function actor(state: Board): Side {
 }
 const isMain = (phase: Phase) => phase === "main1" || phase === "main2";
 const after = (a: Phase, b: Phase) => PHASES.indexOf(a) > PHASES.indexOf(b);
-const TRAP_ANSWERS: Record<Pending["kind"], Effect["type"][]> = { attack: ["weaken-attacker", "stop-attack", "destroy-attacker", "banish-attacker", "reinforce", "negate-attack", "mirror-force", "magic-cylinder", "just-desserts", "clear-backrow", "recharge", "storm-force", "ruin"], spell: ["return-to-hand"], summon: ["trap-hole", "bottomless", "torrential"], effect: [], added: [] };
+const TRAP_ANSWERS: Record<Pending["kind"], Effect["type"][]> = { attack: ["weaken-attacker", "stop-attack", "destroy-attacker", "banish-attacker", "reinforce", "negate-attack", "mirror-force", "magic-cylinder", "just-desserts", "clear-backrow", "recharge", "storm-force", "ruin"], spell: ["return-to-hand"], summon: ["trap-hole", "bottomless", "torrential"], effect: [], added: [], open: [] };
 /** What Ash Blossom & Joyous Spring can negate: an effect that adds a card from the Deck to the hand or Special Summons from the Deck. */
 function ashHits(card: CardId): boolean {
 	const categories = cardCategories(card);
@@ -664,6 +673,8 @@ class Play {
 		this.afterSummons();
 		this.afterTriggers();
 		this.afterAdding();
+		this.fuwalosDraws();
+		if (move.type === "draw" || (move.type === "phase" && move.to !== "end")) this.openMoment();
 		/* The monster whose "When… Summoned" effect was waiting lost its effects in answer to its Summon (Effect Veiler). Destroyed (Trap Hole), its effect still happens. */
 		const waiting = this.state.summonTrigger;
 		const summoned = waiting ? this.state[waiting.side].monsters[waiting.zone] : null;
@@ -1154,6 +1165,64 @@ class Play {
 			}
 		}
 	}
+	/** After the turn player draws or enters a phase: the other player's chance, when they hold a card that needs no reason. */
+	private openMoment(): void {
+		const s = this.state;
+		if (s.pending || s.winner || s.phase === "end") return;
+		s.pending = { kind: "open", phase: s.phase };
+		if (this.canAnswer()) this.events.push({ type: "window", side: other(s.turn), kind: "open" });
+		else s.pending = null;
+	}
+	/** How many Mulcharmy monster effects this player activated this turn. */
+	private mulcharmies(who: Side): number {
+		return this.state.used.filter((key) => key === `${who}:mulcharmy`).length;
+	}
+	/**
+	 * Mulcharmy Fuwalos: "Each time your opponent Special Summons a monster(s) from the Deck and/or Extra Deck,
+	 * immediately draw 1 card."
+	 */
+	private fuwalosDraws(): void {
+		const s = this.state;
+		for (const lock of s.locks) {
+			if (lock.kind !== "fuwalos" || s.winner) continue;
+			const foe = other(lock.side);
+			const summons = this.events.filter((event) => event.type === "special" && event.side === foe && (event.origin === "deck" || ["fusion", "synchro", "xyz", "link"].includes(event.how))).length;
+			for (let count = 0; count < summons && !this.deckLocked(); count++) {
+				const top = s[lock.side].deck.shift();
+				if (!top) {
+					this.events.push({ type: "deck-out", side: lock.side });
+					return this.win(other(lock.side));
+				}
+				s[lock.side].hand.push(top);
+				this.events.push({ type: "drew", side: lock.side, card: top });
+			}
+		}
+	}
+	/**
+	 * Mulcharmy Fuwalos: "Once, during this End Phase, if the number of cards in your hand is more than the number of
+	 * cards your opponent controls +6, you must randomly shuffle cards from your hand into the Deck so the number in your
+	 * hand equals the number your opponent controls +6."
+	 */
+	private fuwalosTrim(): void {
+		const s = this.state;
+		for (const lock of s.locks) {
+			if (lock.kind !== "fuwalos") continue;
+			const foe = s[other(lock.side)];
+			const controlled = foe.monsters.filter(Boolean).length + foe.backrow.filter(Boolean).length + (foe.field ? 1 : 0);
+			const mine = s[lock.side];
+			let back = 0;
+			while (mine.hand.length > controlled + 6) {
+				const rolled = roll(s.rng, mine.hand.length);
+				s.rng = rolled.rng;
+				const [card] = mine.hand.splice(rolled.value, 1);
+				if (card) mine.deck.push(card);
+				back++;
+			}
+			if (back === 0) continue;
+			this.shuffle(mine.deck);
+			this.events.push({ type: "hand-to-deck", side: lock.side, count: back });
+		}
+	}
 	/** "Cards cannot be added from either player's Main Deck to the hand" this turn (Droll & Lock Bird). */
 	private deckLocked(): boolean {
 		return this.state.locks.some((lock) => lock.kind === "deck-to-hand");
@@ -1217,6 +1286,8 @@ class Play {
 		if (effect === "no-battle-damage") return damageStep;
 		if (damageStep) return false;
 		if (effect === "ash") return ((pending.kind === "spell" && ashHits(pending.card)) || (pending.kind === "effect" && this.effectHits(pending, ashCategories))) && !s.used.includes(`${who}:ash`);
+		/* Mulcharmy Fuwalos: "If you control no cards (Quick Effect)"; "only 1 other Mulcharmy monster effect" that turn. */
+		if (effect === "fuwalos") return this.controlsNothing(who) && this.mulcharmies(who) < 2;
 		/* Droll & Lock Bird: "If a card(s) is added from the Main Deck to your opponent's hand, except during the Draw Phase". */
 		if (effect === "droll") return pending.kind === "added" && pending.side !== who && !this.deckLocked();
 		/* Ghost Ogre & Snow Rabbit: "When a monster on the field activates its effect": that monster is still there. */
@@ -1599,6 +1670,7 @@ class Play {
 	}
 	private endTurn(): void {
 		const s = this.state;
+		this.fuwalosTrim();
 		for (const who of [s.turn, other(s.turn)] as const) {
 			s[who].monsters.forEach((slot, zone) => {
 				if (!slot?.doomed) return;
@@ -1706,8 +1778,15 @@ class Play {
 		/* A Field Spell goes in the Field Zone, and nothing else does. */
 		if ((move.row === "field") !== inField) reject("field-zone");
 		if (!inField && (!whole || move.zone >= me.backrow.length)) reject("wrong-zone");
-		/* A Quick-Play Spell can be activated in the Battle Phase too; everything else from the hand waits for a Main Phase. */
-		if (!(isQuickPlay(move.card) && !move.set && s.phase === "battle")) this.needMain();
+		/*
+		 * A Quick-Play Spell from the hand can be activated in any phase of its owner's turn (once the card of the Draw
+		 * Phase is drawn); everything else from the hand waits for a Main Phase.
+		 */
+		const quick = isQuickPlay(move.card) && !move.set;
+		/* Phases moved by hand: the Quick-Play Spell is used in the phase the player is in. Phases that follow the moves (auto) go on to a Main Phase, as before, except in the Battle Phase. */
+		const anyPhase = quick && !this.auto && s.phase !== "end";
+		if (anyPhase && s.phase === "draw" && !s.drawn && s.turnNumber > 1) reject("draw-first");
+		if (!anyPhase && !(quick && s.phase === "battle")) this.needMain();
 		if (!inField && me.backrow[move.zone]) reject("zone-taken");
 		if (move.set) {
 			/* Of the Spells, only a Quick-Play Spell is Set here: it can then be activated on the opponent's turn. */
@@ -2474,7 +2553,7 @@ class Play {
 				this.shuffle(side.deck);
 			}
 			side.monsters[zone] = standing(pick.card, { summoned: true });
-			this.events.push({ type: "special", side: who, card: pick.card, zone, how: "own", materials: [] });
+			this.events.push({ type: "special", side: who, card: pick.card, zone, how: "own", materials: [], origin: pick.from });
 			if (who === by) called = pick.card;
 		}
 		if (called !== "dark-magician" && called !== "dark-magician-girl") return;
@@ -2582,7 +2661,7 @@ class Play {
 			/* "You can Special Summon this card from your hand, then end the Battle Phase. If Summoned this way, banish it when it leaves the field." */
 			const zone = mine.monsters.findIndex((slot, index) => index < mainZones(s) && !slot);
 			mine.monsters[zone] = standing(card, { summoned: true, position: "defense", banishOnLeave: true });
-			this.events.push({ type: "special", side: who, card, zone, how: "own", materials: [] });
+			this.events.push({ type: "special", side: who, card, zone, how: "own", materials: [], origin: "hand" });
 			s.pending = null;
 			return this.endBattle();
 		}
@@ -2603,6 +2682,11 @@ class Play {
 			s.used.push(`${who}:ash`);
 			pending.negated = true;
 			this.events.push({ type: "negated", side: who, card: pending.card, by: card });
+		}
+		if (effect === "fuwalos") {
+			/* "Apply these effects this turn." */
+			s.used.push(`${who}:mulcharmy`);
+			if (!s.locks.some((lock) => lock.kind === "fuwalos" && lock.side === who)) s.locks.push({ kind: "fuwalos", side: who, by: card });
 		}
 		if (effect === "droll") {
 			/* "For the rest of this turn, cards cannot be added from either player's Main Deck to the hand." */
@@ -2821,7 +2905,7 @@ class Play {
 			this.leave(owner, target, "hand");
 			this.events.push({ type: "returned", side: owner, card: saved.card });
 		}
-		if (pending.kind !== "added") this.events.push({ type: "resolve", link: 1, card: pending.card });
+		if (pending.kind !== "added" && pending.kind !== "open") this.events.push({ type: "resolve", link: 1, card: pending.card });
 		this.resolvePending();
 	}
 
@@ -2923,7 +3007,7 @@ class Play {
 		if (pending.kind === "summon") return;
 		if (pending.kind === "spell") return this.resolveSpell(pending);
 		if (pending.kind === "effect") return this.resolveEffect(pending);
-		if (pending.kind === "added") return;
+		if (pending.kind === "added" || pending.kind === "open") return;
 		if (pending.step !== "damage" && this.me.monsters[pending.attacker]) {
 			/* The Battle Step is over: on to the Damage Step, where the defender may still act before damage is calculated. */
 			s.pending = { ...pending, step: "damage" };
@@ -3114,7 +3198,7 @@ class Play {
 				this.events.push({ type: "added", side: s.turn, card: pending.pick, from: "deck" });
 			} else {
 				this.me.monsters[zone] = standing(pending.pick, { summoned: true });
-				this.events.push({ type: "special", side: s.turn, card: pending.pick, zone, how: "own", materials: [] });
+				this.events.push({ type: "special", side: s.turn, card: pending.pick, zone, how: "own", materials: [], origin: "deck" });
 			}
 			return;
 		}
@@ -3131,7 +3215,7 @@ class Play {
 				this.shuffle(this.me.deck);
 			}
 			this.me.monsters[zone] = standing(wanted, { summoned: true });
-			this.events.push({ type: "special", side: s.turn, card: wanted, zone, how: "own", materials: [] });
+			this.events.push({ type: "special", side: s.turn, card: wanted, zone, how: "own", materials: [], origin: from });
 			return;
 		}
 		if (effect.type === "hand-summon") {
@@ -3140,7 +3224,7 @@ class Play {
 			if (!pending.pick || at < 0 || zone < 0) return nothing();
 			this.me.hand.splice(at, 1);
 			this.me.monsters[zone] = standing(pending.pick, { summoned: true });
-			this.events.push({ type: "special", side: s.turn, card: pending.pick, zone, how: "own", materials: [] });
+			this.events.push({ type: "special", side: s.turn, card: pending.pick, zone, how: "own", materials: [], origin: "hand" });
 			return;
 		}
 		if (effect.type === "smash") {

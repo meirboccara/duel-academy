@@ -566,6 +566,7 @@ export function englishCopy(RIVAL: string): PlayCopy {
 					if (!mine) return `${RIVAL} can answer.`;
 					if (event.kind === "summon") return "Freeze! A Monster was just Summoned: you can answer now.";
 					if (event.kind === "effect") return "Freeze! A Monster activated its effect: you can answer now. Your answer will resolve first.";
+					if (event.kind === "open") return "Your chance: a Quick-Play Spell or a Quick Effect can be used now, or let the turn go on.";
 					if (event.kind === "chain") return "Freeze! A Counter Trap can answer that answer. The last card on the Chain resolves first.";
 					return event.kind === "attack" ? "Freeze! You can answer now." : "Freeze! You can answer now. Your answer will resolve first.";
 				case "sprung":
@@ -595,6 +596,8 @@ export function englishCopy(RIVAL: string): PlayCopy {
 					return `${who} lose${mine ? "" : "s"} ${event.from - event.to} Life Points: ${event.to} left.`;
 				case "deck-out":
 					return `${mine ? "Your" : `${RIVAL}'s`} Deck is empty: no card to draw.`;
+				case "hand-to-deck":
+					return `${who} shuffle${mine ? "" : "s"} ${event.count} ${event.count === 1 ? "card" : "cards"} from the hand back into the Deck.`;
 				case "locked":
 					if (event.what === "special") return `${name(event.card)}: for the rest of this turn, ${mine ? "you" : RIVAL} can only Special Summon the Monsters it allows.`;
 					if (event.what === "direct") return `${name(event.card)}: for the rest of this turn, only the Monsters it names can attack directly.`;
