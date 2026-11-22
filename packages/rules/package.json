@@ -1,0 +1,22 @@
+{
+  "name": "@duel-academy/rules",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The new rules core: Yu-Gi-Oh! under full TCG tournament rules (docs/rules-core-spec.md).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "bench": "vitest bench --run"
+  },
+  "devDependencies": {
+    "@duel-academy/cards": "workspace:*",
+    "@duel-academy/engine": "workspace:*",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
+  }
+}
