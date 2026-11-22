@@ -3,10 +3,10 @@
 import { ArrowLeft, ArrowRight, Box, CircleCheck, Hand, Lightbulb, MonitorPlay, Printer, RotateCcw, Square, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
 import type { Locale } from "@/lib/i18n/locales";
-import { cardOf, hasRulesText, inPool, isQuickPlay, mentions, monsterOf, spellTarget, tributesFor, type CardId } from "@/lib/junior/play/cards";
+import { cardOf, hasRulesText, inPool, isQuickPlay, mentions, monsterOf, spellTarget, tributesFor, type CardId } from "@duel-academy/engine";
 import { PLAY_COPY, VOICE_LOCALE, narrateAll, phasesStarted, playCopyFor, stepsStarted, type PlayCopy } from "@/lib/junior/play/copy";
 import { MASTER_NAMES, masterPicture } from "@/lib/junior/play/masters";
-import { actor, apply, effectMoves, fusionFits, mainZones, scalesOf, type Board, type GameEvent, type Move, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
+import { actor, apply, effectMoves, fusionFits, mainZones, scalesOf, type Board, type GameEvent, type Move, type Phase, type Row, type Side } from "@duel-academy/engine";
 import { WORLD_IDS, type Level } from "@/lib/junior/play/levels";
 import { hint as askHint, botTurn, forceWin, next, outcome, play, playOut, restart, start, undo, type Outcome, type Session } from "@/lib/junior/play/session";
 import { DevLevelBarSlot } from "../dev/dev-slot";

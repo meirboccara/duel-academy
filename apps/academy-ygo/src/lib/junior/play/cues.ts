@@ -1,5 +1,5 @@
-import { cardOf, inExtraDeck, monsterOf, type CardId, type Effect } from "./cards";
-import { atkOf, defOf, other, type Board, type GameEvent, type Row, type Side, type SummonWay } from "./engine";
+import { cardOf, inExtraDeck, monsterOf, type CardId, type Effect } from "@duel-academy/engine";
+import { atkOf, defOf, other, type Board, type GameEvent, type Row, type Side, type SummonWay } from "@duel-academy/engine";
 
 /**
  * What the board shows for a move, as pictures: each thing the rules did becomes a cue, a small animation that

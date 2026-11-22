@@ -1,5 +1,5 @@
 import type { Spot } from "./cues";
-import { EXTRA_ZONE, FULL_ZONES, ZONES, type Row, type Side } from "./engine";
+import { EXTRA_ZONE, FULL_ZONES, ZONES, type Row, type Side } from "@duel-academy/engine";
 
 /**
  * Where everything stands on the 3D duel mat, in the mat's own units (one card is 1 wide). A pure plan: the scene

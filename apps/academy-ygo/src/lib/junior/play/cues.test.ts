@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { arrivals, beatLength, effectCues, lpCounts, statHolds, timeline, type Beat, type Cue } from "./cues";
-import { apply, board, type Board, type GameEvent, type Move, type Setup } from "./engine";
+import { apply, board, type Board, type GameEvent, type Move, type Setup } from "@duel-academy/engine";
 import { DEMOS, LEVELS } from "./levels";
 import { demoFrames, next, play, start } from "./session";
 

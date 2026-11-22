@@ -1,0 +1,21 @@
+{
+  "name": "@duel-academy/cards",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The cards Duel Academy plays, with their printed facts, as a catalogue for @duel-academy/engine.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@duel-academy/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
+  }
+}

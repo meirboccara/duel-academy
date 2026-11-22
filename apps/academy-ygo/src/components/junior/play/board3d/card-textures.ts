@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { cardArtUrl, type ArtSize } from "@/lib/junior/play/card-art";
+import { cardArtUrl, type ArtSize } from "@/lib/junior/play/card-pictures";
 import type { FaceSpec } from "@/lib/junior/play/board3d-view";
-import { cardOf, type CardId } from "@/lib/junior/play/cards";
+import { cardOf, type CardId } from "@duel-academy/engine";
 
 /**
  * The pictures on the 3D cards, painted on small canvases: the frame in the colour of the card's kind, its name, its

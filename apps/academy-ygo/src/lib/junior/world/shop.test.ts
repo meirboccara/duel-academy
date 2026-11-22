@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardArtUrl } from "../play/card-art";
+import { cardArtUrl } from "@/lib/junior/play/card-pictures";
 import { LEVELS } from "../play/levels";
 import { emptyPlayProgress, recordSolve, type PlayProgress } from "../play/progress";
 import { RARITIES, RARITY_PRICE, SHOP_CARDS, buy, buyItem, giveItem, loadShop, mergeShop, takeOff, wear, rarityOf, loadPurchases, priceOf, shopKeyFor, spentOnItems, starsEarned, starsLeft, starsWon } from "./shop";

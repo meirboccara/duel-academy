@@ -7,7 +7,7 @@ import { ATTACK_ART } from "@/lib/junior/play/board3d-moves";
 import { clashes, lifeChanges } from "@/lib/junior/play/board3d-show";
 import type { PlayCopy } from "@/lib/junior/play/copy";
 import { arrivals, beatLength, effectCues, lpCounts, spotKey, statHolds, timeline, type ArriveWay, type Beat, type Cue, type Spot } from "@/lib/junior/play/cues";
-import type { Board, GameEvent, Row, Side } from "@/lib/junior/play/engine";
+import type { Board, GameEvent, Row, Side } from "@duel-academy/engine";
 import { AimBeam, BigCast, BigLife, ClashNumbers, type Stage3d } from "./board3d/big-moments";
 import { Board3dStage, type HandItem } from "./board3d/board-3d-stage";
 import { Board3dContext } from "./board3d/support";

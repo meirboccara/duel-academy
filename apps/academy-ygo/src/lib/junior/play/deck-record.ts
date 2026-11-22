@@ -1,4 +1,5 @@
-import { CARDS, inExtraDeck, type CardId } from "./cards";
+import { inExtraDeck, type CardId } from "@duel-academy/engine";
+import { CARDS } from "@duel-academy/cards";
 import { EXTRA_DECK, MAIN_DECK, MOST_COPIES, copiesAllowed, deckProblems, type Deck } from "./masters";
 import { STARTERS, STARTER_IDS, type StarterId } from "./starters";
 

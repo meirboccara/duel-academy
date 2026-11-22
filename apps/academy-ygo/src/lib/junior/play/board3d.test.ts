@@ -6,7 +6,7 @@ import { SHAKE_TIME, clashes, hurtPower, impacts, lifeChanges, shakeAt, showLeng
 import { holdPiles, matView, monsterFace, printedFace } from "./board3d-view";
 import { PLAY_COPY } from "./copy";
 import { effectCues } from "./cues";
-import { EXTRA_ZONE, apply, board, type Board, type Move } from "./engine";
+import { EXTRA_ZONE, apply, board, type Board, type Move } from "@duel-academy/engine";
 
 const copy = PLAY_COPY.en;
 const BEAT = 0.65;

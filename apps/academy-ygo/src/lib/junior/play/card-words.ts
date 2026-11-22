@@ -1,5 +1,5 @@
-import { CARD_ART } from "./card-art";
-import type { CardId } from "./cards";
+import { CARD_ART } from "@duel-academy/cards";
+import type { CardId } from "@duel-academy/engine";
 
 /**
  * The name and text of real cards as printed, in English or French (Konami's wording, fetched by

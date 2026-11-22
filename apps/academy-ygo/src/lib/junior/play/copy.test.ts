@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "@/lib/i18n/locales";
-import { CARD_IDS, hasRulesText } from "./cards";
+import { hasRulesText } from "@duel-academy/engine";
+import { CARD_IDS } from "@duel-academy/cards";
 import { PLAY_COPY, VOICE_LOCALE, narrateAll, phasesStarted, type PlayCopy } from "./copy";
-import type { GameEvent, Move, Board } from "./engine";
+import type { GameEvent, Move, Board } from "@duel-academy/engine";
 import { DEMOS, LEVELS, RULE_IDS } from "./levels";
 import { demoFrames, next, play, start } from "./session";
 

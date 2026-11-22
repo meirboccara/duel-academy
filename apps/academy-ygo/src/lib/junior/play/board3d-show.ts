@@ -1,6 +1,6 @@
-import type { CardId } from "./cards";
+import type { CardId } from "@duel-academy/engine";
 import { timeline, type Beat, type Spot } from "./cues";
-import type { GameEvent, Position, Side } from "./engine";
+import type { GameEvent, Position, Side } from "@duel-academy/engine";
 import { ATTACK_ART, LUNGE_HIT } from "./board3d-moves";
 
 /**

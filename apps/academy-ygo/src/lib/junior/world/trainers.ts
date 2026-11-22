@@ -1,5 +1,5 @@
 import type { Locale } from "@/lib/i18n/locales";
-import { cardArtUrl } from "../play/card-art";
+import { cardArtUrl } from "@/lib/junior/play/card-pictures";
 import { WORLD_IDS, type WorldId } from "../play/levels";
 import { album, type PlayProgress } from "../play/progress";
 import { DORM_INFO, DORM_ISLAND, type Dorm } from "./dorm";

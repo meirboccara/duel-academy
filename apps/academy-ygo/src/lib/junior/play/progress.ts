@@ -1,4 +1,5 @@
-import { CARD_IDS, type CardId } from "./cards";
+import { type CardId } from "@duel-academy/engine";
+import { CARD_IDS } from "@duel-academy/cards";
 import { LEVELS, type Level, type RuleId } from "./levels";
 import type { Outcome } from "./session";
 

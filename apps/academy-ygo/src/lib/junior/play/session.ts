@@ -1,6 +1,8 @@
-import { HINT_PERSONA, botMove, seeded } from "./bot";
-import { cardOf, spellTarget, type CardId } from "./cards";
-import { actor, apply, atkOf, board as makeBoard, defOf, legalMoves, mainZones, type Board, type GameEvent, type Material, type Move, type Reason } from "./engine";
+/* The cards every duel is played with: importing the package gives them to the engine. */
+import "@duel-academy/cards";
+import { HINT_PERSONA, botMove, seeded } from "@duel-academy/engine";
+import { cardOf, spellTarget, type CardId } from "@duel-academy/engine";
+import { actor, apply, atkOf, board as makeBoard, defOf, legalMoves, mainZones, type Board, type GameEvent, type Material, type Move, type Reason } from "@duel-academy/engine";
 import type { Demo, Level, RivalStep } from "./levels";
 import { PERSONAS } from "./masters";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { seeded } from "./bot";
-import { cardOf, inExtraDeck } from "./cards";
+import { seeded } from "@duel-academy/engine";
+import { cardOf, inExtraDeck } from "@duel-academy/engine";
 import { levelById } from "./levels";
 import { MASTERS, MASTER_LP, MASTER_TIER, PERSONAS, TIERS, copiesAllowed, deckProblems, duelSetup, masterDeck, masterLevelId, shuffled, type MasterId } from "./masters";
 import { STARTERS } from "./starters";
@@ -59,8 +59,8 @@ describe("a duel against a trainer", () => {
 
 describe("the trainer bot", () => {
 	it("attacks with every monster before playing a card in the Battle Phase", async () => {
-		const { botMove } = await import("./bot");
-		const { apply, board } = await import("./engine");
+		const { botMove } = await import("@duel-academy/engine");
+		const { apply, board } = await import("@duel-academy/engine");
 		let state = board({ full: true, turn: "rival", phase: "battle", you: { lp: 8000 }, rival: { hand: ["pot-of-greed"], deck: ["pocket-cub", "pocket-cub"], monsters: ["iron-boar", "river-otter", "thorn-fox"] } });
 		for (let step = 0; step < 6 && state.turn === "rival"; step++) {
 			const result = apply(state, botMove(state, { aggression: 1, skill: 1, caution: 1, answers: 1 }, seeded(1)));
@@ -74,8 +74,8 @@ describe("the trainer bot", () => {
 describe("the trainers' levels", () => {
 	/** A duel between two bots with the same starter deck, phases following the moves; the winner, if any. */
 	async function botDuel(you: (typeof PERSONAS)[MasterId], rival: (typeof PERSONAS)[MasterId], seed: number) {
-		const { botMove } = await import("./bot");
-		const { apply, board, other } = await import("./engine");
+		const { botMove } = await import("@duel-academy/engine");
+		const { apply, board, other } = await import("@duel-academy/engine");
 		const deal = (offset: number) => duelSetup("rex-raptor", STARTERS.dragon.deck, seeded(seed + offset));
 		let state = board({ ...deal(0), strict: false, rival: { ...deal(99).you } });
 		const random = seeded(seed * 7);
@@ -118,11 +118,11 @@ describe("the TCG Forbidden & Limited List", () => {
 
 
 describe("how the trainers think", () => {
-	const turnOf = async (persona: (typeof PERSONAS)[MasterId], setup: Parameters<typeof import("./engine").board>[0]) => {
-		const { botMove } = await import("./bot");
-		const { apply, board } = await import("./engine");
+	const turnOf = async (persona: (typeof PERSONAS)[MasterId], setup: Parameters<typeof import("@duel-academy/engine").board>[0]) => {
+		const { botMove } = await import("@duel-academy/engine");
+		const { apply, board } = await import("@duel-academy/engine");
 		let state = board({ full: true, turn: "rival", ...setup });
-		const moves: import("./engine").Move[] = [];
+		const moves: import("@duel-academy/engine").Move[] = [];
 		for (let step = 0; step < 12 && state.turn === "rival" && !state.winner; step++) {
 			const move = botMove(state, persona, seeded(step + 1));
 			const result = apply(state, move);

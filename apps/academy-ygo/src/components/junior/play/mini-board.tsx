@@ -2,10 +2,11 @@
 
 import { animate, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { cardArtUrl } from "@/lib/junior/play/card-art";
-import { CARDS, cardOf, monsterOf, tributesFor, type CardId } from "@/lib/junior/play/cards";
+import { cardArtUrl } from "@/lib/junior/play/card-pictures";
+import { cardOf, monsterOf, tributesFor, type CardId } from "@duel-academy/engine";
+import { CARDS } from "@duel-academy/cards";
 import { PLAY_COPY, cardType, type PlayCopy } from "@/lib/junior/play/copy";
-import { EXTRA_ZONE, PHASES, START_LP, atkOf, defOf, mainZones, type Board, type GameEvent, type Phase, type Row, type Side } from "@/lib/junior/play/engine";
+import { EXTRA_ZONE, PHASES, START_LP, atkOf, defOf, mainZones, type Board, type GameEvent, type Phase, type Row, type Side } from "@duel-academy/engine";
 import type { PhaseBar as PhaseBarKind } from "@/lib/junior/play/levels";
 
 const KIND_FRAME = { monster: "border-normal-monster bg-normal-monster/15", spell: "border-spell bg-spell/15", trap: "border-trap bg-trap/15" } as const;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { botMove, seeded } from "./bot";
-import { actor, apply, board, type Board, type Move, type Setup } from "./engine";
+import { botMove, seeded } from "@duel-academy/engine";
+import { actor, apply, board, type Board, type Move, type Setup } from "@duel-academy/engine";
 import { MASTER_LP, OPENING_HAND, PERSONAS, masterDeck, shuffled, type Deck, type MasterId } from "./masters";
 import { STARTERS } from "./starters";
 

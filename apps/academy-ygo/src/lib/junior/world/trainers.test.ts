@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { cardArtUrl } from "../play/card-art";
-import { CARD_IDS } from "../play/cards";
+import { cardArtUrl } from "@/lib/junior/play/card-pictures";
+import { CARD_IDS } from "@duel-academy/cards";
 import { LEVELS, WORLD_IDS, levelsOf } from "../play/levels";
 import { album, emptyPlayProgress, recordSolve, type PlayProgress } from "../play/progress";
 import { DISPLAY_CARDS, ISLAND_TRAINERS, binder, islandCardUrls, rewardCards, TRAINER_LINES } from "./trainers";

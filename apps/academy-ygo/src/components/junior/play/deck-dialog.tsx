@@ -1,8 +1,8 @@
 "use client";
 
 import type { Locale } from "@/lib/i18n/locales";
-import { cardArtUrl } from "@/lib/junior/play/card-art";
-import type { CardId } from "@/lib/junior/play/cards";
+import { cardArtUrl } from "@/lib/junior/play/card-pictures";
+import type { CardId } from "@duel-academy/engine";
 import type { PlayCopy } from "@/lib/junior/play/copy";
 import { DECK_COPY } from "@/lib/junior/play/deck-copy";
 import { STARTERS, STARTER_IDS, type StarterId } from "@/lib/junior/play/starters";

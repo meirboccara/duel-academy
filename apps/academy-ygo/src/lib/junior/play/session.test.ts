@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Move } from "./engine";
+import type { Move } from "@duel-academy/engine";
 import { DEMOS, LEVELS, RULE_IDS, levelById, type Level } from "./levels";
 import { demoFrames, hint, next, outcome, play, restart, start, undo, type Session } from "./session";
 

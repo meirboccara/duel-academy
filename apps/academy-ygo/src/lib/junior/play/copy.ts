@@ -1,6 +1,6 @@
 import type { Locale } from "@/lib/i18n/locales";
-import { cardOf, type CardId, type CardKind, type Frame, type Icon, type MonsterType } from "./cards";
-import type { Board, GameEvent, Move, Phase, Reason, Side } from "./engine";
+import { cardOf, type CardId, type CardKind, type Frame, type Icon, type MonsterType } from "@duel-academy/engine";
+import type { Board, GameEvent, Move, Phase, Reason, Side } from "@duel-academy/engine";
 import type { RuleId, WorldId } from "./levels";
 import type { Mastery } from "./progress";
 import type { FailReason } from "./session";

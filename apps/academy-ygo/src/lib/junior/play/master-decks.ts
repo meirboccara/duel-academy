@@ -1,4 +1,4 @@
-import type { CardId } from "./cards";
+import type { CardId } from "@duel-academy/engine";
 import type { Deck, MasterId } from "./masters";
 
 /*

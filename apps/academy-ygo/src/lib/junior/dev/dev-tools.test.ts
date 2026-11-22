@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CARD_IDS } from "../play/cards";
+import { CARD_IDS } from "@duel-academy/cards";
 import { LEVELS, levelById, levelsOf } from "../play/levels";
 import { masterLevelId } from "../play/masters";
 import { emptyPlayProgress, isUnlocked } from "../play/progress";

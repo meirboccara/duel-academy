@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, type TargetAndTransition, type Transition } from "motion/react";
-import { cardOf, type CardId } from "@/lib/junior/play/cards";
+import { cardOf, type CardId } from "@duel-academy/engine";
 import type { PlayCopy } from "@/lib/junior/play/copy";
 import type { Cue } from "@/lib/junior/play/cues";
 import { COLOR, at, centred, type CardSize, type Place } from "./effect-kit";

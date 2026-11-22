@@ -4,8 +4,8 @@
   "scripts": {
     "dev": "pnpm --filter academy-ygo dev",
     "build": "pnpm --filter academy-ygo build",
-    "typecheck": "pnpm --filter academy-ygo typecheck",
-    "test": "pnpm --filter academy-ygo test:ci"
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --filter ./packages/* test && pnpm --filter academy-ygo test:ci"
   },
   "engines": {
     "node": ">=20"

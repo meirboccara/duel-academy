@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { botMove, seeded } from "../bot";
-import { cardOf, type CardId } from "../cards";
-import { apply, board, actor, type Board } from "../engine";
+import { botMove, seeded } from "@duel-academy/engine";
+import { cardOf, type CardId } from "@duel-academy/engine";
+import { apply, board, actor, type Board } from "@duel-academy/engine";
 import { deckProblems, MASTER_LP, OPENING_HAND, shuffled } from "../masters";
 import { PACK_IDS, PACKS, type PackId } from ".";
 

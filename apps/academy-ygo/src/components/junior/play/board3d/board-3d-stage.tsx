@@ -8,10 +8,10 @@ import { CARD, TILE, framePoints, matLayout, placeKey, spotPoint, type MatLayout
 import { flights, lunges, playLength } from "@/lib/junior/play/board3d-moves";
 import { impacts, lifeChanges, showLength } from "@/lib/junior/play/board3d-show";
 import { holdPiles, matView, monsterFace, printedFace, type FaceSpec } from "@/lib/junior/play/board3d-view";
-import type { CardId } from "@/lib/junior/play/cards";
+import type { CardId } from "@duel-academy/engine";
 import type { PlayCopy } from "@/lib/junior/play/copy";
 import type { Beat } from "@/lib/junior/play/cues";
-import { START_LP, type Board, type Row, type Side } from "@/lib/junior/play/engine";
+import { START_LP, type Board, type Row, type Side } from "@duel-academy/engine";
 import { BEAT, place, type Finder } from "../effect-kit";
 import type { Stage3d } from "./big-moments";
 import type { LpCount, Pile, StatHold } from "../mini-board";

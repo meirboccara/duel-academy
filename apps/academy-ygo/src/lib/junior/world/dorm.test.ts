@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardArtUrl } from "../play/card-art";
+import { cardArtUrl } from "@/lib/junior/play/card-pictures";
 import { LEVELS, WORLD_IDS, levelsOf } from "../play/levels";
 import { emptyPlayProgress, recordSolve, type PlayProgress } from "../play/progress";
 import { DORMS, DORM_INFO, DORM_ISLAND, dormKeyFor, dormToChoose, loadDorm, saveDorm } from "./dorm";

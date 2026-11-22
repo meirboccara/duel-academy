@@ -1,6 +1,8 @@
 # duel-academy
 
 Duel Academy: the Yu-Gi-Oh teaching game for children. One app today: `apps/academy-ygo` (Next.js, port 3220).
+The duel rules live in `packages/engine` (`@duel-academy/engine`, no cards of its own) and the cards in
+`packages/cards` (`@duel-academy/cards`); the app plugs them together.
 Moved out of `meirboccara/project-meir` into its own repo; the docs in `docs/` came with it.
 
 ## Agent rules

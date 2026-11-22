@@ -3,9 +3,9 @@
 import { motion } from "motion/react";
 import type { Clash, LifeChange } from "@/lib/junior/play/board3d-show";
 import { LP_ROLL } from "@/lib/junior/play/board3d-show";
-import type { CardId } from "@/lib/junior/play/cards";
+import type { CardId } from "@duel-academy/engine";
 import type { PlayCopy } from "@/lib/junior/play/copy";
-import type { Side } from "@/lib/junior/play/engine";
+import type { Side } from "@duel-academy/engine";
 import { COLOR, at, centred, type CardSize, type Finder, type Place } from "../effect-kit";
 import { CardArt } from "../mini-board";
 

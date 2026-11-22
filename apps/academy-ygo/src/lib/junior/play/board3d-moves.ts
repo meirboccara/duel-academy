@@ -1,6 +1,6 @@
-import type { CardId } from "./cards";
+import type { CardId } from "@duel-academy/engine";
 import { beatLength, spotKey, timeline, type Beat, type LeaveHow, type Spot } from "./cues";
-import type { Board } from "./engine";
+import type { Board } from "@duel-academy/engine";
 
 /**
  * What the cards themselves do on the 3D mat while a move plays: which cards fly from one place to another, and

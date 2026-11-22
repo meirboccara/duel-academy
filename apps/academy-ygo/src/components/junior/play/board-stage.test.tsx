@@ -2,7 +2,7 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PLAY_COPY } from "@/lib/junior/play/copy";
-import { apply, board } from "@/lib/junior/play/engine";
+import { apply, board } from "@duel-academy/engine";
 import { BEAT, BoardStage } from "./board-stage";
 
 afterEach(() => {

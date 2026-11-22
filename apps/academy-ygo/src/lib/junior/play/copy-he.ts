@@ -1,5 +1,5 @@
-import { cardOf, monsterOf, type CardId } from "./cards";
-import { atkOf } from "./engine";
+import { cardOf, monsterOf, type CardId } from "@duel-academy/engine";
+import { atkOf } from "@duel-academy/engine";
 import { MASTERS, MASTER_NAMES, MASTER_TIER, masterLevelId, type Tier } from "./masters";
 import type { PlayCopy } from "./copy";
 import { en } from "./copy-en";

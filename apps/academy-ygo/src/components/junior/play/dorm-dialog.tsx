@@ -1,7 +1,7 @@
 "use client";
 
 import type { Locale } from "@/lib/i18n/locales";
-import { cardArtUrl } from "@/lib/junior/play/card-art";
+import { cardArtUrl } from "@/lib/junior/play/card-pictures";
 import { DORMS, DORM_INFO, type Dorm } from "@/lib/junior/world/dorm";
 import { DORM_COPY } from "@/lib/junior/world/dorm-copy";
 import { trainerPicture } from "@/lib/junior/world/trainers";

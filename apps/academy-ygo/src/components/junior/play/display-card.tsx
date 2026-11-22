@@ -1,6 +1,7 @@
 import type { Locale } from "@/lib/i18n/locales";
-import { CARD_ART } from "@/lib/junior/play/card-art";
-import { CARDS, type CardId } from "@/lib/junior/play/cards";
+import { CARD_ART } from "@duel-academy/cards";
+import { type CardId } from "@duel-academy/engine";
+import { CARDS } from "@duel-academy/cards";
 import type { PlayCopy } from "@/lib/junior/play/copy";
 import { rarityOf } from "@/lib/junior/world/shop";
 import { DISPLAY_CARDS } from "@/lib/junior/world/trainers";

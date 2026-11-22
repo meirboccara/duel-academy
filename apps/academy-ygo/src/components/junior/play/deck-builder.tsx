@@ -3,8 +3,9 @@
 import { Minus, Plus, Search, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Locale } from "@/lib/i18n/locales";
-import { CARD_ART, cardArtUrl } from "@/lib/junior/play/card-art";
-import { cardOf, inExtraDeck, monsterOf, type CardId } from "@/lib/junior/play/cards";
+import { CARD_ART } from "@duel-academy/cards";
+import { cardArtUrl } from "@/lib/junior/play/card-pictures";
+import { cardOf, inExtraDeck, monsterOf, type CardId } from "@duel-academy/engine";
 import { PLAY_COPY, cardType, type PlayCopy } from "@/lib/junior/play/copy";
 import { DECK_COPY } from "@/lib/junior/play/deck-copy";
 import { addCard, copiesOf, removeCard, startWith, type DeckRecord } from "@/lib/junior/play/deck-record";

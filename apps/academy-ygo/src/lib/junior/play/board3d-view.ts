@@ -1,7 +1,7 @@
 import type { MatLayout, MatPlace } from "./board3d-layout";
-import { cardOf, monsterOf, type CardId } from "./cards";
+import { cardOf, monsterOf, type CardId } from "@duel-academy/engine";
 import { cardType, type PlayCopy } from "./copy";
-import { EXTRA_ZONE, atkOf, defOf, type Board, type MonsterSlot, type Row, type Side } from "./engine";
+import { EXTRA_ZONE, atkOf, defOf, type Board, type MonsterSlot, type Row, type Side } from "@duel-academy/engine";
 
 /**
  * What the 3D mat shows for a board, place by place: the same cards, numbers and choices as the HTML board, and a tap

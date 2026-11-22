@@ -1,7 +1,7 @@
-import type { Persona } from "./bot";
-import { CARD_ART } from "./card-art";
-import { inExtraDeck, type CardId } from "./cards";
-import type { Setup } from "./engine";
+import type { Persona } from "@duel-academy/engine";
+import { CARD_ART } from "@duel-academy/cards";
+import { inExtraDeck, type CardId } from "@duel-academy/engine";
+import type { Setup } from "@duel-academy/engine";
 import { MASTER_DECKS } from "./master-decks";
 
 /**

@@ -1,0 +1,18 @@
+{
+  "name": "@duel-academy/engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The rules of a Yu-Gi-Oh! duel, the effect vocabulary and a bot, for any catalogue of cards.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
+  }
+}

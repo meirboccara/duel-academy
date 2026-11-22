@@ -1,6 +1,7 @@
-import { FORBIDDEN_LIMBS, cardOf, type CardId } from "./cards";
-import { EXTRA_ZONE, type Material, type Move, type Setup, type Side } from "./engine";
-import type { Persona } from "./bot";
+import { cardOf, type CardId } from "@duel-academy/engine";
+import { FORBIDDEN_LIMBS } from "@duel-academy/cards";
+import { EXTRA_ZONE, type Material, type Move, type Setup, type Side } from "@duel-academy/engine";
+import type { Persona } from "@duel-academy/engine";
 import { MASTERS, masterLevelId, type MasterId } from "./masters";
 
 /** The rules of the Junior course, in teaching order. Each is taught by one level and used again by later ones. */

@@ -4,7 +4,7 @@ import { Star } from "lucide-react";
 import { motion } from "motion/react";
 import { type ReactNode, useRef, useState } from "react";
 import type { Locale } from "@/lib/i18n/locales";
-import { CARD_ART } from "@/lib/junior/play/card-art";
+import { CARD_ART } from "@duel-academy/cards";
 import type { PlayCopy } from "@/lib/junior/play/copy";
 import { CONTROLS_COPY } from "@/lib/junior/world/controls-copy";
 import { RARITIES, SHOP_CARDS, onSale, priceOf, rarityOf } from "@/lib/junior/world/shop";

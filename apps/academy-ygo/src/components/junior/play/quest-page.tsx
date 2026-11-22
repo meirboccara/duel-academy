@@ -1,7 +1,7 @@
 import { Star } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Locale } from "@/lib/i18n/locales";
-import { cardArtUrl } from "@/lib/junior/play/card-art";
+import { cardArtUrl } from "@/lib/junior/play/card-pictures";
 import { LEVELS, WORLD_IDS } from "@/lib/junior/play/levels";
 import type { PlayProgress } from "@/lib/junior/play/progress";
 import { CONTROLS_COPY } from "@/lib/junior/world/controls-copy";

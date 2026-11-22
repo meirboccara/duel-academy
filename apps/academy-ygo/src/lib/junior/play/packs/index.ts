@@ -1,5 +1,5 @@
-import type { Persona } from "../bot";
-import type { CardId } from "../cards";
+import type { Persona } from "@duel-academy/engine";
+import type { CardId } from "@duel-academy/engine";
 import type { Deck } from "../masters";
 import { BLUE_EYES } from "./blue-eyes/pack";
 import { HERO } from "./hero/pack";

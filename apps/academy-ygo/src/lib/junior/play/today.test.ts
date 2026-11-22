@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { islandTrainer } from "../world/trainers";
 import { buildWorld } from "../world/world";
-import type { Move } from "./engine";
+import type { Move } from "@duel-academy/engine";
 import { levelById, levelsOf, WORLD_IDS } from "./levels";
 import { play, next, start, type Session } from "./session";
 

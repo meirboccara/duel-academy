@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { apply, board, type Board, type Move } from "./engine";
+import { apply, board, type Board, type Move } from "@duel-academy/engine";
 import { levelById } from "./levels";
 import { next, play as playLevel, start } from "./session";
 
