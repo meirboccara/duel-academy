@@ -55,6 +55,9 @@ export interface MatLayout {
 	/** Where the middle of the child's hand is held, in front of the mat, and how much bigger than on the mat its cards are. */
 	hand: Point3;
 	handScale: number;
+	/** Where the middle of the rival's hand lies, face-down beyond its edge of the mat, and how big its cards are. */
+	rivalHand: Point3;
+	rivalHandScale: number;
 }
 
 const zoneName = (side: Side, row: Row, zone: number) => `${side}-${row}-${zone}`;
@@ -94,7 +97,20 @@ export function matLayout(full: boolean): MatLayout {
 	const minZ = zOf(0) - TILE.d / 2;
 	const maxZ = zOf(ROWS - 1) + TILE.d / 2;
 	const handScale = 1.35;
-	return { full, places, byKey: new Map(places.map((item) => [item.key, item])), minX, maxX, minZ, maxZ, hand: { x: (minX + maxX) / 2, y: HAND_LIFT, z: maxZ + 0.35 + (CARD.h * handScale) / 2 }, handScale };
+	const rivalHandScale = 0.75;
+	return {
+		full,
+		places,
+		byKey: new Map(places.map((item) => [item.key, item])),
+		minX,
+		maxX,
+		minZ,
+		maxZ,
+		hand: { x: (minX + maxX) / 2, y: HAND_LIFT, z: maxZ + 0.35 + (CARD.h * handScale) / 2 },
+		handScale,
+		rivalHand: { x: (minX + maxX) / 2, y: 0.02, z: minZ - 0.3 - (CARD.h * rivalHandScale) / 2 },
+		rivalHandScale,
+	};
 }
 
 /** Cards in the hand are held up and leaning back, facing the camera. */
@@ -109,6 +125,18 @@ export function handSlots(layout: MatLayout, count: number): Point3[] {
 	const step = count === 1 ? 0 : Math.min(wide + 0.12, room / (count - 1));
 	/* Each card a hair higher than the one before, so overlapping cards never fight for the same pixels. */
 	return Array.from({ length: count }, (_, index) => ({ x: layout.hand.x + (index - (count - 1) / 2) * step, y: layout.hand.y + index * 0.012, z: layout.hand.z }));
+}
+
+/**
+ * Where each card of the rival's hand lies: face-down in a row beyond its edge of the mat, touching and then
+ * overlapping as the hand grows, as card games on screen show the opponent's hand.
+ */
+export function rivalHandSlots(layout: MatLayout, count: number): Point3[] {
+	if (count <= 0) return [];
+	const wide = CARD.w * layout.rivalHandScale;
+	const room = layout.maxX - layout.minX - wide;
+	const step = count === 1 ? 0 : Math.min(wide + 0.04, room / (count - 1));
+	return Array.from({ length: count }, (_, index) => ({ x: layout.rivalHand.x + (index - (count - 1) / 2) * step, y: layout.rivalHand.y + index * 0.006, z: layout.rivalHand.z }));
 }
 
 /** The name of a spot of the effects, as the mat knows it. */
@@ -128,7 +156,7 @@ export function spotPoint(layout: MatLayout, spot: Spot): Point3 & { found: bool
 	if (spot.at === "center") return { x: middle, y: 0, z: (layout.minZ + layout.maxZ) / 2, found: true };
 	const edge = spot.side === "you" ? layout.maxZ + 0.7 : layout.minZ - 0.7;
 	if (spot.at === "lantern") return { x: middle, y: 0, z: edge, found: false };
-	if (spot.at === "pile" && spot.pile === "hand") return spot.side === "you" ? { ...layout.hand, found: true } : { x: middle, y: HAND_LIFT, z: layout.minZ - 1.4, found: false };
+	if (spot.at === "pile" && spot.pile === "hand") return spot.side === "you" ? { ...layout.hand, found: true } : { ...layout.rivalHand, found: true };
 	const known = layout.byKey.get(placeKey(spot));
 	if (known) return { x: known.x, y: 0, z: known.z, found: true };
 	return { x: layout.maxX + 0.4, y: 0, z: edge, found: false };
@@ -143,8 +171,9 @@ export function framePoints(layout: MatLayout): Point3[] {
 	const pad = 0.3;
 	const near = layout.hand.z + (CARD.h * layout.handScale) / 2;
 	const out: Point3[] = [];
+	const far = layout.rivalHand.z - (CARD.h * layout.rivalHandScale) / 2 - 0.1;
 	for (const x of [layout.minX - pad, layout.maxX + pad]) {
-		out.push({ x, y: 0, z: layout.minZ - pad }, { x, y: 1.2, z: layout.minZ - pad }, { x, y: 0, z: near }, { x, y: HAND_LIFT + 0.75, z: layout.hand.z - (CARD.h * layout.handScale) / 2 + 0.3 });
+		out.push({ x, y: 0, z: Math.min(layout.minZ - pad, far) }, { x, y: 1.2, z: layout.minZ - pad }, { x, y: 0, z: near }, { x, y: HAND_LIFT + 0.75, z: layout.hand.z - (CARD.h * layout.handScale) / 2 + 0.3 });
 	}
 	return out;
 }

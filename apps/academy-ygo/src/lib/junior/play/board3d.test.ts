@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fitView, project, projectTile } from "./board3d-camera";
-import { CARD, TILE, framePoints, handSlots, matLayout, spotPoint } from "./board3d-layout";
+import { CARD, TILE, framePoints, handSlots, matLayout, rivalHandSlots, spotPoint } from "./board3d-layout";
 import { ATTACK_ART, LUNGE_HIT, LUNGE_HIT_SHARE, PIECES, flightAt, flights, knockAt, lungeAt, lunges, pieceThrow, playLength } from "./board3d-moves";
 import { SHAKE_TIME, clashes, hurtPower, impacts, lifeChanges, shakeAt, showLength } from "./board3d-show";
 import { holdPiles, matView, monsterFace, printedFace } from "./board3d-view";
@@ -90,7 +90,8 @@ describe("the plan of the 3D mat", () => {
 		/* Everything has somewhere to fly to, even what the small board does not use. */
 		expect(spotPoint(small, { at: "pile", side: "you", pile: "graveyard" }).found).toBe(true);
 		expect(spotPoint(small, { at: "pile", side: "rival", pile: "banished" }).found).toBe(true);
-		expect(spotPoint(small, { at: "pile", side: "rival", pile: "hand" }).found).toBe(false);
+		/* The rival's hand is shown, face-down, beyond its edge of the mat. */
+		expect(spotPoint(small, { at: "pile", side: "rival", pile: "hand" }).found).toBe(true);
 	});
 
 	it("keeps zones apart, wide enough for a monster turned sideways", () => {
@@ -114,12 +115,28 @@ describe("the plan of the 3D mat", () => {
 		}
 		expect(handSlots(layout, 0)).toEqual([]);
 	});
+	it("lays the rival's hand face-down beyond its edge of the mat, smaller, inside the mat's width, however many cards", () => {
+		for (const full of [false, true]) {
+			const layout = matLayout(full);
+			for (const count of [1, 5, 9]) {
+				const slots = rivalHandSlots(layout, count);
+				expect(slots).toHaveLength(count);
+				for (const slot of slots) {
+					expect(slot.z + (CARD.h * layout.rivalHandScale) / 2).toBeLessThan(layout.minZ);
+					expect(slot.x - (CARD.w * layout.rivalHandScale) / 2).toBeGreaterThanOrEqual(layout.minX - 1e-9);
+					expect(slot.x + (CARD.w * layout.rivalHandScale) / 2).toBeLessThanOrEqual(layout.maxX + 1e-9);
+				}
+			}
+			expect(layout.rivalHandScale).toBeLessThan(layout.handScale);
+			expect(rivalHandSlots(layout, 0)).toEqual([]);
+		}
+	});
 });
 
 describe("the camera of the 3D mat", () => {
 	it("shows the whole mat and the hand on every screen, fills the screen one way and centres the mat the other", () => {
 		const layout = matLayout(true);
-		const points = [...framePoints(layout), ...handSlots(layout, 6)];
+		const points = [...framePoints(layout), ...handSlots(layout, 6), ...rivalHandSlots(layout, 6)];
 		for (const shape of SHAPES) {
 			const width = 1000;
 			const height = width / shape;

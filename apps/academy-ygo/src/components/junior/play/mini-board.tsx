@@ -189,6 +189,31 @@ function HeldFace({ hold, playId, atk, def, ...face }: CardFaceProps & { atk: nu
 	const held = !!hold && shown !== playId;
 	return <CardFace {...face} atk={held ? hold.atk : atk} def={held ? hold.def : def} />;
 }
+/** How many card backs the rival's hand shows before they start to overlap more. */
+const ROOMY_HAND = 6;
+/**
+ * The rival's hand, as card games on screen show the opponent's: one card back per card, in a row at its side of the
+ * board, overlapping more as the hand grows, and the count on a badge. A picture: the Lantern says it in words.
+ */
+function RivalHand({ count }: { count: number }) {
+	if (count === 0) return null;
+	const overlap = count > ROOMY_HAND ? "-ms-4" : "-ms-2";
+	return (
+		<div data-spot="rival-hand" aria-hidden className="flex items-center justify-center gap-2">
+			<div className="flex">
+				{Array.from({ length: count }, (_, index) => (
+					<span
+						key={index}
+						data-card-back
+						className={`${index === 0 ? "" : overlap} block h-9 w-6 rounded-[3px] border-2 border-[#4a2a10] shadow-sm`}
+						style={{ background: "radial-gradient(ellipse 34% 42% at 50% 50%, #1b120c 0 55%, #a8662e 60%, #7a4a22 72%)" }}
+					/>
+				))}
+			</div>
+			<span className="rounded-full bg-ember-400/90 px-2 text-xs font-bold text-ink-950">{count}</span>
+		</div>
+	);
+}
 /** Life Points as a lantern that drains. The number is always there in words. */
 /** `hand`: the number of cards held, shown for the rival. The bar is measured against the highest Life Points seen (4000, or 8000 against a trainer). */
 function Lantern({ side, lp, copy, moving, count, playId, hand }: { side: Side; lp: number; copy: PlayCopy; moving: boolean; count?: LpCount | undefined; playId?: number | undefined; hand?: number }) {
@@ -316,6 +341,7 @@ function SmallBoard({ board, copy, moving, glow, chosen, onZone, landing, counti
 	const row = (side: Side, kind: "monsters" | "backrow") => <div className="grid grid-cols-3 gap-2">{zones.map((zone) => cell(side, kind, zone))}</div>;
 	return (
 		<div role="group" aria-label={copy.board} dir="ltr" className="mx-auto max-w-md space-y-2 rounded-2xl border border-white/10 bg-surface/70 p-3">
+			<RivalHand count={board.rival.hand.length} />
 			<div dir="auto">
 				<Lantern side="rival" lp={board.rival.lp} copy={copy} moving={moving} count={counting?.rival} playId={playId} hand={board.rival.hand.length} />
 			</div>
@@ -457,6 +483,7 @@ function FullMat({ board, copy, moving, glow, chosen, onZone, onPile, landing, c
 	const line = (cells: React.ReactNode[]) => <div className="grid grid-cols-7 gap-1">{cells}</div>;
 	return (
 		<div role="group" aria-label={copy.board} dir="ltr" className="mx-auto max-w-xl space-y-1 rounded-2xl border border-white/10 bg-surface/70 p-2">
+			<RivalHand count={board.rival.hand.length} />
 			<div dir="auto">
 				<Lantern side="rival" lp={board.rival.lp} copy={copy} moving={moving} count={counting?.rival} playId={playId} hand={board.rival.hand.length} />
 			</div>

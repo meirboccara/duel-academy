@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { View } from "@/lib/junior/play/board3d-camera";
-import { CARD, HAND_TILT, TILE, handSlots, spotPoint, type MatLayout, type Point3 } from "@/lib/junior/play/board3d-layout";
+import { CARD, HAND_TILT, TILE, handSlots, rivalHandSlots, spotPoint, type MatLayout, type Point3 } from "@/lib/junior/play/board3d-layout";
 import { LUNGE_HIT_SHARE, PIECES, flightAt, knockAt, lungeAt, pieceThrow, type Flight, type Lunge } from "@/lib/junior/play/board3d-moves";
 import { shakeAt, type Impact } from "@/lib/junior/play/board3d-show";
 import type { CardView, FaceSpec, PlaceView } from "@/lib/junior/play/board3d-view";
@@ -53,6 +53,8 @@ export interface BoardSceneProps {
 	layout: MatLayout;
 	places: readonly PlaceView[];
 	hand: readonly HandCardView[];
+	/** How many cards the rival holds: drawn face-down beyond its edge of the mat. */
+	rivalHand: number;
 	play: Play;
 	moving: boolean;
 	/** The place the keyboard is on, in the HTML board. */
@@ -444,6 +446,15 @@ function HandCard({ shared, item, at, size, moving }: { shared: Shared; item: Ha
 	);
 }
 
+/** One card of the rival's hand: face-down, turned towards the rival, as an opponent holds it. */
+function RivalHandCard({ shared, at, size }: { shared: Shared; at: Point3; size: number }) {
+	return (
+		<group position={[at.x, at.y, at.z]} rotation={[0, Math.PI, 0]} scale={size} raycast={noHit}>
+			<CardBody shared={shared} face={null} />
+		</group>
+	);
+}
+
 /* ---------- Table and scenery ---------- */
 
 function Table({ shared, layout }: { shared: Shared; layout: MatLayout }) {
@@ -594,7 +605,7 @@ function LossWatch({ onLost }: { onLost: () => void }) {
 	return null;
 }
 
-function Scene({ view, layout, places, hand, play, moving, focusKey, flightFaces, labels, onLost }: BoardSceneProps) {
+function Scene({ view, layout, places, hand, rivalHand, play, moving, focusKey, flightFaces, labels, onLost }: BoardSceneProps) {
 	const { invalidate } = useThree();
 	/*
 	 * Made and disposed by the same effect, not kept in a memo: React's development double mount disposes once and
@@ -632,6 +643,7 @@ function Scene({ view, layout, places, hand, play, moving, focusKey, flightFaces
 		};
 	}, [layout.full, invalidate]);
 	const slots = useMemo(() => handSlots(layout, hand.length), [layout, hand.length]);
+	const rivalSlots = useMemo(() => rivalHandSlots(layout, rivalHand), [layout, rivalHand]);
 	const glowing = places.some((item) => item.state === "glow") || hand.some((item) => item.state === "hint");
 	if (!shared) return null;
 	return (
@@ -649,6 +661,9 @@ function Scene({ view, layout, places, hand, play, moving, focusKey, flightFaces
 			</Quiet>
 			{places.map((item) => (
 				<Tile key={item.place.key} shared={shared} item={item} focused={focusKey === item.place.key} layout={layout} play={play} moving={moving} labels={labels} />
+			))}
+			{rivalSlots.map((at, index) => (
+				<RivalHandCard key={`rival-hand-${index}`} shared={shared} at={at} size={layout.rivalHandScale} />
 			))}
 			{hand.map((item, index) => (
 				<HandCard key={`${item.face.card}-${index}`} shared={shared} item={item} at={slots[index]!} size={layout.handScale} moving={moving} />

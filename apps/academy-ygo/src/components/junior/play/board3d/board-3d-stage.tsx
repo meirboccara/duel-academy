@@ -186,7 +186,7 @@ export function Board3dStage({ three, board, before, beats, playId, copy, moving
 			{view && (
 				<SceneBoundary onError={three.fail}>
 					<Suspense fallback={<p className="grid h-full place-items-center font-display text-lg text-ink-950">{words.loading}</p>}>
-						<BoardScene view={view} layout={layout} places={places} hand={cards} play={play} moving={moving} focusKey={focusKey} flightFaces={flightFaces} labels={words.zones} onLost={three.fail} />
+						<BoardScene view={view} layout={layout} places={places} hand={cards} rivalHand={board.rival.hand.length} play={play} moving={moving} focusKey={focusKey} flightFaces={flightFaces} labels={words.zones} onLost={three.fail} />
 					</Suspense>
 				</SceneBoundary>
 			)}
