@@ -47,6 +47,7 @@ export function choiceOf(actions: readonly Action[]): { from: readonly ("hand" |
 	for (const action of actions) {
 		if (action.do === "search" || action.do === "mill") return { from: ["deck"], filter: action.filter };
 		if (action.do === "special") return { from: action.from, filter: action.filter };
+		if (action.do === "recover") return { from: ["graveyard"], filter: action.filter };
 	}
 	return null;
 }
@@ -83,10 +84,7 @@ export function cardCategories(card: CardId): Set<Category> {
 }
 
 /** The effects a monster has, written as data. */
-export const effectsOf = (card: CardId): readonly DataEffect[] => {
-	const info = cardOf(card);
-	return info.kind === "monster" ? (info.effects ?? []) : [];
-};
+export const effectsOf = (card: CardId): readonly DataEffect[] => cardOf(card).effects ?? [];
 
 /** What Ash Blossom & Joyous Spring negates: an effect that adds from the Deck, Special Summons from it, sends from it, or draws. */
 export const ashCategories: readonly Category[] = ["search", "deck-summon", "mill", "draw"];

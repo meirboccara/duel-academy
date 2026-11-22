@@ -1,5 +1,5 @@
-import { ashCategories, cardCategories, categoriesOf, type Category, choiceOf, effectsOf, fits as fitsFilter, targetOf } from "./effects";
-import { FORBIDDEN_ONE, attributeOf, cardOf, fusionOnly, hasRulesText, inExtraDeck, inPool, isEffectMonster, isQuickPlay, mentions, monsterOf, named, spellTarget, staysOnField, tributesFor, type Action, type Arrow, type CardId, type DataEffect, type Effect, type FusionMaterial, type MonsterCard } from "./cards";
+import { ashCategories, cardCategories, categoriesOf, type Category, choiceOf, effectsOf, fits as fitsFilter, targetOf, typeOf } from "./effects";
+import { FORBIDDEN_ONE, attributeOf, cardOf, fusionOnly, hasRulesText, inExtraDeck, inPool, isEffectMonster, isQuickPlay, mentions, monsterOf, named, spellTarget, staysOnField, tributesFor, type Action, type Arrow, type CardId, type Condition, type MonsterType, type DataEffect, type Effect, type FusionMaterial, type MonsterCard } from "./cards";
 
 /**
  * The Junior duel board. The small board has three Monster Zones and three Spell & Trap Zones per side; the whole
@@ -108,7 +108,12 @@ export type Pending =
 	/** Cards were just added from the Deck to this player's hand outside the Draw Phase: the other player may answer (Droll & Lock Bird). */
 	| { kind: "added"; side: Side };
 /** "For the rest of this turn…": a rule a card set, until the turn ends. */
-export type TurnLock = { kind: "deck-to-hand"; by: CardId };
+export type TurnLock =
+	| { kind: "deck-to-hand"; by: CardId }
+	/** "You cannot Special Summon for the rest of this turn, except [Types] monsters." */
+	| { kind: "special-only"; side: Side; types: readonly MonsterType[]; by: CardId }
+	/** "You can only attack directly with [archetype] monsters for the rest of this turn." */
+	| { kind: "direct-only"; side: Side; archetype: string; by: CardId };
 /** What a monster's activated effect does when it resolves: add a card (Blazeman), or the steps of an effect written as data. */
 export type EffectRun = { do: "add"; card: CardId } | { do: "data"; effect: number; pick?: CardId; target?: number };
 /**
@@ -152,6 +157,8 @@ export interface Board {
 	chainLimit: number | null;
 	/** Rules cards set "for the rest of this turn"; cleared when the turn ends. */
 	locks: TurnLock[];
+	/** Cards sent to a Graveyard this turn ("if this card is in your GY because it was sent there this turn"). */
+	sentThisTurn: { side: Side; card: CardId }[];
 	winner: Side | null;
 	/** Once-per-turn effects already used this turn, as "side:card". */
 	used: string[];
@@ -208,6 +215,7 @@ export type Move =
 export type Reason =
 	| "duel-over"
 	| "deck-locked"
+	| "card-locked"
 	| "answer-first"
 	| "not-in-hand"
 	| "wrong-zone"
@@ -358,7 +366,7 @@ export type GameEvent =
 	/** An effect written as data was activated. */
 	| { type: "effect-used"; side: Side; card: CardId }
 	/** A card set a rule for the rest of the turn (Droll & Lock Bird: nothing more is added from a Deck to a hand). */
-	| { type: "locked"; side: Side; card: CardId }
+	| { type: "locked"; side: Side; card: CardId; what?: "special" | "direct" }
 	| { type: "won"; side: Side };
 
 /** What happened right after a card went to the Graveyard in the same action: the card it paid for was activated, or the monster it was used for was Summoned. */
@@ -427,7 +435,7 @@ function side(setup: SideSetup = {}, full: boolean): SideState {
 export function board(setup: Setup = {}): Board {
 	const phase = setup.phase ?? "main1";
 	const full = setup.full ?? false;
-	return { you: side(setup.you, full), rival: side(setup.rival, full), full, turn: setup.turn ?? "you", turnNumber: setup.turnNumber ?? 3, phase, strict: setup.strict ?? false, drawn: phase !== "draw", summonUsed: false, pendulumUsed: false, pending: null, chain: [], chainLimit: setup.chainLimit ?? null, locks: [], winner: null, used: [], proper: [], triggers: [], standbyDone: phase !== "draw", summonTrigger: null, triggered: [], rng: (setup.seed ?? 1) >>> 0, summons: 0, summonLock: false };
+	return { you: side(setup.you, full), rival: side(setup.rival, full), full, turn: setup.turn ?? "you", turnNumber: setup.turnNumber ?? 3, phase, strict: setup.strict ?? false, drawn: phase !== "draw", summonUsed: false, pendulumUsed: false, pending: null, chain: [], chainLimit: setup.chainLimit ?? null, locks: [], sentThisTurn: [], winner: null, used: [], proper: [], triggers: [], standbyDone: phase !== "draw", summonTrigger: null, triggered: [], rng: (setup.seed ?? 1) >>> 0, summons: 0, summonLock: false };
 }
 
 export const other = (who: Side): Side => (who === "you" ? "rival" : "you");
@@ -823,6 +831,7 @@ class Play {
 		const refuse = (reason: Reason): false => (auto ? false : reject(reason));
 		const keys = this.onceKeys(who, card, index, effect, zone);
 		if (keys.some((key) => s.used.includes(key))) return refuse("once-per-turn");
+		if (!this.conditionsMet(who, effect.conditions ?? [], card)) return refuse("condition-not-met");
 		if (!this.stepsReady(who, effect.actions, pick, target, card, zone)) return refuse("no-target");
 		if (this.deckLocked() && choiceOf(effect.actions)?.from.includes("deck") && categoriesOf(effect.actions).has("search")) return refuse("deck-locked");
 		const mine = s[who];
@@ -906,15 +915,39 @@ class Play {
 	}
 	/** The steps of an effect, in order. A step that finds nothing to do stops the ones after it ("and if you do"). */
 	private runSteps(who: Side, actions: readonly Action[], source: CardId, pick?: CardId, target?: number, zone?: number): void {
+		this.lastSummoned = null;
 		for (const action of actions) {
 			if (this.state.winner) return;
-			if (!this.runStep(who, action, pick, target, zone)) {
+			const done = this.runStep(who, action, pick, target, zone, source);
+			/* "Then, if…, you can…" and "also…": when they cannot be done, the rest still happens. */
+			if (!done && action.do !== "special-same" && action.do !== "lock") {
 				this.events.push({ type: "no-effect", card: source });
 				return;
 			}
 		}
 	}
-	private runStep(who: Side, action: Action, pick?: CardId, target?: number, source?: number): boolean {
+	/** The monster the steps being run last Special Summoned ("the same name as the Summoned monster"). */
+	private lastSummoned: CardId | null = null;
+	/** Is every condition true now, for an effect of this player's card? */
+	private conditionsMet(who: Side, conditions: readonly Condition[], self: CardId): boolean {
+		const s = this.state;
+		return conditions.every((condition) => {
+			if ("on" in condition) return [s.you, s.rival].some((side) => side.monsters.some((slot) => !!slot && !slot.faceDown && fitsFilter(slot.card, condition.filter)));
+			if ("foeMonsters" in condition) return s[other(who)].monsters.filter(Boolean).length >= condition.foeMonsters;
+			if ("show" in condition) {
+				const mine = s[who];
+				const shown = [...mine.hand, ...mine.deck, ...mine.graveyard, ...mine.monsters.flatMap((slot) => (slot && !slot.faceDown ? [slot.card] : []))];
+				return shown.filter((card) => named(card, condition.show)).length >= condition.count;
+			}
+			if ("phase" in condition) return s.phase === condition.phase && s.turn === who;
+			return s.sentThisTurn.some((sent) => sent.side === who && sent.card === self) && s[who].graveyard.includes(self);
+		});
+	}
+	/** May this player Special Summon this monster now, under "you cannot Special Summon, except…" locks? */
+	private specialAllowed(who: Side, card: CardId): boolean {
+		return this.state.locks.every((lock) => lock.kind !== "special-only" || lock.side !== who || lock.types.includes(typeOf(card) as MonsterType));
+	}
+	private runStep(who: Side, action: Action, pick?: CardId, target?: number, source?: number, card?: CardId): boolean {
 		const s = this.state;
 		const mine = s[who];
 		switch (action.do) {
@@ -941,13 +974,56 @@ class Play {
 			case "special": {
 				const place = pick && fitsFilter(pick, action.filter) ? action.from.find((at) => mine[at].includes(pick)) : undefined;
 				const zone = action.to === "pointed" ? (this.pointedBy(who, source).find((at) => !mine.monsters[at]) ?? -1) : this.freeZone(who);
-				if (!pick || !place || zone < 0) return false;
+				if (!pick || !place || zone < 0 || !this.specialAllowed(who, pick)) return false;
 				const list = mine[place];
 				list.splice(list.indexOf(pick), 1);
 				if (place === "deck") this.shuffle(mine.deck);
 				mine.monsters[zone] = standing(pick, { summoned: true });
 				if (who === s.turn) s.summons += 1;
+				this.lastSummoned = pick;
 				this.events.push({ type: "special", side: who, card: pick, zone, how: "own", materials: [] });
+				return true;
+			}
+			case "special-same": {
+				const same = this.lastSummoned;
+				const zone = this.freeZone(who);
+				if (!same || zone < 0 || !mine.deck.includes(same) || !this.specialAllowed(who, same)) return false;
+				if (action.if && !this.conditionsMet(who, [action.if], card ?? same)) return false;
+				mine.deck.splice(mine.deck.indexOf(same), 1);
+				this.shuffle(mine.deck);
+				mine.monsters[zone] = standing(same, { summoned: true });
+				if (who === s.turn) s.summons += 1;
+				this.events.push({ type: "special", side: who, card: same, zone, how: "own", materials: [] });
+				return true;
+			}
+			case "recover": {
+				const at = pick && fitsFilter(pick, action.filter) ? mine.graveyard.lastIndexOf(pick) : -1;
+				if (at < 0) return false;
+				mine.graveyard.splice(at, 1);
+				mine.hand.push(pick as CardId);
+				this.events.push({ type: "added", side: who, card: pick as CardId, from: "graveyard" });
+				return true;
+			}
+			case "destroy-foes": {
+				const foe = other(who);
+				const any = s[foe].monsters.some(Boolean);
+				s[foe].monsters.forEach((slot, at) => {
+					if (!slot) return;
+					this.events.push({ type: "destroyed", side: foe, card: slot.card });
+					this.leave(foe, at, "graveyard");
+				});
+				return any;
+			}
+			case "lock": {
+				const by = card ?? ("" as CardId);
+				if (action.special) {
+					s.locks.push({ kind: "special-only", side: who, types: action.special, by });
+					this.events.push({ type: "locked", side: who, card: by, what: "special" });
+				}
+				if (action.direct) {
+					s.locks.push({ kind: "direct-only", side: who, archetype: action.direct, by });
+					this.events.push({ type: "locked", side: who, card: by, what: "direct" });
+				}
 				return true;
 			}
 			case "draw": {
@@ -1043,6 +1119,7 @@ class Play {
 	private toGraveyard(who: Side, card: CardId, followedBy: After | null): void {
 		this.state[who].graveyard.push(card);
 		this.sentToGraveyard.push({ side: who, card });
+		this.state.sentThisTurn.push({ side: who, card });
 		const info = cardOf(card);
 		if (info.kind === "monster" && info.trigger) this.state.triggers.push({ side: who, card, after: followedBy });
 	}
@@ -1445,6 +1522,7 @@ class Play {
 		s.standbyDone = false;
 		s.used = [];
 		s.locks = [];
+		s.sentThisTurn = [];
 		this.events.push({ type: "turn", side: s.turn });
 		if (this.me.skipDraw) {
 			delete this.me.skipDraw;
@@ -1503,7 +1581,10 @@ class Play {
 			if (!whole || move.zone >= me.monsters.length) reject("wrong-zone");
 			if (move.zone >= mainZones(s)) reject("extra-zone");
 			this.needMain();
-			if (move.special) return this.ownSummon(move, at);
+			if (move.special) {
+				if (!this.specialAllowed(s.turn, move.card)) reject("card-locked");
+				return this.ownSummon(move, at);
+			}
 			/* A Ritual Monster is only ever Special Summoned by its Ritual Spell; some monsters say "Cannot be Normal Summoned/Set". */
 			if (card.frame || card.noNormal) reject("special-only");
 			return this.summon(move, at, card.level);
@@ -1562,9 +1643,14 @@ class Play {
 		if (effect.type === "data") {
 			/* "If you control no monsters in your Main Monster Zone:" */
 			if (effect.needs === "no-main-monsters" && me.monsters.some((held, zone) => zone < mainZones(s) && !!held)) reject("condition-not-met");
+			if (!this.conditionsMet(s.turn, effect.conditions ?? [], move.card)) reject("condition-not-met");
 			if (!this.stepsReady(s.turn, effect.actions, move.pick, move.target, move.card)) reject("no-target");
 			if (this.deckLocked() && choiceOf(effect.actions)?.from.length === 1 && cardCategories(move.card).has("search")) reject("deck-locked");
 		}
+		/* "You cannot Special Summon, except…": a Spell that would Special Summon another kind of monster cannot be activated. */
+		const called = move.pick ?? move.summon ?? (move.grave ? s[move.grave.side].graveyard[move.grave.index] : undefined) ?? (effect.type === "call" ? (effect.card as CardId) : undefined);
+		const brings = ["revive", "deck-summon", "call", "hand-summon", "fusion", "ritual"].includes(effect.type) || (effect.type === "data" && effect.actions.some((step) => step.do === "special"));
+		if (brings && called && cardOf(called).kind === "monster" && !this.specialAllowed(s.turn, called)) reject("card-locked");
 		/* Under Droll & Lock Bird's lock, a card that could only add from the Deck to the hand cannot be activated. */
 		if (this.deckLocked() && (effect.type === "search" || effect.type === "search-pick" || effect.type === "draw" || effect.type === "draw-then-gift")) reject("deck-locked");
 		if (effect.type === "hand-summon") {
@@ -1807,6 +1893,7 @@ class Play {
 		this.needMain();
 		const scales = scalesOf(s, s.turn);
 		if (!scales) return reject("no-scales");
+		if (cards.some((card) => !this.specialAllowed(s.turn, card))) reject("card-locked");
 		if (s.pendulumUsed) reject("pendulum-used");
 		/* Blue-Eyes Spirit Dragon: "Neither player can Special Summon 2 or more monsters at the same time." */
 		if (cards.length > 1 && [s.you, s.rival].some((who) => who.monsters.some((slot) => !!slot && !!live(slot)?.oneAtATime))) reject("one-at-a-time");
@@ -1863,6 +1950,7 @@ class Play {
 		this.needMain();
 		const at = me.extra.indexOf(move.card);
 		if (at < 0) reject("not-in-extra");
+		if (!this.specialAllowed(s.turn, move.card)) reject("card-locked");
 		const info = monsterOf(move.card);
 		const zones = [...new Set(move.materials)];
 		const slots = zones.map((zone) => me.monsters[zone] ?? null);
@@ -1961,6 +2049,8 @@ class Play {
 		if (s.phase !== "battle" && (!this.auto || after(s.phase, "battle"))) reject("not-battle-phase");
 		const slot = this.me.monsters[attacker];
 		if (!slot) return reject("no-monster");
+		/* "You can only attack directly with [Blue-Eyes] monsters for the rest of this turn." */
+		if (target === "direct" && s.locks.some((lock) => lock.kind === "direct-only" && lock.side === s.turn && !fitsFilter(slot.card, { archetype: lock.archetype }))) reject("card-locked");
 		if (slot.position === "defense" && !(live(slot)?.defenseAttack && !them.monsters.some(Boolean))) reject("defense-cannot-attack");
 		/* Twin Burst: "up to 2 attacks on monsters": a direct attack is its only one. */
 		if (target === "direct" && live(slot)?.monstersOnly && (slot.attackCount ?? 0) > 0) reject("already-attacked");

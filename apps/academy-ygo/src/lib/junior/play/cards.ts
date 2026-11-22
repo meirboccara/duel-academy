@@ -121,7 +121,7 @@ export type Effect =
 	 * A card written as data: what it does, step by step, from the shared vocabulary (effects.ts). `needs`: "If you
 	 * control no monsters in your Main Monster Zone:".
 	 */
-	| { type: "data"; actions: readonly Action[]; needs?: "no-main-monsters" };
+	| { type: "data"; actions: readonly Action[]; needs?: "no-main-monsters"; conditions?: readonly Condition[] };
 
 /** Which cards an effect looks for, as printed: "1 Level 1 LIGHT Tuner", "1 "Toon" card", "1 Field Spell". */
 export interface CardFilter {
@@ -163,7 +163,33 @@ export type Action =
 	/** "Target 1 [filter] you control; send it to the GY." */
 	| { do: "send-target"; filter: CardFilter }
 	/** "Draw [n] card(s)." */
-	| { do: "draw"; count: number };
+	| { do: "draw"; count: number }
+	/** "Add 1 [filter] from your GY to your hand" ("target 1 … in your GY; add it to your hand"). */
+	| { do: "recover"; filter: CardFilter }
+	/** "Destroy all monsters your opponent controls." */
+	| { do: "destroy-foes" }
+	/**
+	 * "Then, if [condition], you can Special Summon 1 monster from your Deck with the same name as the Summoned monster."
+	 * Done only when the condition holds; when it cannot be done, the steps after it still happen.
+	 */
+	| { do: "special-same"; if?: Condition }
+	/**
+	 * "For the rest of this turn": `special` "you cannot Special Summon, except [Types] monsters"; `direct` "you can only
+	 * attack directly with [archetype] monsters".
+	 */
+	| { do: "lock"; special?: readonly MonsterType[]; direct?: string };
+/** What must be true for an effect to be activated. */
+export type Condition =
+	/** "If a [filter] monster is on the field": face-up, on either side. */
+	| { on: "field"; filter: CardFilter }
+	/** "If your opponent controls [n] or more monsters". */
+	| { foeMonsters: number }
+	/** "Show 3 [card] in your hand, Deck, face-up field, and/or GY". */
+	| { show: string; count: number }
+	/** "During your Main Phase 2". */
+	| { phase: "main2" }
+	/** "If this card is in your GY because it was sent there this turn". */
+	| { sentThisTurn: true };
 /** A monster's effect written as data. */
 export interface DataEffect {
 	/**
@@ -180,6 +206,8 @@ export interface DataEffect {
 	 * face-up card you control to the GY".
 	 */
 	cost?: "discard-self" | "banish-self" | "send-self";
+	/** What must be true for it to be activated. */
+	conditions?: readonly Condition[];
 	actions: readonly Action[];
 	/**
 	 * "You can only use this effect of [card] once per turn" (`name`); "You can only use 1 [card] effect per turn"
@@ -397,6 +425,8 @@ export interface EffectCard {
 	icon?: Icon;
 	/** "You can only activate 1 [this card] per turn." */
 	onePerTurn?: true;
+	/** Its effects written as data that work outside its activation: from the GY (The Guiding Flute of Summoning Dragons). */
+	effects?: readonly DataEffect[];
 	art: string;
 }
 export type Card = MonsterCard | EffectCard;
@@ -684,6 +714,18 @@ export const CARDS = {
 		effects: [{ when: "ignition", once: "copy", actions: [{ do: "special", from: ["hand"], filter: { normal: true, maxLevel: 4 }, to: "pointed" }] }],
 	}),
 	/* Cards written as data (effects.ts): their effects need no code of their own. */
+	/* MAMS (Magnificent Maestros, TCG 2026-11-12). */
+	"the-guiding-flute-of-summoning-dragons": {
+		kind: "spell",
+		onePerTurn: true,
+		effect: {
+			type: "data",
+			conditions: [{ on: "field", filter: { kind: "monster", type: "spellcaster" } }],
+			actions: [{ do: "special", from: ["deck"], filter: { kind: "monster", type: "dragon", minLevel: 5 } }, { do: "special-same", if: { foeMonsters: 2 } }, { do: "lock", special: ["dragon", "spellcaster"] }],
+		},
+		effects: [{ when: "ignition", from: "graveyard", cost: "banish-self", once: "name", conditions: [{ phase: "main2" }, { sentThisTurn: true }], actions: [{ do: "draw", count: 1 }] }],
+		art: "🪈",
+	},
 	"fossil-dig": { kind: "spell", effect: { type: "data", actions: [{ do: "search", filter: { kind: "monster", type: "dinosaur", maxLevel: 6 } }] }, art: "🦴" },
 	"summoners-art": { kind: "spell", effect: { type: "data", actions: [{ do: "search", filter: { normal: true, minLevel: 5 } }] }, art: "📜" },
 	"armageddon-knight": real("armageddon-knight", { effects: [{ when: "summoned", optional: true, actions: [{ do: "mill", filter: { kind: "monster", attribute: "DARK" } }] }] }),

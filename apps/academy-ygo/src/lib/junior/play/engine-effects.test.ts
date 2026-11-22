@@ -129,3 +129,28 @@ describe("filters by Type and Level, Flip Summons, and sending the card itself",
 	});
 });
 
+describe("conditions, a second Summon of the same name, locks for the rest of the turn, and a Spell's effect from the GY", () => {
+	const flute = (you: Setup["you"] = {}, rival: Setup["rival"] = {}) =>
+		mat({ you: { hand: ["the-guiding-flute-of-summoning-dragons", "monster-reborn"], deck: ["blue-eyes-white-dragon", "blue-eyes-white-dragon", "iron-boar"], graveyard: ["celtic-guardian"], ...you }, rival });
+	it("The Guiding Flute of Summoning Dragons needs a Spellcaster on the field", () => {
+		expect(reason(flute(), cast("the-guiding-flute-of-summoning-dragons", { pick: "blue-eyes-white-dragon" }))).toBe("condition-not-met");
+		expect(reason(flute({ monsters: ["dark-magician"] }), cast("the-guiding-flute-of-summoning-dragons", { pick: "iron-boar" }))).toBe("no-target");
+	});
+	it("Special Summons a Level 5 or higher Dragon, a second one of the same name when the opponent has 2 monsters, then only Dragons and Spellcasters", () => {
+		const one = play(flute({ monsters: ["dark-magician"] }, { monsters: ["mud-toad"] }), cast("the-guiding-flute-of-summoning-dragons", { pick: "blue-eyes-white-dragon" }));
+		expect(one.you.monsters.filter((slot) => slot?.card === "blue-eyes-white-dragon")).toHaveLength(1);
+		const two = play(flute({ monsters: ["dark-magician"] }, { monsters: ["mud-toad", "iron-boar"] }), cast("the-guiding-flute-of-summoning-dragons", { pick: "blue-eyes-white-dragon" }));
+		expect(two.you.monsters.filter((slot) => slot?.card === "blue-eyes-white-dragon")).toHaveLength(2);
+		expect(reason(two, cast("monster-reborn", { zone: 1, grave: { side: "you", index: 0 } }))).toBe("card-locked");
+	});
+	it("from the GY in Main Phase 2, the turn it was sent there: banish it to draw 1 card", () => {
+		const used = play(flute({ monsters: ["dark-magician"] }), cast("the-guiding-flute-of-summoning-dragons", { pick: "blue-eyes-white-dragon" }));
+		const draw = use("the-guiding-flute-of-summoning-dragons", 0);
+		expect(reason(used, draw)).toBe("condition-not-met");
+		const later = play(used, { type: "phase", to: "battle" }, { type: "phase", to: "main2" });
+		const drawn = play(later, draw);
+		expect(drawn.you.banished).toEqual([{ card: "the-guiding-flute-of-summoning-dragons", faceDown: false }]);
+		expect(drawn.you.hand).toHaveLength(2);
+	});
+});
+
