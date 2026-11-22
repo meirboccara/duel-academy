@@ -7,6 +7,13 @@ export interface DeckCopy {
 	deckButton: string;
 	deckTitle: string;
 	chooseTitle: string;
+	/** A newer edition of the child's starter Deck is offered. */
+	updateTitle: string;
+	updateText: (starter: string) => string;
+	updateCards: string;
+	updateMore: (count: number) => string;
+	takeNew: string;
+	keepMine: string;
 	chooseText: string;
 	starters: Record<StarterId, { name: string; text: string }>;
 	choose: (name: string) => string;
@@ -44,6 +51,12 @@ export const DECK_COPY: Record<Locale, DeckCopy> = {
 		deckButton: "Mon Deck",
 		deckTitle: "Ton Deck pour les maîtres",
 		chooseTitle: "Choisis ton Deck de départ",
+		updateTitle: "Un nouveau Deck de départ !",
+		updateText: (starter) => `Ton Deck ${starter} a une nouvelle version, comme les duellistes d’aujourd’hui : des hand traps, des cartes qui cherchent dans le Deck, et un Extra Deck de 15 cartes. Tu le prends, ou tu gardes le tien ? Ses nouvelles cartes vont dans ton classeur dans les deux cas.`,
+		updateCards: "Les nouvelles cartes :",
+		updateMore: (count) => `et ${count} de plus`,
+		takeNew: "Prendre le nouveau Deck",
+		keepMine: "Garder mon Deck",
 		chooseText: "Chaque Deck a déjà son Extra Deck (Fusion, Synchro, Xyz et Lien). Ses cartes vont dans ton classeur. Ensuite, tu pourras changer ton Deck quand tu veux, avec toutes les cartes de ton classeur.",
 		starters: {
 			warrior: { name: "Magicien Sombre", text: "Magicien Sombre et ses amis. En Fusion : Paladin Sombre, les Chevaliers Dragons, Dragon Crâne Noir." },
@@ -88,6 +101,12 @@ export const DECK_COPY: Record<Locale, DeckCopy> = {
 		deckButton: "My Deck",
 		deckTitle: "Your Deck for the masters",
 		chooseTitle: "Choose your starter Deck",
+		updateTitle: "A new starter Deck!",
+		updateText: (starter) => `Your ${starter} Deck has a new version, like today's duelists play: hand traps, cards that search the Deck, and a 15-card Extra Deck. Take it, or keep yours? Its new cards go into your binder either way.`,
+		updateCards: "The new cards:",
+		updateMore: (count) => `and ${count} more`,
+		takeNew: "Take the new Deck",
+		keepMine: "Keep my Deck",
 		chooseText: "Each Deck comes with its Extra Deck (Fusion, Synchro, Xyz and Link). Its cards go into your binder. Then you can change your Deck any time, with every card in your binder.",
 		starters: {
 			warrior: { name: "Dark Magician", text: "Dark Magician and friends. Fusions: Dark Paladin, the Dragon Knights, Black Skull Dragon." },
@@ -132,6 +151,12 @@ export const DECK_COPY: Record<Locale, DeckCopy> = {
 		deckButton: `החפיסה שלי (${L("Deck")})`,
 		deckTitle: "החפיסה שלכם מול המאסטרים",
 		chooseTitle: "בחרו חפיסת התחלה",
+		updateTitle: "חפיסת התחלה חדשה!",
+		updateText: (starter) => `לחפיסת ה־${starter} שלכם יש גרסה חדשה, כמו שמשחקים היום: ⁦hand traps⁩, קלפים שמחפשים ב־⁦Deck⁩, ו־⁦Extra Deck⁩ של 15 קלפים. לוקחים אותה, או שומרים את שלכם? הקלפים החדשים נכנסים לאלבום בכל מקרה.`,
+		updateCards: "הקלפים החדשים:",
+		updateMore: (count) => `ועוד ${count}`,
+		takeNew: "לקחת את החפיסה החדשה",
+		keepMine: "לשמור את החפיסה שלי",
 		chooseText: `לכל חפיסה כבר יש ${L("Extra Deck")} (${L("Fusion")}, ${L("Synchro")}, ${L("Xyz")}, ${L("Link")}). הקלפים שלה נכנסים לאלבום שלכם. אחר כך אפשר לשנות את החפיסה מתי שרוצים, עם כל הקלפים שבאלבום.`,
 		starters: {
 			warrior: { name: L("Dark Magician"), text: `${L("Dark Magician")} והחברים שלו. מיזוגים: ${L("Dark Paladin")}, אבירי הדרקון, ${L("Black Skull Dragon")}.` },

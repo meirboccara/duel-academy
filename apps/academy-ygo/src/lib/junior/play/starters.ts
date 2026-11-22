@@ -1,3 +1,4 @@
+import type { CardId } from "@duel-academy/engine";
 import { build } from "./master-decks";
 import type { Deck } from "./masters";
 
@@ -28,6 +29,19 @@ const TRAPS = [
 	["bottomless-trap-hole", 1],
 	["torrential-tribute", 1],
 ] as const;
+
+/**
+ * The edition of the starter Decks. Raise it whenever a starter's list changes: a child whose saved Deck came from an
+ * older edition is offered the new one (deck-record.ts `starterUpdate`), and may keep their own.
+ * 1: the first Decks (2026-11-20). 2: today's meta, with hand traps and 15-card Extra Decks (2026-11-23).
+ */
+export const STARTER_EDITION = 2;
+/** The cards of each starter's earlier editions: still the child's, so a Deck built from them stays valid. */
+export const PAST_STARTER_CARDS: Record<StarterId, readonly CardId[]> = {
+	warrior: ["dark-magician", "dark-magician-girl", "magicians-rod", "magicians-valkyria", "buster-blader", "curse-of-dragon", "gaia-the-fierce-knight", "summoned-skull", "red-eyes-black-dragon", "tune-warrior", "ash-blossom-joyous-spring", "effect-veiler", "polymerization", "dark-magical-curtain", "sages-stone", "dark-magic-attack", "thousand-knives", "monster-reborn", "dark-hole", "swords-of-revealing-light", "spark-dash", "magic-cylinder", "negate-attack", "dark-paladin", "dark-magician-the-dragon-knight", "dark-magician-girl-the-dragon-knight", "gaia-the-dragon-champion", "black-skull-dragon", "gaia-dragon-the-thunder-charger", "gaia-knight", "lanphorhynchus", "mirror-force", "bottomless-trap-hole", "trap-hole", "torrential-tribute", "sakuretsu-armor"],
+	dragon: ["blue-eyes-white-dragon", "blue-eyes-alternative-white-dragon", "flamvell-guard", "effect-veiler", "ash-blossom-joyous-spring", "battle-fader", "vorse-raider", "la-jinn-the-mystical-genie-of-the-lamp", "x-head-cannon", "luster-dragon-2", "polymerization", "ancient-rules", "trade-in", "burst-stream-of-destruction", "silvers-cry", "monster-reborn", "raigeki", "dark-hole", "spark-dash", "thunder-clap", "negate-attack", "magic-cylinder", "blue-eyes-ultimate-dragon", "blue-eyes-twin-burst-dragon", "blue-eyes-spirit-dragon", "gem-knight-pearl", "utopia", "lanphorhynchus", "mirror-force", "bottomless-trap-hole", "trap-hole", "torrential-tribute", "sakuretsu-armor"],
+	hero: ["elemental-hero-avian", "elemental-hero-burstinatrix", "elemental-hero-clayman", "elemental-hero-sparkman", "elemental-hero-blazeman", "elemental-hero-bladedge", "elemental-hero-neos", "ash-blossom-joyous-spring", "effect-veiler", "polymerization", "a-hero-lives", "e-emergency-call", "reinforcement-of-the-army", "fusion-sage", "monster-reborn", "dark-hole", "raigeki", "the-warrior-returning-alive", "forbidden-chalice", "book-of-moon", "hero-barrier", "magic-cylinder", "elemental-hero-flame-wingman", "elemental-hero-shining-flare-wingman", "elemental-hero-thunder-giant", "elemental-hero-great-tornado", "elemental-hero-nova-master", "elemental-hero-gaia", "elemental-hero-rampart-blaster", "gem-knight-pearl", "utopia", "mirror-force", "bottomless-trap-hole", "trap-hole", "torrential-tribute", "sakuretsu-armor"],
+};
 
 export const STARTERS: Record<StarterId, Starter> = {
 	/* Dark Magician: Magician's Rod finds the Curtain; Dark Paladin (with Buster Blader), the two Dragon Knights, Black Skull Dragon, a Rank 7. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buy, onSale, SHOP_CARDS, starsEarned } from "../world/shop";
-import { addCard, deckReady, deckable, loadDeck, parseDeck, refreshDeck, removeCard, saveDeck, startWith, starterCards } from "./deck-record";
+import { addCard, deckReady, deckable, keepOwnDeck, loadDeck, parseDeck, refreshDeck, removeCard, saveDeck, startWith, starterCards, starterUpdate } from "./deck-record";
+import { STARTER_EDITION, STARTERS } from "./starters";
 import { MASTER_STARS, masterLevelId } from "./masters";
 import { emptyPlayProgress, type PlayProgress } from "./progress";
 
@@ -19,7 +20,7 @@ describe("the child's Deck", () => {
 		expect(starterCards(deck)).toContain("blue-eyes-white-dragon");
 	});
 	it("keeps only real cards from a stored record, and no deck without a starter", () => {
-		expect(parseDeck({ starter: "hero", main: ["pocket-cub", "not-a-card", 3], extra: ["elemental-hero-flame-wingman"] })).toEqual({ starter: "hero", main: ["pocket-cub"], extra: ["elemental-hero-flame-wingman"] });
+		expect(parseDeck({ starter: "hero", main: ["pocket-cub", "not-a-card", 3], extra: ["elemental-hero-flame-wingman"] })).toEqual({ starter: "hero", main: ["pocket-cub"], extra: ["elemental-hero-flame-wingman"], edition: 1 });
 		expect(parseDeck({ main: ["pocket-cub"] }).main).toEqual([]);
 		expect(parseDeck("broken").starter).toBeNull();
 	});
@@ -61,3 +62,38 @@ describe("the shop and the masters' island", () => {
 		expect(starsEarned(beaten(emptyPlayProgress(), masterLevelId("rex-raptor")))).toBe(MASTER_STARS);
 	});
 });
+
+describe("a new edition of the starter Decks", () => {
+	/* A Deck saved before editions: the first Blue-Eyes starter, with Flamvell Guard and X-Head Cannon. */
+	const old = parseDeck({ starter: "dragon", main: ["blue-eyes-white-dragon", "flamvell-guard", "x-head-cannon"], extra: ["blue-eyes-spirit-dragon"] });
+	it("is offered to a child whose Deck came from an older edition, with the cards it brings", () => {
+		expect(old.edition).toBe(1);
+		const offer = starterUpdate(old);
+		expect(offer?.starter).toBe("dragon");
+		expect(offer?.added).toContain("sage-with-eyes-of-blue");
+		expect(offer?.added).not.toContain("blue-eyes-white-dragon");
+	});
+	it("taking it makes the new starter the child's Deck; keeping the old Deck leaves it as it is; either way it is not offered again", () => {
+		const taken = startWith("dragon");
+		expect(taken.main).toEqual(STARTERS.dragon.deck.main);
+		expect(taken.edition).toBe(STARTER_EDITION);
+		expect(starterUpdate(taken)).toBeNull();
+		const kept = keepOwnDeck(old);
+		expect(kept.main).toEqual(old.main);
+		expect(starterUpdate(kept)).toBeNull();
+		const storage = memory();
+		saveDeck(storage, "k:deck", kept);
+		expect(starterUpdate(loadDeck(storage, "k:deck"))).toBeNull();
+	});
+	it("never takes a card away: the cards of the earlier edition stay in the binder, so a Deck built from them stays", () => {
+		const cards = new Set(starterCards(old));
+		expect(cards.has("flamvell-guard")).toBe(true);
+		expect(cards.has("sage-with-eyes-of-blue")).toBe(true);
+		const edited = { ...startWith("dragon"), main: [...STARTERS.dragon.deck.main.slice(1), "flamvell-guard" as const] };
+		expect(refreshDeck(edited, new Set(starterCards(edited)))).toEqual(edited);
+	});
+	it("is not offered before a starter is chosen", () => {
+		expect(starterUpdate(parseDeck(null))).toBeNull();
+	});
+});
+

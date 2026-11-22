@@ -40,3 +40,46 @@ export function StarterDialog({ copy, locale, onChoose, onClose }: { copy: PlayC
 		</Modal>
 	);
 }
+
+/** How many new cards the offer shows as pictures; the rest are counted. */
+const SHOWN_NEW = 8;
+/**
+ * A newer edition of the child's starter Deck (starters.ts `STARTER_EDITION`): the new cards, and a choice between the
+ * new Deck and the child's own. The new cards join the binder either way.
+ */
+export function StarterUpdateDialog({ starter, added, copy, locale, onTake, onKeep }: { starter: StarterId; added: readonly CardId[]; copy: PlayCopy; locale: Locale; onTake: () => void; onKeep: () => void }) {
+	const words = DECK_COPY[locale];
+	const shown = added.slice(0, SHOWN_NEW);
+	return (
+		<Modal title={words.updateTitle} onClose={onKeep}>
+			<p dir="auto" className="text-sm text-fg-muted">
+				{words.updateText(words.starters[starter].name)}
+			</p>
+			<p className="text-sm font-semibold text-fg">{words.updateCards}</p>
+			<ul className="flex flex-wrap gap-2">
+				{shown.map((card) => {
+					const art = cardArtUrl(card, 160);
+					const name = copy.cards[card]?.name ?? card;
+					return (
+						<li key={card} className="flex w-20 flex-col items-center gap-1 text-center">
+							{art && <img src={art} alt="" width={160} height={160} className="h-16 w-16 rounded-lg object-cover" />}
+							<span dir="auto" className="text-[11px] leading-tight text-fg">
+								{name}
+							</span>
+						</li>
+					);
+				})}
+			</ul>
+			{added.length > shown.length && <p className="text-xs text-fg-muted">{words.updateMore(added.length - shown.length)}</p>}
+			<div className="flex flex-wrap gap-2">
+				<button type="button" onClick={onTake} className="rounded-xl border-4 border-gold-400 bg-gold-400 px-4 py-2 font-display text-base text-ink-950">
+					{words.takeNew}
+				</button>
+				<button type="button" onClick={onKeep} className="rounded-xl border-4 border-gold-400/70 px-4 py-2 font-display text-base text-fg">
+					{words.keepMine}
+				</button>
+			</div>
+		</Modal>
+	);
+}
+

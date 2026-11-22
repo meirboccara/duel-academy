@@ -11,7 +11,7 @@ import { requestPersist } from "@/lib/junior/persist";
 import { PLAY_COPY, playCopyFor } from "@/lib/junior/play/copy";
 import { seeded } from "@duel-academy/engine";
 import { DECK_COPY } from "@/lib/junior/play/deck-copy";
-import { NO_DECK, deckKeyFor, deckReady, deckable, loadDeck, refreshDeck, saveDeck, startWith, starterCards, type DeckRecord } from "@/lib/junior/play/deck-record";
+import { NO_DECK, deckKeyFor, deckReady, deckable, keepOwnDeck, loadDeck, refreshDeck, saveDeck, startWith, starterCards, starterUpdate, type DeckRecord } from "@/lib/junior/play/deck-record";
 import { MASTER_NAMES, duelSetup } from "@/lib/junior/play/masters";
 import { LEVELS, RULE_IDS, WORLD_IDS, levelById, levelsOf, type WorldId } from "@/lib/junior/play/levels";
 import { PLAY_PROGRESS_KEY, emptyPlayProgress, isSolved, isUnlocked, loadPlayProgress, mergePlayProgress, nextLevel, recordSolve, ruleMastery, savePlayProgress, type PlayProgress, type PlayStorage } from "@/lib/junior/play/progress";
@@ -26,7 +26,7 @@ import type { Outfit } from "@/lib/junior/world/wardrobe";
 import { type Dorm, dormCapId, dormKeyFor, dormToChoose, loadDorm, saveDorm } from "@/lib/junior/world/dorm";
 import { IslandWorld } from "../world/island-world";
 import { AlbumCards, AlbumDialog } from "./album-dialog";
-import { StarterDialog } from "./deck-dialog";
+import { StarterDialog, StarterUpdateDialog } from "./deck-dialog";
 import { DeckBuilder } from "./deck-builder";
 import { DEV_TOOLS, DevPanelSlot } from "../dev/dev-slot";
 import { DEV_DEFAULTS, devDuelLevel, loadDev, saveDev, solvedBefore, solvedThrough, type DevSettings } from "@/lib/junior/dev/dev-tools";
@@ -252,6 +252,8 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 		setDeck(record);
 		setDeckOpen(false);
 	};
+	/* A newer edition of the child's starter Deck, offered once on the map: take it, or keep their own. */
+	const starterOffer = hydrated && !level ? starterUpdate(deck) : null;
 	/* Things this character cannot hold (bought before each character had its own) are refunded: they cost nothing. */
 	const heroAvatar = player?.avatar ?? DEFAULT_AVATAR;
 	const stars = starsLeft(progress, bought, shop.items, heroAvatar);
@@ -568,6 +570,9 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 					/>
 				)}
 				{!level && albumOpen && <AlbumDialog cards={cards} rewards={rewards} copy={copy} locale={locale} onClose={() => setAlbumOpen(false)} />}
+				{starterOffer && !deckOpen && (
+					<StarterUpdateDialog starter={starterOffer.starter} added={starterOffer.added} copy={copy} locale={locale} onTake={() => keepDeck(startWith(starterOffer.starter))} onKeep={() => keepDeck(keepOwnDeck(deck))} />
+				)}
 				{deckOpen && !deck.starter && <StarterDialog copy={copy} locale={locale} onChoose={(starter) => keepDeck(startWith(starter))} onClose={() => setDeckOpen(false)} />}
 				{deckOpen && deck.starter && <DeckBuilder deck={deck} owned={owned} copy={copy} locale={locale} onSave={keepDeck} onClose={() => setDeckOpen(false)} />}
 				{!level && shopOpen && <ShopDialog stars={stars} bought={bought} wardrobe={wardrobe} preview={previewOk ? preview : undefined} copy={copy} locale={locale} progress={progress} onBuy={onBuy} onClose={() => setShopOpen(false)} />}
