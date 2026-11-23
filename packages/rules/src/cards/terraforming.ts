@@ -17,6 +17,7 @@ export const TERRAFORMING: CardDef = {
 		{
 			type: "activation",
 			categories: ["search"],
+			requiresAddToHand: true,
 			condition: (duel, { player }) => fieldSpellsIn(duel, player).length > 0,
 			operation: (duel, link) => ask(duel, link.player, fieldSpellsIn(duel, link.player), (board, picked) => moveCard(board, picked, { zone: "hand" })),
 		},

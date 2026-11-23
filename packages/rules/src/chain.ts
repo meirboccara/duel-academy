@@ -1,9 +1,9 @@
 import { activateAction, activateEffect, activationWays } from "./activation";
 import { type Action, PASS, sameAction } from "./action";
-import { type CardInstance, closedPriority, destroyCard, type Duel, type Link, moveCard, other, PHASES, type Side } from "./duel";
+import { type CardInstance, closedPriority, destroyCard, MONSTER_ZONES, type Duel, type Link, moveCard, other, PHASES, type Side } from "./duel";
 import { breakEffect, type GameEvent, raiseEvent } from "./events";
 import { type CardDef, type EffectRecord, effectOf, rangeOf, speedOf } from "./effects";
-import { withoutEnded } from "./modifiers";
+import { returnControl, withoutEnded } from "./modifiers";
 import { cardNegated, immune } from "./negation";
 import { endChain, newTurn, refund } from "./once";
 import { beginSummon, finishSummon } from "./summon";
@@ -49,7 +49,6 @@ import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./
  */
 /** Step 7 gives the exact zones; until then a side holds at most five cards in its Spell & Trap Zones. */
 const SPELL_ZONES = 5;
-const MONSTER_ZONES = 5;
 
 /**
  * Every action open to the player who holds priority, "pass" first. A player who does not hold priority has none.
@@ -218,11 +217,11 @@ function pass(duel: Duel): Duel {
  * (When: after the whole chain, not after its own link. Konami's Japanese Q&A says so for Quick-Play Spells and Traps
  * chained to an effect: rule record `chained-card-after-chain`; the core applies it to every Spell and Trap Card.)
  */
-function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | null): Duel {
+function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | null, before: readonly GameEvent[] = []): Duel {
 	// The links as they stand once each has come up for resolution: a lower link carries the negation a higher one gave it.
 	const all = [...activated];
-	/** Events raised by the links resolved so far that a `lingers` effect may answer after the whole chain. */
-	const carried: GameEvent[] = [];
+	/** Events raised by the links resolved so far, which a `lingers` effect may answer after the whole chain. */
+	const carried: GameEvent[] = [...before];
 	let next = duel;
 	let result = pending;
 	for (;;) {
@@ -236,11 +235,13 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 		}
 		const asking = result.asking;
 		if (asking) {
-			if (asking.from.length > 1) return { ...result, asking: { ...asking, links: all } };
+			if (asking.from.length > 1) return { ...result, asking: { ...asking, links: all, carried } };
 			const board = { ...result, asking: null };
 			result = asking.from.length === 1 ? asking.then(board, asking.from[0]!) : board;
 			continue;
 		}
+		// The cards this link added to a hand stop being the last thing that happened when the next one resolves; a `lingers` effect may still answer it after the chain.
+		for (const event of result.live) if (event.type === "added-to-hand" && !carried.includes(event)) carried.push(event);
 		next = { ...result, chain: result.chain.slice(0, -1) };
 		result = null;
 	}
@@ -251,7 +252,6 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 		const now = next.cards[link.card.id]!;
 		if (now.zone === "spell" && now.face === "up" && now.moves === link.card.moves) next = moveCard(next, now.id, link.activationNegated ? { zone: "graveyard", negated: true } : { zone: "graveyard" });
 	}
-	for (const event of next.live) if (event.type === "added-to-hand" && !carried.includes(event)) carried.push(event);
 	next = endChain(carried.length > 0 ? { ...next, lingering: carried } : next);
 	// The window of a Summon ends with the first chain started in it (lead from YGOProJudge, no Konami page found): the Summon succeeds,
 	// unless it was negated, in which case the monster was destroyed by the negator and nothing was Summoned.
@@ -262,9 +262,9 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 
 /** The player picked a card for the effect that was asking: it goes on, and the rest of the chain resolves. */
 function answer(duel: Duel, picked: number): Duel {
-	const { links, then } = duel.asking!;
+	const { links, then, carried } = duel.asking!;
 	const board = { ...duel, asking: null };
-	return resolveChain(board, links, then(board, picked));
+	return resolveChain(board, links, then(board, picked), carried);
 }
 
 /** The next phase, or the other player's next turn after the End Phase. The game state is open, the turn player first. */
@@ -275,7 +275,9 @@ function nextPhase(duel: Duel): Duel {
 	if (at < PHASES.length - 1) {
 		const phase = PHASES[at + 1]!;
 		const turn = { ...moved.turn, phase };
-		return triggerPoint(raiseEvent({ ...moved, turn }, { type: "phase", phase, player: turn.player }), { holder: turn.player, passed: [], open: true });
+		// Control taken "until the End Phase" goes back as it begins, before its triggers are put on a chain.
+		const entered = phase === "end" ? returnControl(moved, turn.number) : moved;
+		return triggerPoint(raiseEvent({ ...entered, turn }, { type: "phase", phase, player: turn.player }), { holder: turn.player, passed: [], open: true });
 	}
 	const player: Side = other(duel.turn.player);
 	const turn = { player, number: duel.turn.number + 1, phase: PHASES[0]! };

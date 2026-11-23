@@ -167,3 +167,29 @@ Same machine and day (macOS, Node 20+, 2026-11-23), one run of `bench/legal-move
 
 crowdedHand stays above 10× (a full `pnpm bench` run just before had a noisy today's-engine mean of 0.727 ms against 0.0659 ms,
 11.0×). Step 6's change in the move path is one optional field on `moved`; the listing is untouched.
+
+# Rules core, step 6 (continuous effects, locks, control)
+
+Another machine (Windows 11, Node 20+, 2026-11-23), so the absolute numbers are not comparable with the macOS rows above; the ratio
+is. One run of `bench/legal-moves.bench.ts` (today's engine in the same run), mean per call:
+
+| Position | `legalActions` | list + `act` | today's engine | ratio |
+|---|---:|---:|---:|---:|
+| opening | 0.0004 ms | 0.0139 ms | 0.785 ms | 56× |
+| midgame | 0.0014 ms | 0.0182 ms | 3.293 ms | 181× |
+| crowdedHand | 0.0015 ms | 0.0383 ms | 1.142 ms | **29.8×** |
+
+The reference boards have no modifier and no card with a continuous record, so every query returns at once (`quiet`); the
+listing's new work is one `requiresAddToHand` flag read per offered effect.
+
+New in step 6 (`bench/continuous.bench.ts`), mean per call:
+
+| Case | Mean |
+|---|---:|
+| `legalActions`: Skill Drain, Muka Muka and a made-up continuous monster face-up, an ignition monster offered | 0.0016 ms |
+| `atk` of Muka Muka under Skill Drain (reads every face-up source, and asks whether each source is itself negated) | 0.0073 ms |
+| `legalActions`: your window with Droll & Lock Bird after the rival's search | 0.0009 ms |
+| `legalActions`: the rival's turn under Droll's lock (Pot of Greed and Terraforming not offered) | 0.0004 ms |
+
+`atk` on a board with continuous sources is the slow query (it walks the field and checks each source's own negation). Battle
+(step 6b) reads it at damage calculation only; a bot that reads every monster's ATK per move should cache per position.

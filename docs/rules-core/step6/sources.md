@@ -151,3 +151,17 @@ Ids are proposals for `src/continuous-sources.ts` (the same shape as `negation-s
 - Timestamp definition (what is the "timestamp" of a continuous effect): RB10 says the effect "starts when the face-up monster appears on the field", but no page defines a timestamp or compares two continuous effects that started at the same time (e.g. two Field Spells appearing together). Not asked of the judge (the question would have repeated #1).
 - Two simultaneous locks or a lock and its source being negated at the same time: the lazy reading in design.md makes it order-free except the negation recursion; no Konami page.
 - Droll & Lock Bird: whether the hand-add event survives a later Chain Link that resolved in the same chain (Konami only says "after the whole chain resolves"); OCG-only wording; step 3's "last thing that happened" limit may drop it (see design.md, Droll slice).
+
+## Read later (2026-11-23, while finishing step 6)
+
+- **drish** (`jp-qa`, cid 9279, fid 24396, page date 2026-10-02): on the turn Droll's effect was activated, Drish's effect ② may
+  choose its first bullet (return Link Monsters) but not its second (return the hands, then draw): "（A）１つ目の『●』の効果を選択して
+  発動することはできますが、２つ目の『●』の効果を選択して発動することはできません。" If Droll's effect is applied first in the same chain,
+  only the return is done and the draw is not. Recorded on Droll as a pending ruling.
+- fid 24401 (2つに1つ, page date 2026-10-08): "発動できます。" under the lock; its cards are Special Summoned or sent instead of added.
+  Not recorded (not an Academy card).
+- fid 24256 (Forbidden Crown vs Droll, page date 2025-12-11): about who activates first when a card is added; not about the lock.
+- YGOProJudge (third lead, asked 2026-11-23, one session, `ruling` with no source beyond its card cache): "a player cannot activate
+  'Terraforming' or 'Pot of Greed' while the effect of 'Droll & Lock Bird' is applying ... cards that have a mandatory effect to add
+  or draw cards from the Deck cannot be activated under this restriction." Consistent with fid 12797 (Maxx "C" etc. can be
+  activated: their draws come later) and with fid 24396. Used for `requiresAddToHand` on Terraforming and Pot of Greed.

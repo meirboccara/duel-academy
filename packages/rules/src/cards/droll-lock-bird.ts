@@ -29,6 +29,7 @@ export const DROLL_LOCK_BIRD: CardDef = {
 };
 
 const notes = "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=4&cid=9279&request_locale=ja";
+const qa = (fid: number) => `https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=${fid}&request_locale=ja`;
 
 export const DROLL_LOCK_BIRD_SOURCES: CardSources = {
 	code: "droll-lock-bird",
@@ -49,7 +50,13 @@ export const DROLL_LOCK_BIRD_SOURCES: CardSources = {
 		},
 		// OCG only: Konami's Japanese notes for the card (dated 2021-02-06).
 		{ id: "notes", kind: "jp-notes", cid: 9279, url: notes, read: "2026-11-23", quote: "（チェーン処理中に相手がカードを手札に加えた場合には、その一連のチェーン処理後に発動できます。）" },
+		// OCG only. Droll's list, Maxx "C" under the lock: it can be activated, and the draws are not done.
+		{ id: "draws-fail", kind: "jp-qa", cid: 9279, fid: 12797, url: qa(12797), read: "2026-11-23", quote: "発動できます。ただし、その効果によってドローする状況になった際には、実際にカードをドローすることはできません。" },
+		// OCG only. Droll's list, Allied Spatial Battle under the lock: a card that does not add from the Deck to the hand is played in full.
+		{ id: "other-parts", kind: "jp-qa", cid: 9279, fid: 24259, url: qa(24259), read: "2026-11-23", quote: "発動できます。発動した場合、『お互いはそれぞれ自身のデッキから攻撃力？以外のモンスター１体を選び、お互いに確認する』処理を行い、攻撃力が高い方のモンスターは墓地に送られます。" },
+		// OCG only. Droll's list, Drish's effect ② (page date 2026-10-02): of its two bullets, the one that returns the hands and then draws cannot be chosen.
+		{ id: "drish", kind: "jp-qa", cid: 9279, fid: 24396, url: qa(24396), read: "2026-11-23", quote: "（A）１つ目の『●』の効果を選択して発動することはできますが、２つ目の『●』の効果を選択して発動することはできません。" },
 	],
 	effects: ["text"],
-	rulings: [{ source: "notes" }],
+	rulings: [{ source: "notes" }, { source: "draws-fail" }, { source: "other-parts" }, { source: "drish", pending: "Drish (choosing among bullets) is not an Academy card" }],
 };

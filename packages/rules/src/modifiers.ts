@@ -1,4 +1,4 @@
-import type { CardInstance, Duel, Side } from "./duel";
+import { type CardInstance, changeControl, type Duel, MONSTER_ZONES, moveCard, type Side } from "./duel";
 import type { CardDef, EffectRecord } from "./effects";
 
 /**
@@ -53,9 +53,42 @@ export function addModifier(duel: Duel, modifier: Omit<Modifier, "stamp">): Duel
 const reaches = (duel: Duel, affects: Affects, target: CardInstance, source: CardInstance | null): boolean =>
 	typeof affects === "function" ? affects(duel, target, source) : affects.card === target.id && affects.moves === target.moves;
 
-/** The modifiers that have not ended at the end of turn number `endedTurn`. */
+/** The modifiers that end with turn number `endedTurn` are gone (a control change still standing is given back first). */
 export function withoutEnded(duel: Duel, endedTurn: number): Duel {
-	return duel.modifiers.some((modifier) => modifier.until <= endedTurn) ? { ...duel, modifiers: duel.modifiers.filter((modifier) => modifier.until > endedTurn) } : duel;
+	const returned = returnControl(duel, endedTurn);
+	return returned.modifiers.some((modifier) => modifier.until <= endedTurn) ? { ...returned, modifiers: returned.modifiers.filter((modifier) => modifier.until > endedTurn) } : returned;
+}
+
+/**
+ * The End Phase of turn number `turn` begins: each control change "until the End Phase" ends, and the card goes back to the player it
+ * was taken from, if it is still the card that was taken (`moves` unchanged); it is then a new card for them (record
+ * `control-until-end-phase`). Konami's notes say that player chooses the zone: zones are step 7, so it just goes to their field.
+ * With no free Monster Zone it is sent to the Graveyard: the core's reading, no Konami page read.
+ */
+export function returnControl(duel: Duel, turn: number): Duel {
+	const ending = duel.modifiers.filter((modifier) => modifier.layer.kind === "control" && modifier.until <= turn);
+	if (ending.length === 0) return duel;
+	let next: Duel = { ...duel, modifiers: duel.modifiers.filter((modifier) => !ending.includes(modifier)) };
+	for (const modifier of ending) {
+		if (modifier.layer.kind !== "control" || typeof modifier.affects === "function") continue;
+		const card = next.cards[modifier.affects.card]!;
+		if (card.moves !== modifier.affects.moves || card.zone !== "monster") continue;
+		next = next.piles[modifier.layer.to].monster.length < MONSTER_ZONES ? changeControl(next, card.id, modifier.layer.to) : moveCard(next, card.id, { zone: "graveyard" });
+	}
+	return next;
+}
+
+/**
+ * "Take control of that monster until the End Phase": the card moves to `side`'s field now (a new card for them: what was applied to
+ * it before ends, record `negated-monster-state`), and goes back when the End Phase of turn number `until` begins (`returnControl`). Control stays a
+ * physical move (design D3): piles are kept by controller. The card must be on the field and controlled by the other player.
+ */
+export function takeControl(duel: Duel, id: number, side: Side, until: number): Duel {
+	const before = duel.cards[id]!;
+	// With no free Monster Zone the card cannot come over (step 7 gives the zones).
+	if (before.zone !== "monster" || before.controller === side || duel.piles[side].monster.length >= MONSTER_ZONES) return duel;
+	const taken = changeControl(duel, id, side);
+	return addModifier(taken, { affects: { card: id, moves: taken.cards[id]!.moves }, until, layer: { kind: "control", to: before.controller } });
 }
 
 /**
@@ -186,7 +219,20 @@ export function originalAtk(duel: Duel, id: number): number {
 
 export const atk = (duel: Duel, id: number): number => statOf(duel, id, "atk");
 export const def = (duel: Duel, id: number): number => statOf(duel, id, "def");
-export const level = (duel: Duel, id: number): number => printed(duel, id, "level");
+/**
+ * The Level: the printed one, then the `set` and `add` modifiers in the order they began to apply, a `set` replacing what came before
+ * and an `add` counted from there. Backed by YGOProJudge only (asked 2026-11-23, no source cited); no Konami page was found.
+ */
+export function level(duel: Duel, id: number): number {
+	let value = printed(duel, id, "level");
+	if (quiet(duel)) return value;
+	const target = duel.cards[id]!;
+	for (const { layer, source } of entriesFor(duel, target, NOBODY)) {
+		if (layer.kind === "set" && layer.stat === "level") value = typeof layer.to === "function" ? layer.to(duel, target) : layer.to;
+		else if (layer.kind === "add" && layer.stat === "level") value += amount(layer.by, duel, source, target);
+	}
+	return value;
+}
 
 /**
  * Does a lock of this kind apply now: a lasting lock, or a continuous one of a card that is face-up on the field and not negated?

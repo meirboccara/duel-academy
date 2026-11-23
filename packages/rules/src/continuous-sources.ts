@@ -27,4 +27,10 @@ export const CONTINUOUS_SOURCES: readonly SourceRecord[] = [
 	qa("set-vs-original-later-wins-a", 4663, 6156, "その後に、自分や相手のライフポイントが変化し、それによって適用される「巨大化」の『自分のLPが相手より少ない場合、装備モンスターの攻撃力は元々の攻撃力の倍になる』処理や『自分のLPが相手より多い場合、装備モンスターの攻撃力は元々の攻撃力の半分になる』処理が変わる場合でも、「サクリファイス」の攻撃力や守備力が変化する事はありません。"),
 	// OCG only. Same list: Sacrifice first, Megamorph equipped later: while Megamorph changes the original ATK the ATK is the original 0; when the Life Points are equal, Sacrifice's 2500 is back.
 	qa("set-vs-original-later-wins-b", 4663, 113, "『自分のLPが相手より少ない場合、装備モンスターの攻撃力は元々の攻撃力の倍になる』処理または、『自分のLPが相手より多い場合、装備モンスターの攻撃力は元々の攻撃力の半分になる』処理が適用される間は、「サクリファイス」の元々の攻撃力となる0の状態になりますが、自分と相手のライフポイントが同じ間は、装備されている「ブラック・マジシャン」の攻撃力となる2500の状態になります。"),
+	// OCG only. Skill Drain's list (cid 5740), a "neither player can Special Summon" monster negated by Skill Drain: once the negating card has left, the effect applies again at once.
+	qa("negated-floodgate-returns", 5740, 7965, "（「D-HERO Bloo-D」がモンスターゾーンから離れますと「虚無魔人」の効果が再び適用され、モンスターを特殊召喚できなくなりますので、相手は「D-HERO Bloo-D」を素材に含めて融合召喚できません。）"),
+	// OCG only. Enemy Controller's notes (cid 5505): control taken "until the End Phase" goes back to the opponent then.
+	notes("control-until-end-phase", 5505, "■エンドフェイズに効果を適用したモンスターのコントロールが相手に戻る場合、相手のメインモンスターゾーンに置く位置は相手が決めます。"),
+	// OCG only. Enemy Controller's list: a monster whose control was taken by a link that resolved earlier counts as yours when a later link resolves.
+	qa("control-read-at-resolution", 5505, 18400, "『「ルドラの魔導書」以外の自分の手札・フィールドの「魔導書」カード１枚または自分フィールドの魔法使い族モンスター１体を墓地へ送り』の処理によって、そのコントロールを得た魔法使い族モンスターを墓地へ送るカードに選ぶ事ができます。"),
 ];

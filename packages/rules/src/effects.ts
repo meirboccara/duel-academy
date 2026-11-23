@@ -99,6 +99,13 @@ export interface EffectRecord {
 	 * sent to the Graveyard. Its continuous effect is another record, `type: "continuous"`.
 	 */
 	readonly stays?: boolean;
+	/**
+	 * The effect is there to add a card from the Main Deck to the hand (a search, a draw): it cannot be activated while that is locked
+	 * (Droll & Lock Bird). A card that does something else, or adds later (Maxx "C"), leaves it unset: it is activated, and only the add is
+	 * not done (Konami's Japanese Q&A, Droll's records `draws-fail`, `other-parts`). Which cards need it: YGOProJudge (no source cited,
+	 * 2026-11-23) for Terraforming and Pot of Greed; Konami's Q&A on Drish (fid 24396) shows the same per-card call for one bullet.
+	 */
+	readonly requiresAddToHand?: boolean;
 	/** "This activation cannot be negated." */
 	readonly activationCannotBeNegated?: Immunity;
 	/** "This effect cannot be negated." */

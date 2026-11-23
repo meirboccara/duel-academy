@@ -6,7 +6,7 @@ import { type CardInstance, type Duel, type Link, moveCard, type Side } from "./
 import { type Action, sameIds } from "./action";
 import { dropWhen } from "./events";
 import { type CardDef, type Cost, type CostSpec, type EffectContext, type EffectRecord, effectOf, speedOf } from "./effects";
-import { isNegatedLasting } from "./modifiers";
+import { isNegatedLasting, locked } from "./modifiers";
 import { hitByCardNegation } from "./negation";
 import { isSpent, keyOf, spend } from "./once";
 
@@ -47,6 +47,7 @@ function checkDefinition(card: CardInstance, effect: EffectRecord): void {
  */
 export function activationWays(duel: Duel, ctx: EffectContext, index: number, effect: EffectRecord, firstOnly = false): readonly Way[] {
 	checkDefinition(ctx.card, effect);
+	if (effect.requiresAddToHand && locked(duel, "add-to-hand", ctx.player)) return NO_WAYS;
 	if (effect.condition && !effect.condition(duel, ctx)) return NO_WAYS;
 	if (isSpent(duel, effect, keyOf(effect, ctx.player, ctx.card, index))) return NO_WAYS;
 	if (!effect.cost && !effect.target) return ACTIVATE_AS_IS;

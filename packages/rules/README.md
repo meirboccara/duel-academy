@@ -217,3 +217,45 @@ Known limits of step 5 (what the tests do not prove):
   read) has no entry on it, and Solemn Judgment's 105 were not read; the core destroys only a card on the field. A YGOProJudge
   question was not asked (the key lives in another project's env file and the sandbox refused the read).
 - A negated monster's Continuous effects, and any other source of negation (Skill Drain), are step 6's modifiers.
+
+Step 6 (continuous effects, as one list of timestamped modifiers; design in `docs/rules-core/step6/design.md`, sources in
+`docs/rules-core/step6/sources.md`):
+- `src/modifiers.ts`: two sources feed every query. **Lasting modifiers** (`Duel.modifiers`, stamped by `Duel.clock`) are what a
+  resolved effect leaves "until the end of this turn": a negation (`negateCardEffects`; `Duel.negations` of step 5 is folded in),
+  Shrink, Droll & Lock Bird's lock, a control change. **Continuous records** (`EffectRecord.type: "continuous"`, with `modifies` and
+  `affects`) are read from the board when asked, never stored: a card is a source while it is face-up on the field, not negated and
+  its `condition` holds, so a card that leaves, turns face-down or is negated simply stops counting, and counts again when the
+  negation ends (record `negated-floodgate-returns`). Its stamp is `CardInstance.since`, the moment it came face-up on the field.
+- Queries: `atk`, `def`, `originalAtk`, `level`, `isNegated`, `locked`. ATK/DEF: the printed value, then `base` ("original ATK
+  becomes") and `set` ("becomes") in stamp order, a later one winning, then every `add` on top, re-read on each query (Konami's
+  Japanese Q&A, OCG only, accepted by the owner: records in `src/continuous-sources.ts`). A negated monster loses its continuous
+  effects while it is in the Monster Zone (Infinite Impermanence, Skill Drain).
+- Locks: `locked(duel, "add-to-hand")` is checked in `move()` (a card does not go from a Deck to a hand while it holds) and in
+  `activationWays` for a record marked `requiresAddToHand` (Terraforming, Pot of Greed), which is then not offered.
+- `GameEvent` gains `added-to-hand` (`from` says where the card was). `EffectRecord.lingers`: a Quick Effect worded "If ..." may also
+  answer what a link of the chain that has just resolved raised, in the first window after it (`Duel.lingering`; Droll's notes).
+- Control: `takeControl(duel, id, side, until)` moves the card (control stays physical, design D3) and adds a `control` modifier;
+  as the End Phase of turn `until` begins, `returnControl` gives the card back if it is still the card taken (sent to the Graveyard
+  if its owner has no free Monster Zone: the core's reading). A card cannot be taken onto a full field.
+- `EffectRecord.stays`: a Continuous Spell or Trap Card stays on the field after its chain (Skill Drain).
+- `src/cards/`: Shrink, Muka Muka, Skill Drain, Droll & Lock Bird. `bench/continuous.bench.ts` and the step 6 table in BASELINE.md.
+
+Known limits of step 6 (what the tests do not prove):
+- The ATK/DEF order rests on Konami's Japanese Q&A (OCG only) and on made-up continuous Spells standing in for the Equip Cards of
+  those Q&As (Sacrifice, Megamorph: step 7). Two Konami cases are **not** modelled (design D2, an `it.todo`): an older *lasting*
+  change of the original ATK (Gale, Apollousa's own effect) does not come back when a later one (Shrink) ends; the core brings back
+  whatever still applies.
+- ATK and DEF are clamped at 0: the old engine does so; no Konami page read. The Level query (set, then add, in stamp order) is
+  YGOProJudge's lead only (no source cited) and has no floor (a Level can go below 1); a Link monster's Level is not modelled (no
+  `link` fact yet).
+- Which cards cannot be activated under Droll's lock (`requiresAddToHand`) is YGOProJudge's answer for Terraforming and Pot of Greed
+  (asked 2026-11-23, no source cited). Konami's Q&A says Maxx "C"-like cards can be activated and only their draws fail
+  (`draws-fail`), and that Drish's draw bullet cannot be chosen (`drish`, pending: not an Academy card). Each new card needs its own call.
+- `lingering` keeps the `added-to-hand` events the links of the chain raised, for the first window after the chain only; it is cleared by the next
+  break or activation. Only Droll uses it.
+- With no zone layout (step 7) the owner of a returning monster does not choose its zone; the Graveyard for a full field and the
+  refusal to take onto a full field are the core's reading (no Konami page read). A taken monster that was turned face-down: not read.
+- Two negators that negate each other: a card being asked about counts as not negated (no Konami page; the guard only stops a loop).
+- Modifier durations are turn numbers; the Damage Step's durations come with the battle step.
+- `atk` on a board with continuous sources walks the field each time (0.007 ms in the bench): fine for damage calculation, worth a
+  per-position cache if a bot reads every ATK per move.

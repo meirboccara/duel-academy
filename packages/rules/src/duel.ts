@@ -108,7 +108,7 @@ export interface Duel {
 	/** The last things that happened (step 3): events since the last break, which a fast effect may still answer. */
 	readonly live: readonly GameEvent[];
 	/**
-	 * Step 6: events of the chain that has just resolved that an effect marked `lingers` may still answer (Droll & Lock Bird: Konami's
+	 * Step 6: the `added-to-hand` events of the chain that has just resolved, which an effect marked `lingers` may still answer (Droll & Lock Bird: Konami's
 	 * notes say it can be activated after the chain in which the card was added). Cleared by the next break or activation.
 	 */
 	readonly lingering: readonly GameEvent[];
@@ -156,6 +156,8 @@ export interface Asking {
 	readonly player: Side;
 	readonly from: readonly number[];
 	readonly then: (duel: Duel, picked: number) => Duel;
+	/** The events the links resolved before it raised (step 6, `Duel.lingering`): kept across the pause. */
+	readonly carried?: readonly GameEvent[];
 }
 
 export interface DeckSetup {
@@ -178,6 +180,9 @@ export const STARTING_LP = 8000;
 
 /** Priority in a closed game state with nobody having passed: after an action or a chain, `holder` may use a fast effect first. */
 export const closedPriority = (holder: Side): Priority => ({ holder, passed: [], open: false });
+
+/** Step 7 gives the exact zones; until then a side holds at most five monsters. */
+export const MONSTER_ZONES = 5;
 
 export const other = (side: Side): Side => (side === "you" ? "rival" : "you");
 
@@ -293,7 +298,7 @@ export function moveCards(duel: Duel, ids: readonly number[], to: MoveTo): Duel 
 
 function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Duel {
 	const before = instance(duel, id);
-	if (before.zone === "deck" && to.zone === "hand" && locked(duel, "add-to-hand")) return duel;
+	if (before.zone === "deck" && to.zone === "hand" && locked(duel, "add-to-hand", before.owner)) return duel;
 	if (to.controller !== undefined && !isOnField(to.zone)) throw new Error("a controller can be chosen only on the field");
 	const zone = before.extraDeck && (to.zone === "deck" || to.zone === "hand") ? "extra" : to.zone;
 	const controller = isOnField(zone) ? (to.controller ?? before.controller) : before.owner;

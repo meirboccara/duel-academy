@@ -15,6 +15,7 @@ export const POT_OF_GREED: CardDef = {
 		{
 			type: "activation",
 			categories: ["draw"],
+			requiresAddToHand: true,
 			condition: (duel, { player }) => duel.piles[player].deck.length >= 2,
 			operation: (duel, link) => moveCards(duel, duel.piles[link.player].deck.slice(0, 2), { zone: "hand" }),
 		},

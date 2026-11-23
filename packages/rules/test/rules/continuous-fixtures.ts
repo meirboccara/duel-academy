@@ -1,5 +1,12 @@
-import { addModifier, moveCard, type CardDef, type Duel, type EffectRecord, type Layer, other, targetsOf } from "../../src";
+import { addModifier, ask, moveCard, takeControl, type CardDef, type Duel, type EffectRecord, type Layer, other, targetsOf } from "../../src";
 import { play } from "./fixtures";
+
+/** Passes until the phase `phase` of the current turn (the game state open). */
+export function toPhase(duel: Duel, phase: Duel["turn"]["phase"]): Duel {
+	let next = duel;
+	for (let guard = 0; guard < 30 && next.turn.phase !== phase; guard++) next = play(next, "pass");
+	return next;
+}
 
 /** Passes until the first phase of turn number `turn` (the game state open). */
 export function nextTurn(duel: Duel, turn: number): Duel {
@@ -67,6 +74,42 @@ export function continuousCards(log: string[] = []): Record<string, CardDef> {
 		// A Spell with no effect: something to Set, so the opponent gets priority.
 		{ code: "idle", kind: "spell" },
 		{ code: "big", kind: "monster", facts: { level: 4, atk: 2000, def: 1000 } },
+		// A monster with a Continuous Effect: "Neither player can add cards from the Main Deck to the hand" (a floodgate).
+		{ code: "no-search", kind: "monster", facts: { level: 4, atk: 1000, def: 1000 }, effects: [{ type: "continuous", range: "field", operation: (duel) => duel, affects: () => true, modifies: () => [{ kind: "lock", what: "add-to-hand", who: "both" }] }] },
+		// A monster with a Continuous Effect: "Your opponent cannot add cards from the Main Deck to the hand" (a lock on one player).
+		{ code: "their-search-locked", kind: "monster", facts: { level: 4, atk: 1000, def: 1000 }, effects: [{ type: "continuous", range: "field", operation: (duel) => duel, affects: () => true, modifies: (_duel, source) => [{ kind: "lock", what: "add-to-hand", who: other(source.controller) }] }] },
+		// A Normal Spell in two parts: it writes in `log`, and adds the top card of its controller's Deck to the hand.
+		{
+			code: "two-part",
+			kind: "spell",
+			effects: [{ type: "activation", operation: (duel, link) => (log.push("two-part"), moveCard(duel, duel.piles[link.player].deck[0]!, { zone: "hand" })) }],
+		},
+		// A Normal Spell that draws 1 card, written without `requiresAddToHand` (like a card whose draw is one part among others).
+		{ code: "draw-one", kind: "spell", effects: [{ type: "activation", operation: (duel, link) => moveCard(duel, duel.piles[link.player].deck[0]!, { zone: "hand" }) }] },
+		// A Quick-Play Spell: "Target 1 face-up monster your opponent controls; take control of it until the End Phase."
+		{
+			code: "take-control",
+			kind: "quick-play",
+			effects: [
+				{
+					type: "activation",
+					target: (duel, { player }) => duel.piles[other(player)].monster.filter((id) => duel.cards[id]!.face === "up"),
+					operation: (duel, link) => {
+						const target = targetsOf(duel, link)[0];
+						return target ? takeControl(duel, target.id, link.player, duel.turn.number) : duel;
+					},
+				},
+			],
+		},
+		// A Quick-Play Spell: "Send 1 monster you control to the GY" (chosen when it resolves).
+		{
+			code: "offer-up",
+			kind: "quick-play",
+			effects: [{ type: "activation", operation: (duel, link) => ask(duel, link.player, duel.piles[link.player].monster, (board, picked) => moveCard(board, picked, { zone: "graveyard" })) }],
+		},
+		// A Quick-Play Spell: "Target 1 face-up monster; its Level becomes 8 until the end of this turn", and one that raises it by 2.
+		lasting("level-eight", { kind: "set", stat: "level", to: 8 }),
+		lasting("level-up", { kind: "add", stat: "level", by: 2 }),
 		{ code: "small", kind: "monster", facts: { level: 2, atk: 600, def: 300 } },
 		{ code: "huge", kind: "monster", facts: { level: 8, atk: 3000, def: 2500 } },
 	];

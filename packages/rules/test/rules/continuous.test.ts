@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { atk, cites, def, isNegated, level, originalAtk } from "../../src";
+import { atk, cites, def, isNegated, level, locked, originalAtk } from "../../src";
 import { moveCard } from "../../src";
-import { nextTurn } from "./continuous-fixtures";
-import { play, position, REAL_CARDS } from "./fixtures";
+import { nextTurn, toPhase } from "./continuous-fixtures";
+import { codes, offered, play, position, REAL_CARDS } from "./fixtures";
 import { continuousCards } from "./continuous-fixtures";
 
 const defs = continuousCards();
@@ -76,4 +76,109 @@ describe("a monster whose effects are negated has its continuous effects switche
 		expect(isNegated(later, id)).toBe(false);
 		expect(atk(later, id)).toBe(600 + 300 * later.piles.you.hand.length);
 	});
+});
+
+describe("a negated floodgate is off, and applies again once the negation ends", () => {
+	const withDrain = { ...REAL_CARDS, ...defs };
+	it(`${cites("rules", "negated-floodgate-returns")} a monster's lock is off while Skill Drain negates it, and back the moment Skill Drain has left the field`, () => {
+		const start = position({ defs: withDrain, you: { monsters: ["no-search"], deck: ["umi", "celtic-guardian"] }, rival: { faceupSpells: ["skill-drain"] } });
+		expect(isNegated(start, idOf(start, "no-search"))).toBe(true);
+		expect(locked(start, "add-to-hand")).toBe(false);
+		const added = moveCard(start, start.piles.you.deck[0]!, { zone: "hand" });
+		expect(added.piles.you.hand).toHaveLength(1);
+		const gone = moveCard(added, idOf(added, "skill-drain"), { zone: "graveyard" });
+		expect(locked(gone, "add-to-hand")).toBe(true);
+		const tried = moveCard(gone, gone.piles.you.deck[0]!, { zone: "hand" });
+		expect(tried.piles.you.hand).toEqual(gone.piles.you.hand);
+	});
+});
+
+describe("a lock on one player", () => {
+	const all = { ...REAL_CARDS, ...defs };
+	it(`${cites("droll-lock-bird", "text")} stops only that player: the other may still add from the Deck and activate a search`, () => {
+		const start = position({ defs: all, you: { hand: ["pot-of-greed"], monsters: ["their-search-locked"], deck: ["umi", "celtic-guardian", "celtic-guardian"] }, rival: { deck: ["umi"] } });
+		expect([locked(start, "add-to-hand", "you"), locked(start, "add-to-hand", "rival")]).toEqual([false, true]);
+		expect(offered(start)).toContain("activate pot-of-greed");
+		const theirs = moveCard(start, start.piles.rival.deck[0]!, { zone: "hand" });
+		expect(theirs.piles.rival.hand).toEqual([]);
+		const mine = moveCard(start, start.piles.you.deck[0]!, { zone: "hand" });
+		expect(mine.piles.you.hand).toHaveLength(2);
+	});
+});
+
+describe("the added-to-hand event", () => {
+	// Droll & Lock Bird listens to events, so the duel keeps them (`live`).
+	const listening = { ...REAL_CARDS, ...defs };
+	it(`${cites("droll-lock-bird", "text")} a card that goes to the hand says where it came from: the Deck for a draw or a search, the Graveyard for a recovery`, () => {
+		const start = position({ defs: listening, you: { deck: ["umi"], graveyard: ["celtic-guardian"] } });
+		const searched = moveCard(start, start.piles.you.deck[0]!, { zone: "hand" });
+		expect(searched.live.filter((event) => event.type === "added-to-hand").map((event) => event.type === "added-to-hand" && event.from)).toEqual(["deck"]);
+		const recovered = moveCard(start, start.piles.you.graveyard[0]!, { zone: "hand" });
+		expect(recovered.live.filter((event) => event.type === "added-to-hand").map((event) => event.type === "added-to-hand" && event.from)).toEqual(["graveyard"]);
+	});
+});
+
+describe("control changes that last", () => {
+	const all = { ...REAL_CARDS, ...defs };
+	it(`${cites("rules", "control-until-end-phase")} a monster taken until the End Phase goes back to its owner as the End Phase begins, and what applied to it before ended when it changed hands`, () => {
+		const start = position({ defs: all, options, you: { hand: ["shrink", "take-control"] }, rival: { monsters: ["huge"] } });
+		const shrunk = play(start, "activate shrink > huge", "pass", "pass");
+		expect(atk(shrunk, idOf(shrunk, "huge"))).toBe(1500);
+		const taken = play(shrunk, "activate take-control > huge", "pass", "pass");
+		const id = idOf(taken, "huge");
+		expect(codes(taken, "you", "monster")).toEqual(["huge"]);
+		expect([taken.cards[id]!.controller, taken.cards[id]!.owner]).toEqual(["you", "rival"]);
+		// It is a new card for its new controller: Shrink was applied to the card as it was.
+		expect(atk(taken, id)).toBe(3000);
+		// Still yours until the End Phase, back to the rival as it begins.
+		expect(codes(toPhase(taken, "main2"), "you", "monster")).toEqual(["huge"]);
+		const back = toPhase(taken, "end");
+		expect(back.turn.number).toBe(3);
+		expect(codes(back, "rival", "monster")).toEqual(["huge"]);
+		expect(codes(back, "you", "monster")).toEqual([]);
+		expect(back.modifiers.filter((modifier) => modifier.layer.kind === "control")).toEqual([]);
+	});
+	it(`${cites("rules", "control-read-at-resolution")} a monster taken by a link that resolved first counts as yours when a later link resolves`, () => {
+		const start = position({ defs: all, you: { hand: ["offer-up", "take-control"], monsters: ["big"] }, rival: { monsters: ["huge"] } });
+		// Chain Link 1: offer-up ("send 1 monster you control"); Chain Link 2: take-control, which resolves first.
+		const asked = play(start, "activate offer-up", "activate take-control > huge");
+		expect(offered(asked)).toEqual(["choose big", "choose huge"]);
+		const sent = play(asked, "choose huge");
+		expect(codes(sent, "rival", "graveyard")).toContain("huge");
+	});
+	it("a monster cannot be taken onto a field with no free Monster Zone (zones are step 7: the core's reading)", () => {
+		const start = position({ defs: all, options, you: { hand: ["take-control"], monsters: ["big", "big", "big", "big", "big"] }, rival: { monsters: ["huge"] } });
+		const tried = play(start, "activate take-control > huge", "pass", "pass");
+		expect(codes(tried, "rival", "monster")).toEqual(["huge"]);
+		expect(tried.modifiers).toEqual([]);
+	});
+	it("a monster that left the field before the End Phase does not come back to its owner's field", () => {
+		const start = position({ defs: all, options, you: { hand: ["take-control", "offer-up"] }, rival: { monsters: ["huge"] } });
+		const taken = play(start, "activate take-control > huge", "pass", "pass");
+		const sent = play(taken, "activate offer-up", "pass", "pass");
+		const later = nextTurn(sent, 4);
+		expect(codes(later, "rival", "graveyard")).toEqual(["huge"]);
+		expect(codes(later, "rival", "monster")).toEqual([]);
+	});
+});
+
+// YGOProJudge only (asked 2026-11-23, sessions q-lvl1/q-lvl2, no source cited): no Konami page on the order of Level changes was found.
+describe("Level changes (YGOProJudge lead only)", () => {
+	const all = { ...REAL_CARDS, ...defs };
+	it("the Level is the printed one, then each 'becomes' and each raise in the order they began to apply", () => {
+		const start = position({ defs: all, options, you: { hand: ["level-up", "level-eight", "level-up"], monsters: ["big"] } });
+		const raised = play(start, "activate level-up > big", "pass", "pass");
+		expect(level(raised, idOf(raised, "big"))).toBe(6);
+		const set = play(raised, "activate level-eight > big", "pass", "pass");
+		expect(level(set, idOf(set, "big"))).toBe(8);
+		const again = play(set, "activate level-up > big", "pass", "pass");
+		expect(level(again, idOf(again, "big"))).toBe(10);
+		expect(level(nextTurn(again, 4), idOf(again, "big"))).toBe(4);
+	});
+});
+
+describe("pending (design D2)", () => {
+	// Konami says an older lasting "halved" (Gale) or a monster's own original-ATK effect (Apollousa) does not come back when Shrink
+	// ends (fids 7944, 22612); the core brings back whatever still applies. Not built: no card of ours needs it (owner decision D2).
+	it.todo("an older lasting change of the original ATK does not come back when a later one (Shrink) ends");
 });
