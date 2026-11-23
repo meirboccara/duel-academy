@@ -1,12 +1,12 @@
 "use client";
 
-import { Heart } from "lucide-react";
+import { Heart, Search } from "lucide-react";
 import Link from "next/link";
 import { APP_NAME, PATREON_URL } from "@/lib/brand";
 import { LanguageSwitcher, useLanguage } from "@/lib/i18n/provider";
 
 /**
- * The site is one children's game: the name leads home, and the language can be changed from every page. Grown-ups
+ * The site is one children's game: the name leads home, "Cards" opens the card search, and the language can be changed from every page. Grown-ups
  * can support the project on Patreon (the owner's page; it opens in a new tab, the game stays open).
  */
 export function SiteHeader() {
@@ -17,6 +17,13 @@ export function SiteHeader() {
 				{APP_NAME}
 			</Link>
 			<div className="flex items-center gap-2">
+				<Link
+					href="/card-search"
+					className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-white/15 px-3 text-sm font-semibold text-fg hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-400"
+				>
+					<Search className="h-4 w-4" aria-hidden />
+					<span>{t("Cards")}</span>
+				</Link>
 				<a
 					href={PATREON_URL}
 					target="_blank"

@@ -1,0 +1,24 @@
+# Local Postgres for the card search (development only).
+#
+# One server, two databases:
+#   ygojudge  a local copy of YGOProJudge's database, filled by YGOProJudge's own scripts (see README, "Card search").
+#             Duel Academy reads it as `academy_reader`, which can only SELECT: YGOProJudge is a provider.
+#   academy   Duel Academy's own database: the kid explanations.
+#
+# pgvector image: YGOProJudge's migrations create the `vector` extension.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: duel-academy-postgres
+    environment:
+      POSTGRES_USER: academy
+      POSTGRES_PASSWORD: academy
+      POSTGRES_DB: academy
+    ports:
+      - "5434:5432"
+    volumes:
+      - duel-academy-pgdata:/var/lib/postgresql/data
+      - ./scripts/db/init:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  duel-academy-pgdata:

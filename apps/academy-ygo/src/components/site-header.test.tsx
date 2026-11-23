@@ -28,7 +28,12 @@ describe("site header", () => {
 		renderHeader();
 		expect(screen.queryByRole("link", { name: "Beginner" })).toBeNull();
 		expect(screen.queryByRole("link", { name: "Home" })).toBeNull();
-		expect(screen.getAllByRole("link")).toHaveLength(2);
+		expect(screen.getAllByRole("link")).toHaveLength(3);
+	});
+
+	it("opens the card search", () => {
+		renderHeader();
+		expect(screen.getByRole("link", { name: "Cards" }).getAttribute("href")).toBe("/card-search");
 	});
 
 	it("offers to support the project on Patreon, in a new tab", () => {
