@@ -14,6 +14,8 @@ export type Action =
 	 * of its own that the opponent may answer ("would be Summoned") before it succeeds.
 	 */
 	| { readonly type: "summon"; readonly card: number; readonly how: "normal" | "special" }
+	/** Step 6b: declare an attack with `card` on `target`, or directly (`target: null`). An action that starts no chain. */
+	| { readonly type: "attack"; readonly card: number; readonly target: number | null }
 	/** The card an effect asked for while it resolves (a choice that is not a target). */
 	| { readonly type: "choose"; readonly card: number };
 
@@ -29,6 +31,7 @@ export function sameAction(a: Action, b: Action): boolean {
 	const other = b as typeof a;
 	if (a.card !== other.card) return false;
 	if (a.type === "summon") return a.how === (b as typeof a).how;
+	if (a.type === "attack") return a.target === (b as typeof a).target;
 	if (a.type !== "activate") return true;
 	const asked = b as typeof a;
 	return a.effect === asked.effect && sameIds(a.targets, asked.targets) && sameIds(a.paid ?? [], asked.paid ?? []);

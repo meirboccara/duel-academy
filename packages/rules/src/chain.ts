@@ -7,6 +7,7 @@ import { returnControl, withoutEnded } from "./modifiers";
 import { cardNegated, immune } from "./negation";
 import { endChain, newTurn, refund } from "./once";
 import { beginSummon, finishSummon } from "./summon";
+import { advanceBattle, attackActions, damageStepAllows, declareAttack } from "./battle";
 import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./triggers";
 
 /**
@@ -55,6 +56,8 @@ const SPELL_ZONES = 5;
  * The teaching chain limit only shortens this list: once the chain has that many links, only "pass" is offered.
  */
 export function legalActions(duel: Duel): Action[] {
+	// The Duel is over: nothing more is offered.
+	if (duel.winner) return [];
 	if (duel.asking) return duel.asking.from.map((card): Action => ({ type: "choose", card }));
 	if (duel.building) return triggerActions(duel);
 	const actions: Action[] = [PASS];
@@ -80,6 +83,8 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 		if (duel.summoning && chain.length === 0 && !effect.answersSummon) return false;
 		const speed = speedOf(def, effect);
 		if (speed === 1 ? !slow : speed < topSpeed) return false;
+		// In the Damage Step, only Counter Traps and effects that directly change ATK/DEF, up to damage calculation (step 6b).
+		if (duel.battle && !damageStepAllows(duel, def, effect)) return false;
 		const ctx = { player, card };
 		// An effect that answers an event needs that event to be the last thing that happened.
 		if (effect.event && !duel.live.some((event) => effect.event!(duel, event, ctx)) && !(effect.lingers && duel.lingering.some((event) => effect.event!(duel, event, ctx)))) return false;
@@ -147,6 +152,11 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 			}
 		}
 	}
+	// Step 6b: the attacks the turn player can declare in the Battle Phase.
+	if (only === undefined && attackActions(duel, out)) {
+		if (!out) return true;
+		found = true;
+	}
 	return found;
 }
 
@@ -158,15 +168,22 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 export function act(duel: Duel, action: Action): Duel {
 	if (!isLegal(duel, action)) throw new Error(`not a legal action for ${duel.asking ? duel.asking.player : duel.priority.holder}: ${JSON.stringify(action)}`);
 	let next = apply(duel, action);
-	while (!next.building && !next.asking && !next.options.everyWindow && !decides(next) && !collect(next, null)) next = pass(next);
+	while (!next.winner && !next.building && !next.asking && !next.options.everyWindow && !decides(next) && !collect(next, null)) next = pass(next);
 	return next;
 }
 
 /** Is the action among `legalActions(duel)`? An ordinary action is checked by listing only what its own card could do. */
 function isLegal(duel: Duel, action: Action): boolean {
+	// The Duel is over: nothing, not even a pass.
+	if (duel.winner) return false;
 	if (duel.asking || duel.building) return legalActions(duel).some((legal) => sameAction(legal, action));
 	// Passing is always open to the player who holds priority.
 	if (action.type === "pass") return true;
+	if (action.type === "attack") {
+		const attacks: Action[] = [];
+		attackActions(duel, attacks);
+		return attacks.some((legal) => sameAction(legal, action));
+	}
 	const listed: Action[] = [];
 	collect(duel, listed, action.card);
 	return listed.some((legal) => sameAction(legal, action));
@@ -177,6 +194,7 @@ function apply(duel: Duel, action: Action): Duel {
 	if (duel.building) return action.type === "pass" ? declineTriggers(duel) : chooseTrigger(duel, action as Extract<Action, { type: "activate" }>);
 	if (action.type === "pass") return pass(duel);
 	if (action.type === "summon") return beginSummon(duel, duel.priority.holder, action.card, action.how);
+	if (action.type === "attack") return declareAttack(duel, action.card, action.target);
 	return action.type === "set" ? set(duel, action.card) : activate(duel, action as Extract<Action, { type: "activate" }>);
 }
 
@@ -203,6 +221,8 @@ function pass(duel: Duel): Duel {
 	if (duel.chain.length > 0) return resolveChain(duel, duel.chain, null);
 	// A Summon that nobody answered (or whose answers have resolved) succeeds.
 	if (duel.summoning) return finishSummon(duel);
+	// An attack moves to its next timing (step 6b).
+	if (duel.battle) return advanceBattle(duel);
 	// Nothing happened and both passed: the game state is open again, and the events before are no longer the last thing.
 	if (!open) return { ...breakEffect(duel), priority: { holder: turnPlayer, passed: [], open: true } };
 	return nextPhase(duel);
@@ -281,7 +301,7 @@ function nextPhase(duel: Duel): Duel {
 	}
 	const player: Side = other(duel.turn.player);
 	const turn = { player, number: duel.turn.number + 1, phase: PHASES[0]! };
-	return triggerPoint(raiseEvent(newTurn(withoutEnded({ ...moved, turn, setThisTurn: [], normalSummoned: false }, duel.turn.number)), { type: "phase", phase: turn.phase, player }), { holder: player, passed: [], open: true });
+	return triggerPoint(raiseEvent(newTurn(withoutEnded({ ...moved, turn, setThisTurn: [], normalSummoned: false, attacked: [], replay: null }, duel.turn.number)), { type: "phase", phase: turn.phase, player }), { holder: player, passed: [], open: true });
 }
 
 const flag = (duel: Duel, index: number, change: Partial<Link>): Duel => (duel.chain[index] ? { ...duel, chain: duel.chain.map((link, i) => (i === index ? { ...link, ...change } : link)) } : duel);

@@ -78,20 +78,23 @@ export interface SideSpec {
 	monsters?: string[];
 	/** Face-up Spell and Trap Cards in the Spell & Trap Zone (Continuous cards whose effects are activated). */
 	faceupSpells?: string[];
-	/** Face-down monsters. */
+	/** Face-down monsters (Defense Position). */
 	facedown?: string[];
+	/** Face-up monsters in Defense Position. */
+	defense?: string[];
 	graveyard?: string[];
 	deck?: string[];
 }
 
 /** Builds a position: your turn, Main Phase 1, the game state open, unless told otherwise. */
 export function position(spec: { defs: Record<string, CardDef>; you?: SideSpec; rival?: SideSpec; turn?: Side; phase?: Phase; options?: Partial<TeachingOptions> }): Duel {
-	const places: [keyof SideSpec, Zone, "up" | "down" | undefined][] = [
+	const places: [keyof SideSpec, Zone, "up" | "down" | undefined, ("attack" | "defense")?][] = [
 		["hand", "hand", undefined],
 		["set", "spell", "down"],
 		["setThisTurn", "spell", "down"],
 		["monsters", "monster", "up"],
 		["facedown", "monster", "down"],
+		["defense", "monster", "up", "defense"],
 		["faceupSpells", "spell", "up"],
 		["graveyard", "graveyard", undefined],
 		["deck", "deck", undefined],
@@ -102,9 +105,9 @@ export function position(spec: { defs: Record<string, CardDef>; you?: SideSpec; 
 	const setThisTurn: number[] = [];
 	let id = 1;
 	for (const side of ["you", "rival"] as const) {
-		for (const [key, zone, face] of places) {
+		for (const [key, zone, face, battlePosition] of places) {
 			for (const _code of sides[side][key] ?? []) {
-				if (zone !== "deck") duel = moveCard(duel, id, { zone, face });
+				if (zone !== "deck") duel = moveCard(duel, id, { zone, face, ...(battlePosition ? { position: battlePosition } : {}) });
 				if (key === "setThisTurn") setThisTurn.push(id);
 				id++;
 			}
@@ -124,6 +127,7 @@ export function label(duel: Duel, action: Action): string {
 	if (action.type === "set") return `set ${code}`;
 	if (action.type === "summon") return `${action.how === "special" ? "special-summon" : "summon"} ${code}`;
 	if (action.type === "choose") return `choose ${code}`;
+	if (action.type === "attack") return `attack ${code} ${action.target === null ? "directly" : `> ${duel.cards[action.target]!.code}`}`;
 	return `activate ${code}${(action.paid ?? []).map((card) => ` ~ ${duel.cards[card]!.code}`).join("")}${action.targets.map((target) => ` > ${duel.cards[target]!.code}`).join("")}`;
 }
 export const offered = (duel: Duel) => legalActions(duel).map((action) => label(duel, action)).sort();

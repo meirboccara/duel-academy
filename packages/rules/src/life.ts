@@ -12,3 +12,15 @@ export function payLp(duel: Duel, side: Side, amount: number): Duel | null {
 export function payHalfLp(duel: Duel, side: Side): Duel | null {
 	return payLp(duel, side, Math.floor(duel.lp[side] / 2));
 }
+
+/**
+ * Loses Life Points (battle damage, an effect's damage): never below 0. A player at 0 LP loses; both at 0 at the same time is a draw
+ * (RB10, record `lp-zero-wins-both-draw`). `winner` is set once and never changed afterwards.
+ */
+export function loseLp(duel: Duel, side: Side, amount: number): Duel {
+	if (amount <= 0) return duel;
+	const lp = { ...duel.lp, [side]: Math.max(0, duel.lp[side] - amount) };
+	return { ...duel, lp, winner: duel.winner ?? winnerOf(lp) };
+}
+
+const winnerOf = (lp: Duel["lp"]): Duel["winner"] => (lp.you === 0 && lp.rival === 0 ? "draw" : lp.you === 0 ? "rival" : lp.rival === 0 ? "you" : null);

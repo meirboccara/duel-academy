@@ -10,6 +10,8 @@ export const SHRINK: CardDef = {
 	effects: [
 		{
 			type: "activation",
+			// It directly changes ATK, so it can be activated in the Damage Step up to damage calculation (RB10, step 6b).
+			categories: ["change-atk"],
 			target: (duel) => [...duel.piles.you.monster, ...duel.piles.rival.monster].filter((id) => duel.cards[id]!.face === "up"),
 			operation: (duel, link) => {
 				// "that target": still face-up on the field when this resolves.

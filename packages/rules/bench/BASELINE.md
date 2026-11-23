@@ -193,3 +193,16 @@ New in step 6 (`bench/continuous.bench.ts`), mean per call:
 
 `atk` on a board with continuous sources is the slow query (it walks the field and checks each source's own negation). Battle
 (step 6b) reads it at damage calculation only; a bot that reads every monster's ATK per move should cache per position.
+
+# Rules core, step 6b (battle)
+
+Same Windows machine, same day, but a slower run overall (today's engine itself was ~25 % slower than in the step 6 run). One run
+of `bench/legal-moves.bench.ts`: crowdedHand list + `act` 0.0697 ms against today's engine 1.409 ms: **20.2×** (a combined run with
+the battle bench just before: 0.0748 ms vs 1.470 ms, 19.7×). The listing's new work outside the Battle Phase is one phase check.
+
+New in step 6b (`bench/battle.bench.ts`), mean per call:
+
+| Case | Mean |
+|---|---:|
+| `legalActions`: Battle Step, 3 attackers × 3 targets, a Set Shrink on the other side | 0.0004 ms |
+| One attack from its declaration to the end of the Damage Step, nobody responding (5 trigger points, ATK/DEF read at damage calculation) | 0.0127 ms |

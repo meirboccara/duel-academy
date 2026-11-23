@@ -1,3 +1,4 @@
+import { BATTLE_SOURCES } from "./battle-sources";
 import { CONTINUOUS_SOURCES } from "./continuous-sources";
 import { NEGATION_SOURCES } from "./negation-sources";
 import { konamiCardUrl, type SourceRecord } from "./sources";
@@ -285,4 +286,5 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 	qa("duel-per-player-effect-used", 7095, 8114, "相手プレイヤーがそのデュエル中に「 D-HERO ディスクガイ 」のモンスター効果が発動できなくなる事はありません。"),
 	...NEGATION_SOURCES,
 	...CONTINUOUS_SOURCES,
+	...BATTLE_SOURCES,
 ];

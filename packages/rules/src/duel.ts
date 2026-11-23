@@ -32,7 +32,11 @@ export interface CardInstance {
 	readonly extraDeck: boolean;
 	/** Step 6: the stamp (`Duel.clock`) of the moment it came face-up on the field: when its continuous effects began to apply. */
 	readonly since: number;
+	/** Step 6b: its battle position in the Monster Zone (face-down monsters are in Defense Position). Elsewhere, `attack`. */
+	readonly position: Position;
 }
+
+export type Position = "attack" | "defense";
 
 /** Step 2 only tells a Main Phase from the others; steps inside the Battle Phase come later. */
 export type Phase = "draw" | "standby" | "main1" | "battle" | "main2" | "end";
@@ -134,10 +138,45 @@ export interface Duel {
 	readonly clock: number;
 	/** While a link resolves and its effect waits for a choice that is not a target: the whole chain, and the choice. */
 	readonly asking: Asking | null;
+	/** Step 6b: the attack in progress, from its declaration to the end of its Damage Step (src/battle.ts). */
+	readonly battle: Battle | null;
+	/** Step 6b: the monsters that have declared an attack this turn, each as it was (a card that moved is a new card). */
+	readonly attacked: readonly CardRef[];
+	/** Step 6b: after a replay, the monster that may declare an attack again although it already has. */
+	readonly replay: CardRef | null;
+	/** Step 6b: who won (`draw` when both reached 0 LP at the same time). Once set, nothing more is offered. */
+	readonly winner: Side | "draw" | null;
 	/** How many groups of simultaneous moves (`moveCards`) have happened: the last one's number tags its events. */
 	readonly batches: number;
 	/** What each card code does, as effect records (src/effects.ts): shared by reference, never copied, never changed. */
 	readonly defs: Readonly<Record<string, CardDef>>;
+}
+
+/** A card as it was: its id and its `moves` then. It is still that card while its `moves` has not changed. */
+export interface CardRef {
+	readonly id: number;
+	readonly moves: number;
+}
+
+export const refOf = (card: CardInstance): CardRef => ({ id: card.id, moves: card.moves });
+/** Is the card still the one referred to (it has not moved since)? */
+export const isStill = (duel: Duel, ref: CardRef): boolean => duel.cards[ref.id]!.moves === ref.moves;
+
+/** The Damage Step's timings (Konami's Damage Step Rules): start, before damage calculation, after it, end. Damage calculation itself has no window here. */
+export type DamageStep = "start" | "before" | "after" | "end";
+
+/** An attack: `step` is `declared` in the Battle Step (after the declaration), then each timing of the Damage Step. */
+export interface Battle {
+	readonly attacker: CardRef;
+	/** The attack target, or `null` for a direct attack. */
+	readonly target: CardRef | null;
+	/** The opponent's monsters when the attack was declared: a new one there before the Damage Step causes a replay. */
+	readonly defenders: readonly CardRef[];
+	readonly step: "declared" | DamageStep;
+	/** Decided at damage calculation, sent to the Graveyard at the end of the Damage Step (Damage Step Rules). */
+	readonly destroyed: readonly CardRef[];
+	/** The attack target flipped face-up before damage calculation: its "when flipped" effects wait until after it. */
+	readonly flipped: CardRef | null;
 }
 
 /** The Summon in progress: it has been attempted and has not succeeded yet (step 5). The monster stays where it was, not on the field. */
@@ -204,7 +243,7 @@ export function createDuel(setup: DuelSetup): Duel {
 		for (const zone of ["deck", "extra"] as const) {
 			for (const code of setup[side][zone] ?? []) {
 				const id = nextId++;
-				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0 };
+				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0, position: "attack" };
 				piles[side][zone].push(id);
 			}
 		}
@@ -239,6 +278,10 @@ export function createDuel(setup: DuelSetup): Duel {
 		modifiers: [],
 		clock: 0,
 		asking: null,
+		battle: null,
+		attacked: [],
+		replay: null,
+		winner: null,
 		batches: 0,
 		defs: setup.defs ?? {},
 	};
@@ -275,7 +318,8 @@ export function moveCard(duel: Duel, id: number, to: MoveTo): Duel {
 }
 
 /** `negated`: the move of a Spell or Trap Card whose activation was negated, or of a monster whose Summon was negated (`GameEvent`). */
-type MoveTo = { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: "destroyed" };
+/** `position`: in the Monster Zone (default: Defense Position face-down, else the position it had there, else Attack Position). `by`: a destruction by battle. */
+type MoveTo = { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: "destroyed"; by?: "battle"; position?: Position };
 
 /**
  * Destroys a card: it goes to the Graveyard and the move says it was destroyed (`moved.reason`), which "when destroyed" triggers
@@ -307,11 +351,12 @@ function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Du
 	const renewed = zone !== before.zone || controller !== before.controller || flippedDown;
 	// A card that comes face-up on the field starts to apply its continuous effects now (a move in the same zone, face-up, does not restart them).
 	const cameUp = isOnField(zone) && face === "up" && (before.face === "down" || !isOnField(before.zone) || controller !== before.controller);
-	const after = { ...before, zone, face, controller, moves: before.moves + (renewed ? 1 : 0), since: cameUp ? duel.clock + 1 : before.since };
+	const position: Position = zone !== "monster" ? "attack" : (to.position ?? (face === "down" ? "defense" : before.zone === "monster" ? before.position : "attack"));
+	const after = { ...before, zone, face, controller, position, moves: before.moves + (renewed ? 1 : 0), since: cameUp ? duel.clock + 1 : before.since };
 	const placed = place(duel, before, after, to.at ?? "top");
 	const moved = cameUp ? { ...placed, clock: placed.clock + 1 } : placed;
 	if (!renewed) return moved;
-	const raised = raiseEvent(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}) });
+	const raised = raiseEvent(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}), ...(to.by ? { by: to.by } : {}) });
 	return zone === "hand" && before.zone !== "hand" ? raiseEvent(raised, { type: "added-to-hand", card: after, from: before.zone, ...(batch === undefined ? {} : { batch }) }) : raised;
 }
 

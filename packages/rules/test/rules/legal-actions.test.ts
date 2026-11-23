@@ -18,7 +18,7 @@ describe("legalActions in an open game state", () => {
 	});
 	it(`${cites("rules", "spell-main-phase")} ${cites("rules", "quick-play")} outside the Main Phase, offers no Spell Speed 1 card and no Set, but still a Quick-Play Spell from the hand`, () => {
 		const duel = position({ defs, phase: "battle", you: { hand: ["spell", "quick-play", "trap"], set: ["spell"], monsters: ["ignition"] } });
-		expect(offered(duel)).toEqual(["activate quick-play", "pass"]);
+		expect(offered(duel)).toEqual(["activate quick-play", "attack ignition directly", "pass"]);
 	});
 	it(`${cites("rules", "set-spell-same-turn")} ${cites("rules", "trap-set-first")} offers a Spell Set this turn, but not a Trap or a Quick-Play Spell Set this turn, nor a Trap in the hand`, () => {
 		const duel = position({ defs, you: { hand: ["other-trap"], setThisTurn: ["spell", "quick-play", "trap"] } });

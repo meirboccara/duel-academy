@@ -1,6 +1,6 @@
 # Step 6b, Battle: design and slice list
 
-Status: research and design only. Nothing in the repo was changed. Built after step 6 (reads ATK/DEF through step 6's queries). Records live in `packages/rules/src/battle-sources.ts` (new, same shape as `negation-sources.ts`); quotes are in `sources.md` next to this file.
+Status: built (2026-11-23), see `packages/rules/src/battle.ts` and the README's step 6b section; slice 20 (one script of Konami's examples) left out. Built after step 6 (reads ATK/DEF through step 6's queries). Records live in `packages/rules/src/battle-sources.ts` (new, same shape as `negation-sources.ts`); quotes are in `sources.md` next to this file.
 
 ## Record ids (all read 2026-11-23)
 
@@ -68,9 +68,9 @@ Order notes: 1-9 need only step 6's ATK/DEF query; 10-12 need step 3 events; 13-
 
 ## Open questions for the owner
 
-1. YGOProJudge was not asked: the harness blocked reading `YGOJ_PARTNER_KEY` as credential exploration. If the owner wants it, they must allow that read (or run the questions). Questions to ask, one per session, flagged as leads:
-   a. In the TCG, which effects can be activated after damage calculation and at the end of the Damage Step?
-   b. Can a monster Quick Effect (such as a hand trap) be activated at the start of the Damage Step?
-   c. After Negate Attack, does the attacker count as having declared its attack, and does the Battle Phase continue?
-2. Slices 13-14 follow RB10 strictly. Confirm that over a looser reading.
-3. Replay slice order (17-19) is last by decision; confirm it stays inside 6b.
+1. YGOProJudge was asked afterwards (2026-11-23); its answers are in `ygoprojudge-leads.json` (leads, no source cited): after damage
+   calculation and at the end of the Damage Step it would also allow Counter Traps and activation negators (the core follows RB10 and
+   allows nothing but triggers there); at the start of the Damage Step it refuses Quick Effects that do not change ATK/DEF, as the core
+   does; a monster whose attack is negated still counts as having declared it (Negate Attack is not built).
+2. Slices 13-14 follow RB10 strictly. Confirm that over YGOProJudge's looser reading.
+3. Replays: RB10 names two causes (the target removed, a new monster on the opponent's side: record `replay-causes`); built as read.

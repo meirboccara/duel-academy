@@ -27,7 +27,7 @@ describe("Link Spider, written as an effect record", () => {
 	});
 	it(`${cites("link-spider", "text")} ${cites("rules", "open-state-only")} is an Ignition Effect: only in its controller's Main Phase, nothing else going on`, () => {
 		expect(offered(position({ defs, options, turn: "rival", you: { monsters: [card], hand: ["normal-4"] } }))).toEqual(["pass"]);
-		expect(offered(position({ defs, options, phase: "battle", you: { monsters: [card], hand: ["normal-4"] } }))).toEqual(["pass"]);
+		expect(offered(position({ defs, options, phase: "battle", you: { monsters: [card], hand: ["normal-4"] } }))).toEqual(["attack link-spider directly", "pass"]);
 	});
 	it(`${cites("link-spider", "text")} ${cites("rules", "once-instance-wording")} can be used once per turn by each copy`, () => {
 		const start = position({ defs, options, you: { monsters: [card, card], hand: ["normal-4", "normal-4-b", "celtic-guardian", "effect-4"] } });

@@ -258,3 +258,37 @@ Known limits of step 6 (what the tests do not prove):
 - Modifier durations are turn numbers; the Damage Step's durations come with the battle step.
 - `atk` on a board with continuous sources walks the field each time (0.007 ms in the bench): fine for damage calculation, worth a
   per-position cache if a bot reads every ATK per move.
+
+Step 6b (battle; plan in `docs/rules-core/battle/design.md`, sources in `docs/rules-core/battle/sources.md`, records in
+`src/battle-sources.ts`):
+- `src/battle.ts`. In the Battle Phase, with the game state open, `legalActions` lists `attack` actions (`{ type: "attack", card,
+  target }`, `target: null` for a direct attack): each face-up Attack Position monster once a turn (`Duel.attacked`, per card as it
+  was), never on the Duel's first turn, directly only when the opponent has no monster. Declaring starts no chain (FET); the turn
+  player then the opponent may respond.
+- `Duel.battle` is the attack in progress. When both players pass with no chain it moves on: Battle Step (`declared`) → start of
+  the Damage Step → before damage calculation (a face-down target is flipped face-up in Defense Position) → damage calculation
+  (RB10's tables, ATK/DEF read now through step 6's queries; 0 ATK destroys nothing; `battled`, `battle-damage` events; the
+  target's `flipped` event is raised only now) → after → end (the destroyed monsters go to the Graveyard together, `moved` with
+  `reason: "destroyed"`, `by: "battle"`) → back to the Battle Step. Each timing raises `damage-step` and is a trigger point.
+- Replay: a target gone or a new monster on the opponent's side before the Damage Step stops the attack; the attacker may attack
+  again (`Duel.replay`), or another monster does and the first stays used.
+- In the Damage Step, up to damage calculation, only Counter Trap Cards and effects whose `categories` say they directly change ATK
+  or DEF (`change-atk`, `change-def`; Shrink has it) can be activated; afterwards nothing but triggers (`damageStepAllows`).
+- `CardInstance.position` (`attack` / `defense`); `loseLp` and `Duel.winner` (0 LP loses, both at once is a draw); a won Duel
+  offers nothing.
+
+Known limits of step 6b (what the tests do not prove):
+- The Battle Phase's Start Step and End Step are not separate windows (the `phase` event of the Battle Phase stands for the Start
+  Step); damage calculation itself has no window ("during damage calculation" effects: none of our cards).
+- After damage calculation and at the end of the Damage Step nothing is listed but triggers, as RB10 says. YGOProJudge (lead, no
+  source) would also allow Counter Traps and activation negators there; no Konami page read says so.
+- A monster Quick Effect that does not change ATK/DEF is refused in the Damage Step (RB10's wording); no Konami page on hand traps
+  there was read (YGOProJudge agrees, no source). Whether an effect "directly changes ATK or DEF" is the card's `categories`.
+- Changing battle positions, Flip Summons and FLIP effects as such are step 8 (the `flipped` event exists; a FLIP card is a trigger on
+  it). Negate Attack and "end the Battle Phase" are not modelled (YGOProJudge lead in `docs/rules-core/battle/ygoprojudge-leads.json`).
+- Modifiers still end with the turn; "until the end of the Damage Step" durations are not modelled (no card needs them yet).
+- A monster that leaves during the Damage Step ends the attack with no damage calculation (the core's reading of "the monster
+  battled" needing damage calculation; no page read on what else happens).
+  A target flipped face-up still has its flip raised then. An attacker changed to Defense Position during the Damage Step still
+  battles with its ATK: no page read (no card of ours changes battle positions before step 8).
+- Konami's worked Damage Step examples (design slice 20) are not scripted as one test; each timing has its own test.
