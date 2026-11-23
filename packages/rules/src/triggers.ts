@@ -70,8 +70,10 @@ export function triggerPoint(duel: Duel, after: Priority): Duel {
 	// Only occurrences whose card has not moved since can activate; a stale earlier one must not hide a valid later one.
 	const remaining = duel.waiting.filter((waiting) => {
 		if (duel.cards[waiting.card.id]!.moves !== waiting.card.moves) return false;
-		if (effectOf(duel, waiting).each) return true;
-		const key = `${waiting.card.id}:${waiting.effect}`;
+		// An "each time" effect counts occurrences: cards moved at the same time (one batch) are one occurrence.
+		const batch = waiting.event.type === "moved" ? waiting.event.batch : undefined;
+		if (effectOf(duel, waiting).each && batch === undefined) return true;
+		const key = `${waiting.card.id}:${waiting.effect}${effectOf(duel, waiting).each ? `:batch ${batch}` : ""}`;
 		if (seen.has(key)) return false;
 		seen.add(key);
 		return true;

@@ -1,4 +1,4 @@
-import { type Action, act, breakEffect, raiseEvent, type CardDef, cardsIn, createDuel, type Duel, type Effect, legalActions, moveCard, negateActivation, negateEffect, other, type Phase, type Side, type TeachingOptions, type Zone } from "../../src";
+import { type Action, act, moveCards, breakEffect, raiseEvent, type CardDef, cardsIn, createDuel, type Duel, type Effect, legalActions, moveCard, negateActivation, negateEffect, other, type Phase, type Side, type TeachingOptions, type Zone } from "../../src";
 
 /**
  * Test cards for step 2, written with the provisional effect shape of src/effects.ts. None is registered in
@@ -134,7 +134,7 @@ export const REAL_CARDS: Record<string, CardDef> = Object.fromEntries(
 					{
 						activates: "card",
 						categories: ["send-from-deck"],
-						resolve: (duel, link) => duel.piles[link.player].deck.slice(0, 5).reduce((next, id) => moveCard(next, id, { zone: "graveyard" }), duel),
+						resolve: (duel, link) => moveCards(duel, duel.piles[link.player].deck.slice(0, 5), { zone: "graveyard" }),
 					},
 				],
 			},
@@ -204,7 +204,7 @@ export function play(duel: Duel, ...moves: string[]): Duel {
 	return duel;
 }
 
-const banishGraveyards = (duel: Duel) => [...duel.piles.you.graveyard, ...duel.piles.rival.graveyard].reduce((next, id) => moveCard(next, id, { zone: "banished" }), duel);
+const banishGraveyards = (duel: Duel) => moveCards(duel, [...duel.piles.you.graveyard, ...duel.piles.rival.graveyard], { zone: "banished" });
 
 const sentToGraveyard: NonNullable<Effect["on"]> = (_duel, event, { card }) => event.type === "moved" && event.after.id === card.id && event.after.zone === "graveyard";
 
@@ -223,7 +223,7 @@ export function triggerCards(log: string[] = []): Record<string, CardDef> {
 		kind: "monster",
 		effects: [{ activates: "trigger", from: "graveyard", mandatory, timing, on: sentToGraveyard, resolve: logs(code), ...more }],
 	});
-	const sweepAll = (duel: Duel) => [...duel.piles.you.monster, ...duel.piles.rival.monster].reduce((next, id) => moveCard(next, id, { zone: "graveyard" }), duel);
+	const sweepAll = (duel: Duel) => moveCards(duel, [...duel.piles.you.monster, ...duel.piles.rival.monster], { zone: "graveyard" });
 	const cards: CardDef[] = [
 		// A hand effect that discards the card as its cost; once in the Graveyard, it triggers.
 		...(["when", "if"] as const).map((timing): CardDef => {
@@ -277,7 +277,7 @@ export function triggerCards(log: string[] = []): Record<string, CardDef> {
 					activates: "card",
 					resolve: (duel, link) => {
 						const ids = [...duel.piles[link.player].monster];
-						const to = (zone: "graveyard" | "hand") => (state: Duel) => ids.reduce((next, id) => moveCard(next, id, { zone }), state);
+						const to = (zone: "graveyard" | "hand") => (state: Duel) => moveCards(state, ids, { zone });
 						return to("graveyard")(to("hand")(to("graveyard")(duel)));
 					},
 				},
@@ -303,6 +303,8 @@ export function triggerCards(log: string[] = []): Record<string, CardDef> {
 		// Writes what its controller's Spell & Trap Zones hold while it resolves.
 		{ code: "peek", kind: "spell", effects: [{ activates: "card", resolve: (duel) => (log.push(`peek sees ${duel.piles.you.spell.map((id) => duel.cards[id]!.code).sort().join(",")}`), duel) }] },
 		{ code: "quick-play", kind: "quick-play", effects: [{ activates: "card", resolve: logs("quick-play") }] },
+		// "Send all monsters your opponent controls to the GY" (the rival's, whoever activates it), all at once.
+		{ code: "sweep-rival", kind: "spell", effects: [{ activates: "card", resolve: (duel) => moveCards(duel, duel.piles.rival.monster, { zone: "graveyard" }) }] },
 		// "Banish all cards in both Graveyards."
 		{ code: "vacuum", kind: "spell", effects: [{ activates: "card", resolve: banishGraveyards }] },
 		// A mandatory trigger that banishes both Graveyards as its cost.
@@ -322,8 +324,8 @@ export function triggerCards(log: string[] = []): Record<string, CardDef> {
 				{
 					activates: "card",
 					resolve: (duel, link) => {
-						const sent = duel.piles[link.player].monster.reduce((next, id) => moveCard(next, id, { zone: "graveyard" }), duel);
-						return sent.piles[other(link.player)].monster.reduce((next, id) => moveCard(next, id, { zone: "graveyard" }), breakEffect(sent));
+						const sent = moveCards(duel, duel.piles[link.player].monster, { zone: "graveyard" });
+						return moveCards(breakEffect(sent), sent.piles[other(link.player)].monster, { zone: "graveyard" });
 					},
 				},
 			],
@@ -332,7 +334,7 @@ export function triggerCards(log: string[] = []): Record<string, CardDef> {
 		...(["purge-spell", "purge-quick"] as const).map((code): CardDef => ({
 			code,
 			kind: code === "purge-spell" ? "spell" : "quick-play",
-			effects: [{ activates: "card", resolve: (duel, link) => (log.push(code), duel.piles[link.player].monster.reduce((next, id) => moveCard(next, id, { zone: "graveyard" }), duel)) }],
+			effects: [{ activates: "card", resolve: (duel, link) => (log.push(code), moveCards(duel, duel.piles[link.player].monster, { zone: "graveyard" })) }],
 		})),
 		{ code: "sweep", kind: "spell", effects: [{ activates: "card", resolve: (duel) => (log.push("sweep"), sweepAll(duel)) }] },
 	];

@@ -163,6 +163,20 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 		read,
 		quote: "チェーン１：自分の「 ゴブリンドバーグ 」の効果の発動 チェーン２：相手の「 激流葬 」の発動 チェーン３：自分の「 カゲトカゲ 」の効果の発動",
 	},
+	/**
+	 * Konami's Japanese Q&A under Zeta Reticulant (cid 6794), whose effect triggers "each time" a monster is banished:
+	 * two monsters banished at the same time by one effect make it activate once. (Q&A fid 6888, Soul Absorption, says
+	 * the same for five cards banished by one effect.) Two separate banishings are two occurrences (fid 24018 above).
+	 */
+	{
+		id: "simultaneous-counts-once",
+		kind: "jp-qa",
+		cid: 6794,
+		fid: 11558,
+		url: "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=11558&request_locale=ja",
+		read,
+		quote: "複数体の相手フィールドのモンスターが同時に除外された場合でも、「 ゼータ・レティキュラント 」の効果は1回のみ発動し",
+	},
 	// FET, introduction.
 	fet("fast-effects-either-turn", "Fast effects can be activated by either player – even during their opponent’s turn, as long as the conditions are appropriate."),
 	// FET, "Turn Player Actions": box A.

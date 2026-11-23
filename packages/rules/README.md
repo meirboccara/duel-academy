@@ -42,9 +42,15 @@ Known limits of step 3 (to be honest about what the tests do not prove):
   true`) then goes on the chain once for every time its condition was met, as Konami's Japanese Q&A says (records
   `each-time-counts-events`, `each-time-across-chain`; 24018 and 22573 are about "each time" effects only). Any other effect
   goes on the chain once per trigger point: no Konami page we found says whether such an effect can activate twice
-  off two events, so the once-per-point policy is a choice, not a ruling. Simultaneous moves are one event each, so an
-  "each time" effect counts a sweep of two cards twice; Konami counts simultaneous sends once. Batched events are not
-  modelled yet.
+  off two events, so the once-per-point policy is a choice, not a ruling.
+- Cards moved at the same time by one effect (`moveCards`, events sharing a `batch`) are one occurrence for an "each time"
+  effect (record `simultaneous-counts-once`: Konami's Japanese Q&A on Zeta Reticulant, two monsters banished at once, one
+  activation; fid 6888 says the same for five cards). Separate moves (`moveCard`, or two links) count separately. A card
+  effect has to say what is simultaneous by calling `moveCards`; the core cannot tell. "a monster" wording is assumed to
+  count like "monsters": YGOProJudge (the owner's rules site, no source cited) says so, and no Konami page was found.
+- Targets of an "each time" effect are not tied to one occurrence: it may choose among all cards that met the condition
+  (YGOProJudge agrees, no source). `pass` declines all that is left of a player's optional effects, so an optional "each
+  time" effect can be activated fewer times than it counted (a player may activate fewer; YGOProJudge agrees, no source).
 - The teaching chain limit stops optional triggers from being offered once the chain is full; mandatory triggers still
   go on the chain (dropping them would change how a card resolves), so a trigger chain can exceed the limit.
 - A Spell or Trap Card of a chain goes to the Graveyard after the whole chain (record `chained-card-after-chain`: Konami's

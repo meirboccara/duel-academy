@@ -6,8 +6,9 @@ import { type Effect, effectOf } from "./effects";
  * `raiseEvent`. An event is looked at by the trigger effects of every card in the place they trigger from.
  */
 export type GameEvent =
-	/** A card became a new card by moving (zone, control or flipped face-down): `before` and `after` are its two states. */
-	| { readonly type: "moved"; readonly before: CardInstance; readonly after: CardInstance }
+	/** A card became a new card by moving (zone, control or flipped face-down): `before` and `after` are its two states.
+	 * Cards moved at the same time (`moveCards`) share a `batch`. */
+	| { readonly type: "moved"; readonly before: CardInstance; readonly after: CardInstance; readonly batch?: number }
 	| { readonly type: "summoned"; readonly card: CardInstance; readonly how: "normal" | "flip" | "special" }
 	/** A phase starts; `player` is the turn player. */
 	| { readonly type: "phase"; readonly phase: Phase; readonly player: Side };

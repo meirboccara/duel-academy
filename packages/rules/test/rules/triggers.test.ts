@@ -306,3 +306,12 @@ describe("answering a Summon whose trigger is on the chain", () => {
 		expect(offered(play(resolved, "pass"))).toEqual(["pass"]);
 	});
 });
+
+describe("cards moved at the same time", () => {
+	it(`${cites("rules", "simultaneous-counts-once")} counts cards sent by one effect at once as a single occurrence for an "each time" trigger, while two separate links still count twice`, () => {
+		const start = position({ defs: triggerCards(), options, you: { hand: ["sweep-rival"], monsters: ["each-counter"] }, rival: { monsters: ["monster", "monster"] } });
+		const swept = play(start, "activate sweep-rival", "pass", "pass");
+		expect(codes(swept, "rival", "graveyard")).toEqual(["monster", "monster"]);
+		expect(chainOf(swept)).toEqual(["each-counter"]);
+	});
+});

@@ -96,6 +96,8 @@ export interface Duel {
 	readonly waiting: readonly Waiting[];
 	/** While trigger effects are being put on a chain: whose choice it is is in `priority.holder`. */
 	readonly building: Building | null;
+	/** How many groups of simultaneous moves (`moveCards`) have happened: the last one's number tags its events. */
+	readonly batches: number;
 	/**
 	 * What each card code does. Provisional (see effects.ts): shared by reference, never copied, never changed. Step 4
 	 * decides where effect records live.
@@ -165,6 +167,7 @@ export function createDuel(setup: DuelSetup): Duel {
 		live: [],
 		waiting: [],
 		building: null,
+		batches: 0,
 		defs: setup.defs ?? {},
 	};
 }
@@ -195,7 +198,23 @@ function place(duel: Duel, before: CardInstance, after: CardInstance, at: "top" 
  * controller, unless `controller` puts it on the other player's field. Default face: down in the Deck, hand and Extra
  * Deck, up elsewhere. A card goes on top of the Deck unless `at: "bottom"`.
  */
-export function moveCard(duel: Duel, id: number, to: { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side }): Duel {
+export function moveCard(duel: Duel, id: number, to: MoveTo): Duel {
+	return move(duel, id, to, undefined);
+}
+
+type MoveTo = { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side };
+
+/**
+ * Moves several cards at the same time, as one effect does ("send all monsters ... to the Graveyard"). Each moves like
+ * `moveCard` and raises its own `moved` event, all sharing one `batch`, so an "each time" trigger counts them once.
+ */
+export function moveCards(duel: Duel, ids: readonly number[], to: MoveTo): Duel {
+	if (ids.length === 0) return duel;
+	const batch = duel.batches + 1;
+	return ids.reduce((next, id) => move(next, id, to, batch), { ...duel, batches: batch });
+}
+
+function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Duel {
 	const before = instance(duel, id);
 	if (to.controller !== undefined && !isOnField(to.zone)) throw new Error("a controller can be chosen only on the field");
 	const zone = before.extraDeck && (to.zone === "deck" || to.zone === "hand") ? "extra" : to.zone;
@@ -205,7 +224,7 @@ export function moveCard(duel: Duel, id: number, to: { zone: Zone; face?: Face; 
 	const renewed = zone !== before.zone || controller !== before.controller || flippedDown;
 	const after = { ...before, zone, face, controller, moves: before.moves + (renewed ? 1 : 0) };
 	const moved = place(duel, before, after, to.at ?? "top");
-	return renewed ? raiseEvent(moved, { type: "moved", before, after }) : moved;
+	return renewed ? raiseEvent(moved, { type: "moved", before, after, batch }) : moved;
 }
 
 /** Gives control of a card on the field to a player: it becomes a new card for them. Its owner never changes. */
