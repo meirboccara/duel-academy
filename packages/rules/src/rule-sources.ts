@@ -25,15 +25,10 @@ const fet = (id: string, quote: string): SourceRecord => ({ id, kind: "tcg-rule"
 
 const konamiPage = (id: string, url: string, quote: string): SourceRecord => ({ id, kind: "tcg-rule", url, read, quote });
 
-/** Konami's Japanese Q&A fid 14075, filed under Ash Blossom & Joyous Spring (cid 12950): see the rule record and the card's sources. */
-export const ICE_BELL_QA: Omit<SourceRecord, "id"> = {
-	kind: "jp-qa",
-	cid: 12950,
-	fid: 14075,
-	url: "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=14075&request_locale=ja",
-	read,
-	quote: "その場合でも、手札の「 WW－アイス・ベル 」のモンスター効果の発動は行われていますので、このターンに自分は、レベル５以上の風属性モンスターしかエクストラデッキから特殊召喚する事はできなくなります。",
-};
+const qa = (id: string, cid: number, fid: number, quote: string): SourceRecord => ({ id, kind: "jp-qa", cid, fid, url: `https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=${fid}&request_locale=ja`, read, quote });
+
+/** Konami's Japanese Q&A fid 14075, filed under Ash Blossom & Joyous Spring (cid 12950): the rule record, also a ruling of that card's sources. */
+export const ICE_BELL_QA: SourceRecord = qa("effect-negated-still-activated", 12950, 14075, "その場合でも、手札の「 WW－アイス・ベル 」のモンスター効果の発動は行われていますので、このターンに自分は、レベル５以上の風属性モンスターしかエクストラデッキから特殊召喚する事はできなくなります。");
 
 const cardText = (id: string, cid: number, quote: string): SourceRecord => ({ id, kind: "card-text", cid, url: konamiCardUrl(cid, "en"), read, quote });
 
@@ -232,6 +227,9 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 	// UCT4, New Zombie Master: the cost comes first and the target is picked after it. Konami says nothing about an effect
 	// whose cost cannot be paid or whose cost removes its only target: that such an effect is not offered follows from this.
 	konamiPage("cost-then-target", UCT4, "Clues: You send a card to the Graveyard first, ‘then’ pick a target after that."),
+	// UCT3, a card that targets "2 Level 2 monsters": how many cards a card targets is what its text says. That the core lists
+	// each legal combination, with the exact count needed, is its reading of such wording; Konami's page gives the wording.
+	konamiPage("target-count-from-text", UCT3, "You can target 2 Level 2 monsters in your Graveyard; Special Summon them, but their effects are negated."),
 	// UCT3, Creature Swap: what an effect does, and the choices it makes, happen when it resolves.
 	konamiPage("choice-at-resolution", UCT3, "In fact, its text is exactly the same as before because everything on Creature Swap happens when the effect resolves: Each player chooses 1 monster they control and switches control of those monsters with each other."),
 	/**
@@ -242,15 +240,17 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 	cardText("frozen-categories", 12950, "When a card or effect is activated that includes any of these effects (Quick Effect): You can discard this card; negate that effect."),
 	// The five printed once-per-turn wordings (card text). What each does is the core's reading; see EffectRecord.once.
 	// "Once per turn:" (Link Spider, cid 13034). That each copy has its own use, and that a card that moved is a new card
-	// with a new use, is not worded on a Konami page we found; YGOProJudge (no source cited) says so.
+	// with a new use, is not worded on a Konami page we found; YGOProJudge (no source cited) says so. Nor is what a negated
+	// activation does to a "Once per turn:" use.
 	cardText("once-instance-wording", 13034, "Once per turn: You can Special Summon 1 Level 4 or lower Normal Monster from your hand to your zone this card points to."),
-	// "You can only use this effect of [name] once per turn" (Ash Blossom & Joyous Spring, cid 12950). By name and per
-	// player, spent at activation even if negated: YGOProJudge (no source cited).
+	// "You can only use this effect of [name] once per turn" (Ash Blossom & Joyous Spring, cid 12950). By name and by
+	// player, spent at activation even if negated: see once-name-second-copy and use-negated-activation-spent below.
 	cardText("once-name-wording", 12950, 'You can only use this effect of "Ash Blossom & Joyous Spring" once per turn.'),
 	// "You can only activate 1 [name] per turn" (Pot of Desires, cid 12465). That a negated activation gives the use back
-	// and a negated effect does not: YGOProJudge (no source cited); no Konami page found.
+	// and a negated effect does not: see activate-one-unless-negated, activate-negated-can-again and effect-negated-still-activated.
 	cardText("once-activation-wording", 12465, 'You can only activate 1 "Pot of Desires" per turn.'),
-	// "once per Duel" (Revolution Synchron, cid 18789). Tracked per player: YGOProJudge (no source cited).
+	// "once per Duel" (Revolution Synchron, cid 18789). Spent even if negated, and per player: see duel-use-spent-even-if-negated,
+	// duel-per-player-control and duel-per-player-effect-used.
 	cardText("once-duel-wording", 18789, 'You can only use this effect of "Revolution Synchron" once per Duel.'),
 	// "Once per Chain" (Argostars - Home Stadium, cid 20795). Lifted when the chain has resolved, per player: YGOProJudge (no source cited).
 	cardText("once-chain-wording", 20795, 'Once per Chain, if a Continuous Trap activates its effect in your Monster Zone'),
@@ -259,5 +259,26 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 	 * the activation of its effect was made, so what applies at activation (its restriction on Extra Deck Summons) does.
 	 * Used for: a negated effect is still an activation that happened, so no "activate 1 per turn" use is given back.
 	 */
-	{ id: "effect-negated-still-activated", ...ICE_BELL_QA },
+	ICE_BELL_QA,
+	// Konami's Japanese Q&A on the once-per-turn family. Each is filed under the card Konami lists it with; the quote is the
+	// answer's own sentence (page read 2026-11-23). Each says what its title says and no more.
+	// "You can only use this effect of [name] once per turn" (Lovely Labrynth, cid 17360): a second copy, Special Summoned
+	// the same turn and renamed, cannot use the effect again: "I have already used it". By player and effect, not by copy.
+	qa("once-name-second-copy", 17360, 24139, "そのターン、すでに自分は『②：自分の墓地の通常罠カード１枚を対象として発動できる。そのカードを自分フィールドにセットする。この効果でセットしたカードは、自分フィールドに悪魔族モンスターが存在しない場合には発動できない』効果を使用していますので、そのターン中２回目の発動を行うことはできません。"),
+	// "You can only activate 1 [name] per turn" (Metaverse's Q&A, cid 13292, about Field Spells with that wording): a card
+	// activated this turn whose activation was not negated blocks a same-name activation. That a negated activation does not
+	// block is the implication of "was not negated"; the page does not say it outright. (Konami's Q&A fid 11730, on Great
+	// Shogun Shien's "can only activate 1 Spell/Trap each turn", says a negated activation does not count against that
+	// other limit: an analogy only, not a record.)
+	qa("activate-one-unless-negated", 13292, 21245, "そのターンにすでにそのフィールド魔法カードを発動を行い、そのカードの発動が無効になっていない場合、そのターンに発動した「 メタバース 」「 終焉の地 」「 ポップルアップ 」「 ゴーストリック・リフォーム 」の『①』の効果「 フェイバリット・ヒーロー 」の②の効果によって、同名となるフィールド魔法カードをデッキから選んで発動することはできません。"),
+	// "once per Duel" (the question is about Heavenly Sword's own once-per-Duel effect; Revolution Synchron, cid 18789, is on
+	// the answer's list): in each case (A) the activation or the effect negated, (B) the effect changed, (C) its processing not
+	// done, the effect counts as used and cannot be activated again in the Duel.
+	qa("duel-use-spent-even-if-negated", 18789, 23336, "（A）「 天羽々斬之巳剣 」の①の効果の発動や、発動した効果が無効になった場合 （B）発動した「 天羽々斬之巳剣 」の①の効果が、チェーンして発動した「 No.75 惑乱のゴシップ・シャドー 」の①の効果により『お互いのプレイヤーは、それぞれデッキから１枚ドローする』に変更され、処理が行われた場合 （C）「 天羽々斬之巳剣 」の①の発動や効果が無効にならず、その処理時に他の効果が適用されたことによって、『デッキから「巳剣」モンスター１体を特殊召喚する』処理が行われなかった場合 Answer いずれの場合でも、「 天羽々斬之巳剣 」の①の効果を使用したことになりますので、そのデュエル中に再び発動することはできなくなります。"),
+	// "once per Duel" (Armored Kappa, cid 10466): the opponent who took control of it may use the effect if they have not
+	// activated it themselves this Duel: the limit is per player.
+	qa("duel-per-player-control", 10466, 12798, "「 アーマー・カッパー 」のコントロールを得た相手プレイヤーが、そのデュエル中に「 アーマー・カッパー 」の『このターン、自分フィールド上のモンスターは戦闘では破壊されず、戦闘によって発生する自分への戦闘ダメージは0になる』効果を発動していないのであれば、相手プレイヤーはその効果を発動する事ができます。"),
+	// "once per Duel" (Destiny HERO - Disk Commander, Japanese name D-HERO ディスクガイ, cid 7095; the card text there is "once
+	// per Duel"): that I used a copy's effect does not stop the other player from activating it in that Duel.
+	qa("duel-per-player-effect-used", 7095, 8114, "相手プレイヤーがそのデュエル中に「 D-HERO ディスクガイ 」のモンスター効果が発動できなくなる事はありません。"),
 ];

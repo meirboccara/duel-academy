@@ -1,5 +1,5 @@
 import { type Action, PASS, sameAction } from "./action";
-import { activateEffect, activationWays } from "./activation";
+import { activateAction, activateEffect, activationWays } from "./activation";
 import { type Duel, other, type Priority, type Side } from "./duel";
 import { effectOf } from "./effects";
 import type { Waiting } from "./events";
@@ -46,7 +46,7 @@ function options(duel: Duel, waiting: Waiting): Activate[] {
 	if (card.moves !== waiting.card.moves) return [];
 	// The teaching chain limit stops us asking for optional effects; a mandatory one still goes on, or the card would resolve differently.
 	if (!effect.mandatory && duel.options.chainLimit !== null && duel.chain.length >= duel.options.chainLimit) return [];
-	return activationWays(duel, { player: card.controller, card }, waiting.effect, effect).map((targets): Activate => ({ type: "activate", card: card.id, effect: waiting.effect, targets }));
+	return activationWays(duel, { player: card.controller, card }, waiting.effect, effect).map((way): Activate => activateAction(card.id, waiting.effect, way));
 }
 
 /** An "each time" effect waiting twice offers the same action twice: show it once, it will be offered again. */
@@ -109,7 +109,7 @@ function finish(duel: Duel): Duel {
 function add(duel: Duel, action: Activate): Duel {
 	const building = duel.building!;
 	const waiting = building.remaining.find((entry) => entry.card.id === action.card && entry.effect === action.effect)!;
-	const next = activateEffect(duel, waiting.card.controller, duel.cards[action.card]!, action.effect, action.targets);
+	const next = activateEffect(duel, waiting.card.controller, duel.cards[action.card]!, action.effect, { paid: action.paid ?? [], targets: action.targets }, false);
 	const remaining = building.remaining.filter((entry) => entry !== waiting);
 	return { ...next, building: { ...building, remaining, anyActivated: true } };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { act, cardsIn, cites, legalActions } from "../../src";
+import { act, cardsIn, cites, legalActions, moveCard } from "../../src";
 import { codes, offered, play, position, recordCards } from "./fixtures";
 
 /** Step 4: effect records played through `legalActions` and `act`: costs, targets and their dry runs. */
@@ -144,5 +144,118 @@ describe("effect records: categories are frozen on the link", () => {
 		// Nothing is left in the Deck to search, but link 1 still says what it declared.
 		expect(codes(swept, "you", "deck")).toEqual([]);
 		expect(swept.chain.map((link) => link.categories)).toEqual([["search"], []]);
+	});
+});
+
+describe("effect records: how many targets", () => {
+	// Konami's UCT3 has a card that says "target 2 Level 2 monsters": how many a card targets is its text.
+	// That a count is chosen among legal combinations, with the exact number needed, is the core's reading of those words.
+	const graveyard = ["monster", "monster-b", "normal-4"];
+	const defs = (log: string[] = []) => ({ ...recordCards(log), "normal-4": { code: "normal-4", kind: "monster" as const } });
+	it(`${cites("rules", "target-count-from-text")} lists every pair for "target 2 monsters", and none with fewer than two`, () => {
+		const start = position({ defs: defs(), options, you: { hand: ["aim-two"], graveyard } });
+		expect(offered(start).filter((label) => label.startsWith("activate"))).toEqual(["activate aim-two > monster > monster-b", "activate aim-two > monster > normal-4", "activate aim-two > monster-b > normal-4"].sort());
+		expect(offered(position({ defs: defs(), options, you: { hand: ["aim-two"], graveyard: ["monster"] } }))).toEqual(["pass", "set aim-two"]);
+	});
+	// The core's own bookkeeping (each target's `moves` is frozen on the link); no Konami sentence.
+	it("freezes each of the targets on the link", () => {
+		const start = position({ defs: defs(), options, you: { hand: ["aim-two"], graveyard } });
+		const pair = offered(start).find((label) => label.startsWith("activate aim-two"))!;
+		const done = play(start, pair);
+		expect(done.chain[0]!.targets).toHaveLength(2);
+		expect(done.chain[0]!.targetMoves).toEqual(done.chain[0]!.targets.map((id) => done.cards[id]!.moves));
+	});
+	// The core's reading of "up to 2" (one card or both); the record only has the "target 2" wording.
+	it('lists one card, or both, for "target up to 2"', () => {
+		const start = position({ defs: defs(), options, you: { hand: ["aim-up-to-two"], graveyard: ["monster", "monster-b"] } });
+		expect(offered(start).filter((label) => label.startsWith("activate"))).toEqual(["activate aim-up-to-two > monster", "activate aim-up-to-two > monster > monster-b", "activate aim-up-to-two > monster-b"]);
+	});
+	// The core's reading of an effect that may be activated with no target; the record only has the "target 2" wording.
+	it('can be activated with no target when none is needed ("you can target 1")', () => {
+		const none = position({ defs: defs(), options, you: { hand: ["aim-optional"] } });
+		expect(offered(none)).toEqual(["activate aim-optional", "pass", "set aim-optional"]);
+		const some = position({ defs: defs(), options, you: { hand: ["aim-optional"], graveyard: ["monster"] } });
+		expect(offered(some)).toEqual(["activate aim-optional", "activate aim-optional > monster", "pass", "set aim-optional"]);
+	});
+	it("never pairs a card with itself, even when the candidates repeat it", () => {
+		const start = position({ defs: defs(), options, you: { hand: ["aim-two-repeated"], graveyard } });
+		const labels = offered(start).filter((label) => label.startsWith("activate"));
+		expect(labels).toHaveLength(3);
+		for (const label of labels) {
+			const [first, second] = label.split(" > ").slice(1);
+			expect(first).not.toBe(second);
+		}
+		for (const action of legalActions(start)) expect(() => act(start, action)).not.toThrow();
+	});
+	it("throws a clear error for a record that counts targets and has nothing to target", () => {
+		const start = position({ defs: defs(), options, you: { hand: ["count-without-target"] } });
+		expect(() => legalActions(start)).toThrow(/targetCount/);
+	});
+	it("checks the combination again after the cost is paid", () => {
+		// The cost banishes the first monster of the Graveyard: with 3 left 2, one pair; with 2 left 1, none.
+		const three = position({ defs: defs(), options, you: { hand: ["banish-then-aim-two"], graveyard } });
+		expect(offered(three).filter((label) => label.startsWith("activate"))).toHaveLength(1);
+		expect(offered(position({ defs: defs(), options, you: { hand: ["banish-then-aim-two"], graveyard: ["monster", "monster-b"] } }))).toEqual(["pass", "set banish-then-aim-two"]);
+		const spell = cardsIn(three, "you", "hand")[0]!;
+		const all = cardsIn(three, "you", "graveyard").slice(1, 3).map((card) => card.id);
+		expect(() => act(three, { type: "activate", card: spell.id, effect: 0, targets: all })).not.toThrow();
+		const stale = cardsIn(three, "you", "graveyard")[0]!.id;
+		expect(() => act(three, { type: "activate", card: spell.id, effect: 0, targets: [stale, all[1]!] })).toThrow(/not a legal action/);
+	});
+	it("resolves with the targets that are still the same cards", () => {
+		const log: string[] = [];
+		const start = position({ defs: defs(log), options, you: { hand: ["aim-two"], graveyard: ["monster", "monster-b"] } });
+		const aimed = play(start, "activate aim-two > monster > monster-b");
+		// One of the two targets leaves the Graveyard and comes back before the chain resolves: it is a new card.
+		const id = aimed.chain[0]!.targets[0]!;
+		const bounced = moveCard(moveCard(aimed, id, { zone: "hand" }), id, { zone: "graveyard" });
+		play(bounced, "pass", "pass");
+		expect(log).toEqual(["aim-two aims " + [bounced.cards[aimed.chain[0]!.targets[1]!]!.code].join(",")]);
+	});
+});
+
+describe("effect records: a cost with a choice", () => {
+	// Konami's UCT4 lists "pay, discard, Tribute, or destroy" in the activation text (before the semicolon) as a cost, paid at
+	// activation. Which card is discarded is the player's choice then; that each way of paying is its own action is the core's reading.
+	const defs = recordCards();
+	it(`${cites("rules", "costs-at-activation")} lists one activation for each card that can be discarded, and pays the one chosen`, () => {
+		const start = position({ defs, options, you: { hand: ["discard-one", "monster", "monster-b"] } });
+		expect(offered(start).filter((label) => label.startsWith("activate"))).toEqual(["activate discard-one ~ monster", "activate discard-one ~ monster-b"]);
+		const done = play(start, "activate discard-one ~ monster-b");
+		expect(codes(done, "you", "graveyard")).toEqual(["monster-b"]);
+		expect(codes(done, "you", "hand")).toEqual(["monster"]);
+	});
+	it("is not offered when no way of paying exists", () => {
+		expect(offered(position({ defs, options, you: { hand: ["discard-one"] } }))).toEqual(["pass", "set discard-one"]);
+		expect(offered(position({ defs, options, you: { hand: ["tribute-one"] } }))).toEqual(["pass", "set tribute-one"]);
+	});
+	it(`${cites("rules", "cost-then-target")} combines each way of paying with the targets read after paying it`, () => {
+		const start = position({ defs, options, you: { hand: ["discard-then-aim", "monster", "monster-b"], graveyard: ["normal-6"] } });
+		const labels = offered({ ...start, defs: { ...defs, "normal-6": { code: "normal-6", kind: "monster" } } }).filter((label) => label.startsWith("activate"));
+		// The card discarded is in the Graveyard when the target is chosen, so it may be the target.
+		expect(labels).toEqual(["activate discard-then-aim ~ monster > monster", "activate discard-then-aim ~ monster > normal-6", "activate discard-then-aim ~ monster-b > monster-b", "activate discard-then-aim ~ monster-b > normal-6"]);
+	});
+	it("pays exactly the way that was listed: every listed action can be played, and an unlisted way is refused", () => {
+		const start = position({ defs, options, you: { hand: ["discard-then-aim", "monster", "monster-b"], graveyard: ["monster"] } });
+		for (const action of legalActions(start)) expect(() => act(start, action)).not.toThrow();
+		const spell = cardsIn(start, "you", "hand").find((card) => card.code === "discard-then-aim")!;
+		const asked = cardsIn(start, "you", "hand").find((card) => card.code === "monster")!;
+		expect(() => act(start, { type: "activate", card: spell.id, effect: 0, paid: [spell.id], targets: [asked.id] })).toThrow(/not a legal action/);
+		expect(() => act(start, { type: "activate", card: spell.id, effect: 0, targets: [asked.id] })).toThrow(/not a legal action/);
+	});
+	it("lets a Quick Effect with a cost of Tribute choose the monster", () => {
+		const start = position({ defs, options, you: { hand: ["tribute-one"], monsters: ["monster", "monster-b"] } });
+		expect(offered(start).filter((label) => label.startsWith("activate"))).toEqual(["activate tribute-one ~ monster", "activate tribute-one ~ monster-b"]);
+		expect(codes(play(start, "activate tribute-one ~ monster-b"), "you", "monster")).toEqual(["monster"]);
+	});
+});
+
+describe("effect records: what a link answers", () => {
+	it("records no answered link for trigger effects put on a chain at a trigger point: they answer nothing", async () => {
+		const { triggerCards } = await import("./fixtures");
+		const start = position({ defs: triggerCards(), options, you: { hand: ["sweep"], monsters: ["forced-a", "forced-b"] } });
+		const swept = play(start, "activate sweep", "pass", "pass", "activate forced-a");
+		expect(swept.chain.map((link) => link.card.code)).toEqual(["forced-a", "forced-b"]);
+		expect(swept.chain.map((link) => link.answers)).toEqual([null, null]);
 	});
 });

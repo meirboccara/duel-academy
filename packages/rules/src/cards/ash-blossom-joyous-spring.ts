@@ -24,7 +24,7 @@ export const ASH_BLOSSOM: CardDef = {
 			range: "hand",
 			condition: (duel) => duel.chain[duel.chain.length - 1]?.categories.some((category) => ASH_BLOSSOM_ANSWERS.includes(category)) ?? false,
 			cost: sendThisToGraveyard,
-			operation: (duel, _link, index) => negateEffect(duel, index - 1),
+			operation: (duel, link) => negateEffect(duel, link.answers!),
 			once: { scope: "name" },
 		},
 	],
@@ -47,7 +47,7 @@ export const ASH_BLOSSOM_SOURCES: CardSources = {
 			read: "2026-11-23",
 			quote: "When a card or effect is activated that includes any of these effects (Quick Effect): You can discard this card; negate that effect. ●Add a card from the Deck to the hand. ●Special Summon from the Deck. ●Send a card from the Deck to the GY. You can only use this effect of \"Ash Blossom & Joyous Spring\" once per turn.",
 		},
-		{ id: "negated-effect-activation-stands", ...ICE_BELL_QA },
+		{ ...ICE_BELL_QA, id: "negated-effect-activation-stands" },
 
 	],
 	effects: ["text"],

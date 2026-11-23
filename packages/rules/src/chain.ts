@@ -1,4 +1,4 @@
-import { activateEffect, activationWays } from "./activation";
+import { activateAction, activateEffect, activationWays } from "./activation";
 import { type Action, PASS, sameAction } from "./action";
 import { type CardInstance, type Duel, type Link, moveCard, other, PHASES, type Side } from "./duel";
 import { breakEffect, raiseEvent } from "./events";
@@ -50,7 +50,7 @@ export function legalActions(duel: Duel): Action[] {
 }
 
 /** Lists what the holder of priority can do besides passing; with no list, only tells whether there is anything. */
-function collect(duel: Duel, out: Action[] | null): boolean {
+function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 	const { chain, priority, turn, options, defs } = duel;
 	if (options.chainLimit !== null && chain.length >= options.chainLimit) return false;
 	const player = priority.holder;
@@ -68,8 +68,8 @@ function collect(duel: Duel, out: Action[] | null): boolean {
 		const ctx = { player, card };
 		// An effect that answers an event needs that event to be the last thing that happened.
 		if (effect.event && !duel.live.some((event) => effect.event!(duel, event, ctx))) return false;
-		const ways = activationWays(duel, ctx, index, effect);
-		if (out) for (const targets of ways) out.push({ type: "activate", card: card.id, effect: index, targets });
+		const ways = activationWays(duel, ctx, index, effect, out === null);
+		if (out) for (const way of ways) out.push(activateAction(card.id, index, way));
 		return ways.length > 0;
 	};
 
@@ -78,6 +78,7 @@ function collect(duel: Duel, out: Action[] | null): boolean {
 		effect.type === "activation" ? ready : effect.type !== "trigger" && rangeOf(effect) === zone && (zone === "hand" || card.face === "up");
 
 	for (const id of piles.hand) {
+		if (only !== undefined && id !== only) continue;
 		const card = duel.cards[id]!;
 		const def = defs[card.code];
 		if (!def) continue;
@@ -103,6 +104,7 @@ function collect(duel: Duel, out: Action[] | null): boolean {
 	}
 	for (const zone of ["spell", "monster"] as const) {
 		for (const id of piles[zone]) {
+			if (only !== undefined && id !== only) continue;
 			const card = duel.cards[id]!;
 			const effects = defs[card.code]?.effects;
 			if (!effects) continue;
@@ -128,10 +130,20 @@ function collect(duel: Duel, out: Action[] | null): boolean {
  * who can only pass does so at once, so the duel returned always waits on a real decision.
  */
 export function act(duel: Duel, action: Action): Duel {
-	if (!legalActions(duel).some((legal) => sameAction(legal, action))) throw new Error(`not a legal action for ${duel.asking ? duel.asking.player : duel.priority.holder}: ${JSON.stringify(action)}`);
+	if (!isLegal(duel, action)) throw new Error(`not a legal action for ${duel.asking ? duel.asking.player : duel.priority.holder}: ${JSON.stringify(action)}`);
 	let next = apply(duel, action);
 	while (!next.building && !next.asking && !next.options.everyWindow && !decides(next) && !collect(next, null)) next = pass(next);
 	return next;
+}
+
+/** Is the action among `legalActions(duel)`? An ordinary action is checked by listing only what its own card could do. */
+function isLegal(duel: Duel, action: Action): boolean {
+	if (duel.asking || duel.building) return legalActions(duel).some((legal) => sameAction(legal, action));
+	// Passing is always open to the player who holds priority.
+	if (action.type === "pass") return true;
+	const listed: Action[] = [];
+	collect(duel, listed, action.card);
+	return listed.some((legal) => sameAction(legal, action));
 }
 
 function apply(duel: Duel, action: Action): Duel {
@@ -152,7 +164,7 @@ function set(duel: Duel, id: number): Duel {
 
 function activate(duel: Duel, action: Extract<Action, { type: "activate" }>): Duel {
 	const player = duel.priority.holder;
-	const next = activateEffect(duel, player, duel.cards[action.card]!, action.effect, action.targets);
+	const next = activateEffect(duel, player, duel.cards[action.card]!, action.effect, { paid: action.paid ?? [], targets: action.targets });
 	return { ...next, priority: { holder: other(player), passed: [], open: false } };
 }
 

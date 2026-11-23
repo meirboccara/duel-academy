@@ -1,4 +1,4 @@
-import { type Action, act, ask, CARD_DEFS, moveCards, breakEffect, raiseEvent, type CardDef, cardsIn, createDuel, type Duel, type EffectRecord, legalActions, moveCard, negateActivation, negateEffect, other, type Phase, type Side, type TeachingOptions, type Zone } from "../../src";
+import { type Action, act, ask, CARD_DEFS, targetsOf, moveCards, breakEffect, raiseEvent, type CardDef, cardsIn, createDuel, type Duel, type EffectRecord, legalActions, moveCard, negateActivation, negateEffect, other, type Phase, type Side, type TeachingOptions, type Zone } from "../../src";
 
 /**
  * Test cards, written as effect records (src/effects.ts). The made-up ones are not registered in CARD_SOURCES; the real
@@ -117,7 +117,7 @@ export function label(duel: Duel, action: Action): string {
 	const code = duel.cards[action.card]!.code;
 	if (action.type === "set") return `set ${code}`;
 	if (action.type === "choose") return `choose ${code}`;
-	return `activate ${code}${action.targets.map((target) => ` > ${duel.cards[target]!.code}`).join("")}`;
+	return `activate ${code}${(action.paid ?? []).map((card) => ` ~ ${duel.cards[card]!.code}`).join("")}${action.targets.map((target) => ` > ${duel.cards[target]!.code}`).join("")}`;
 }
 export const offered = (duel: Duel) => legalActions(duel).map((action) => label(duel, action)).sort();
 
@@ -311,6 +311,85 @@ export function recordCards(log: string[] = []): Record<string, CardDef> {
 					cost: (duel, { player }) => { const top = firstOf(duel, player, "deck"); return top === undefined ? null : moveCard(duel, top, { zone: "graveyard" }); },
 					target: (duel, { player }) => duel.piles[player].graveyard,
 					operation: logs("mill-then-aim"),
+				},
+			],
+		},
+		// Targets of other counts, all in your Graveyard: "target 2 monsters", "target up to 2", "you can target 1" (no target is fine).
+		...([
+			["aim-two", { min: 2, max: 2 }],
+			["aim-up-to-two", { min: 1, max: 2 }],
+			["aim-optional", { min: 0, max: 1 }],
+		] as const).map(([code, count]): CardDef => ({
+			code,
+			kind: "quick-play",
+			effects: [{ type: "activation", target: (duel, { player }) => monsterIn(duel, player, "graveyard"), targetCount: count, operation: (duel, link) => (log.push(`${code} aims ${targetsOf(duel, link).map((card) => card.code).sort().join(",")}`), duel) }],
+		})),
+		// "Target 2 monsters" whose candidate list repeats every card (a card written carelessly): a card is still not paired with itself.
+		{
+			code: "aim-two-repeated",
+			kind: "quick-play",
+			effects: [{ type: "activation", target: (duel, { player }) => [...monsterIn(duel, player, "graveyard"), ...monsterIn(duel, player, "graveyard")], targetCount: { min: 2, max: 2 }, operation: logs("aim-two-repeated") }],
+		},
+		// A definition error: a count of targets with nothing to target.
+		{ code: "count-without-target", kind: "quick-play", effects: [{ type: "activation", targetCount: { min: 2, max: 2 }, operation: logs("count-without-target") }] },
+		// The same with a cost that banishes the first monster of your Graveyard.
+		{
+			code: "banish-then-aim-two",
+			kind: "quick-play",
+			effects: [
+				{
+					type: "activation",
+					cost: (duel, { player }) => { const first = monsterIn(duel, player, "graveyard")[0]; return first === undefined ? null : moveCard(duel, first, { zone: "banished" }); },
+					target: (duel, { player }) => monsterIn(duel, player, "graveyard"),
+					targetCount: { min: 2, max: 2 },
+					operation: logs("banish-then-aim-two"),
+				},
+			],
+		},
+		// "Discard 1 card": a Spell whose cost is the player's choice among the other cards of the hand.
+		{
+			code: "discard-one",
+			kind: "spell",
+			effects: [
+				{
+					type: "activation",
+					cost: {
+						pick: (duel, { player, card }) => duel.piles[player].hand.filter((id) => id !== card.id).map((id) => [id]),
+						pay: (duel, _ctx, picked) => moveCards(duel, picked, { zone: "graveyard" }),
+					},
+					operation: logs("discard-one"),
+				},
+			],
+		},
+		// "Discard 1 card; target 1 monster in your GY": the card discarded may be the target.
+		{
+			code: "discard-then-aim",
+			kind: "quick-play",
+			effects: [
+				{
+					type: "activation",
+					cost: {
+						pick: (duel, { player, card }) => duel.piles[player].hand.filter((id) => id !== card.id).map((id) => [id]),
+						pay: (duel, _ctx, picked) => moveCards(duel, picked, { zone: "graveyard" }),
+					},
+					target: (duel, { player }) => monsterIn(duel, player, "graveyard"),
+					operation: logs("discard-then-aim"),
+				},
+			],
+		},
+		// "Tribute 1 monster": a Quick-Play Spell with a cost that cannot be paid without one, and a cheap pre-check for it.
+		{
+			code: "tribute-one",
+			kind: "quick-play",
+			effects: [
+				{
+					type: "activation",
+					cost: {
+						can: (duel, { player }) => duel.piles[player].monster.length > 0,
+						pick: (duel, { player }) => duel.piles[player].monster.map((id) => [id]),
+						pay: (duel, _ctx, picked) => moveCards(duel, picked, { zone: "graveyard" }),
+					},
+					operation: logs("tribute-one"),
 				},
 			],
 		},

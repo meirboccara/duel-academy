@@ -19,9 +19,10 @@ const BUCKETS: Record<OnceScope, Bucket> = { instance: "turn", name: "turn", act
 /**
  * The key of one use of an effect, or `null` when it has no limit. Always read on the card as it is before it is
  * activated (a Spell or Trap Card not yet placed), so that checking and spending use the same key. An `instance` limit
- * tells a copy apart by its id and its `moves`: a card that has moved is a new card, with no use. This is how the core
- * reads it; YGOProJudge (the owner's rules site, no source cited) says the same, no Konami page was found. Every other
- * scope is by player and name (YGOProJudge too): both players may each use their own.
+ * tells a copy apart by its id and its `moves`: a card that has moved is a new card, with no use (YGOProJudge, the owner's
+ * rules site, no source cited; no Konami page found). Every other scope is by player and name: a second copy is blocked
+ * (`once-name-second-copy`) and, for `duel`, each player has their own (`duel-per-player-control`); for the others that
+ * both players may each use their own is YGOProJudge's answer too.
  */
 export function keyOf(effect: EffectRecord, player: Side, card: CardInstance, index: number): string | null {
 	const once = effect.once;
@@ -42,8 +43,9 @@ export function spend(duel: Duel, effect: EffectRecord, key: string | null): Due
 
 /**
  * The activation of `link` was negated: its own use is given back, once, and only for a "You can only activate 1 ..."
- * limit. That a negated activation gives the use back for that wording, and not for the others, is YGOProJudge's
- * answer (no source cited); no Konami page was found.
+ * limit (`activate-one-unless-negated`, `activate-negated-can-again`). The other wordings are spent at activation and
+ * stay spent (`use-negated-activation-spent`, `duel-use-spent-even-if-negated`); for "Once per turn:" that is YGOProJudge's
+ * answer only (no source cited).
  */
 export function refund(duel: Duel, link: Link, effect: EffectRecord): Duel {
 	if (effect.once?.scope !== "activation" || link.spent === null || link.activationNegated) return duel;

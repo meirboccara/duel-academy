@@ -103,25 +103,40 @@ Step 4 (effect records + once per turn):
   scopes), `test/cards/*` (each card through `legalActions`/`act`, citing its Konami text).
 
 Known limits of step 4 (what the tests do not prove):
-- Most of the once-per-turn semantics rest on YGOProJudge (the owner's rules site), which cites no source, and not on a
-  Konami record: per-copy reset when a card moves, the limit being per player, a negated activation keeping a "use" limit
-  and giving back an "activate" one, `duel` and `chain` being per player and `chain` lifting at the end of the chain.
-  What Konami's pages give is the printed wording of each scope (records `once-*-wording`, card text) and, for a negated
-  effect still counting as an activation, one Japanese Q&A (`effect-negated-still-activated`, fid 14075, about WW-Ice
-  Bell: the other consequences of the activation still apply). A "Once per turn:" effect whose activation is negated is
-  not refunded here; YGOProJudge says so too, but its own answer was not consistent on the point (it first described the
-  `activate` refund for the other wording). Treat it as unsettled.
-- A cost has one way to be paid: there is no choice among cost cards (discard 1 card, Tribute 1 monster are written with a
-  fixed pick), and offering one needs an `ask` at activation.
-- A target is exactly one card: no zero targets, no "up to N", no several.
+- Once-per-turn semantics now rest mostly on Konami's Japanese Q&A (rule records in `src/rule-sources.ts`): a "use" wording
+  is by player and effect and a second copy is blocked (`once-name-second-copy`, fid 24139), and it is spent when the
+  activation or the effect is negated (`use-negated-activation-spent`, fid 12001; `effect-negated-still-activated`,
+  fid 14075); an "activate 1 ..." limit gives the use back when the activation is negated (`activate-one-unless-negated`,
+  fid 21245; `activate-negated-can-again`, fid 11730); a once-per-Duel use is spent even if negated and each player has
+  their own (`duel-use-spent-even-if-negated`, fid 23336; `duel-per-player-control`, fid 12798; `duel-per-player-effect-used`,
+  fid 8114). Still unsourced, resting on YGOProJudge (no source cited): a card that moved is a new card with a new
+  "Once per turn:" use; what a negated activation does to a "Once per turn:" use (not refunded here; YGOProJudge's first
+  answer on it was inconsistent, so unsettled); that the other player's copy has its own per-turn `name` use; and every
+  claim about "once per Chain" (per player, lifted when the chain resolves), for which only a card's printed wording
+  was found.
+- A cost can offer choices (`CostSpec` in `effects.ts`: `pick` lists the ways, each a list of cards, `pay` pays one, an
+  optional cheap `can` pre-check): `legalActions` lists one activation per way, combined with the targets read after paying
+  it (`paid` on the action), and `act` pays exactly that way. A function cost stays one way. Which cards a cost lists is the
+  card's `pick`: the core does not enumerate "any 2 cards" by itself (a card lists the combinations it allows). No real card
+  of ours needs it yet (Ash and D.D. Crow discard themselves).
+- Targets: `targetCount: { min, max }` (default one) lists every legal combination (zero for `min: 0`, "up to N", "target 2"),
+  checked again after the cost; each target's `moves` is frozen on the link. Konami's pages only give the wording
+  (`target-count-from-text`): the combinations are the core's reading. A target list is in the candidates' order, so the
+  action must name them in that order. A card listed twice among the candidates counts once, so a card is never paired
+  with itself. Combinations are not capped: "up to 5" of 30 candidates lists them all (the listing of a whole duel stops at
+  the first way when it only needs to know whether there is one). A record with `targetCount` and no `target` is a
+  definition error and throws when the effect is read. No real card of ours needs several targets yet.
 - A target counts as the same card only while it has not moved (`targetsOf` compares `moves` with the value frozen on the
   link); that a card that left and came back is no longer "that target" is the core's reading, no Konami page found.
-- Ash Blossom & Joyous Spring negates the link right below it (`index - 1`): it assumes it sits directly above the link it
-  answers. Several negations, and "cannot be negated", come with step 5.
+- Every link freezes `answers`, the link on top of the chain when it was activated (`null` for Chain Link 1 and for trigger
+  effects put on a chain at a trigger point, which answer nothing), and Ash Blossom & Joyous Spring negates that link. Chain links only go on top, so nothing can sit between Ash and the link it answered; the test for it is structural (it would pass with the old
+  `index - 1`) and says so; the
+  frozen link only matters once something can change the chain from below (step 5). Several negations of one link, and
+  "cannot be negated", also come with step 5.
 - A resolved Field or Continuous Spell is swept to the Graveyard like a Normal Spell until step 7 (zones) and the later
   steps keep it on the field.
-- A choice at resolution is one card from a list; "up to N", "you may choose none" and several cards in a row (chain `ask`s
-  by hand) are not modelled as such, and a player cannot decline a mandatory search.
+- A choice at resolution is one card from a list; "up to N" and "you may choose none" are not modelled as such (several cards
+  are several `ask`s in a row), and a player cannot decline a mandatory search.
 - Zones: Link Spider summons "to your zone this card points to" into the Monster Zone with no zone choice (step 7); a Field
   Spell is a Spell in the S/T pile (`facts.icon: "field"` is only used for searching).
 - Droll & Lock Bird is not a card of the core yet: its lock "for the rest of this turn" is a continuous effect (step 6), so
@@ -132,4 +147,5 @@ Known limits of step 4 (what the tests do not prove):
   of Level 4 or lower in the hand to be activated (an analogy with `search-needs-a-card`; no Konami page read).
 - Mystical Space Typhoon cannot target itself and "destroys" by moving to the Graveyard (no destruction event yet). The
   rulings of its Q&A that need a card on the field after the cost (Xyz Reborn) are only in the step 2 rule records.
-- The cost dry run makes the listing 1.5 to 2× slower (BASELINE.md); a pre-check beside it is the lever if needed.
+- The cost dry run makes the listing 1.5 to 2× slower (BASELINE.md). `act` now checks an action by listing only what its own
+  card could do, which more than pays for it; the optional `CostSpec.can` pre-check showed no gain on the reference boards.

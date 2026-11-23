@@ -29,16 +29,18 @@ export type Range = "hand" | "field" | "graveyard" | "banished";
 
 /**
  * How often an effect may be used, as the printed wording says it (each wording has a card-text record in
- * src/rule-sources.ts; those prove the wording, not what the core does with it). What the core does is mostly
- * YGOProJudge's answer (the owner's rules site, no source cited); no Konami page was found for the starred parts:
+ * src/rule-sources.ts). What the core does with each is sourced by Konami's Japanese Q&A (records named below), except
+ * the starred parts, which rest on YGOProJudge (the owner's rules site, no source cited):
  * - `instance`: "Once per turn:". Each copy has its own use, and a card that has become a new card (it moved) has not
  *   used it (*). A negated activation does not give it back (*).
- * - `name`: "You can only use this effect of [name] once per turn." Per player, by name, spent at activation (*); a
- *   negated activation does not give it back (*).
- * - `activation`: "You can only activate 1 [name] per turn." As `name`, but a negated activation gives the use back (*);
- *   a negated effect does not (the activation was made: Konami's Q&A fid 14075 says that of a negated effect).
- * - `duel`: "once per Duel": as `name`, for the whole Duel, per player (*).
- * - `chain`: "once per Chain": as `name`, until the chain it was put on has resolved (*).
+ * - `name`: "You can only use this effect of [name] once per turn." By player and effect, not by copy (`once-name-second-copy`);
+ *   spent at activation, a negated activation or effect does not give it back (`use-negated-activation-spent`,
+ *   `effect-negated-still-activated`). That the other player's copy has a use of its own is (*).
+ * - `activation`: "You can only activate 1 [name] per turn." As `name`, but a negated activation gives the use back
+ *   (`activate-one-unless-negated`, `activate-negated-can-again`); a negated effect does not (`effect-negated-still-activated`).
+ * - `duel`: "once per Duel": as `name`, for the whole Duel, spent even if negated (`duel-use-spent-even-if-negated`), per
+ *   player (`duel-per-player-control`, `duel-per-player-effect-used`).
+ * - `chain`: "once per Chain": as `name`, until the chain it was put on has resolved, per player (*): no Konami page found.
  * `key` lets several effects share one limit ("You can only use 1 [name] effect per turn"); the default is the card
  * code and the effect's place in the card.
  */
@@ -55,6 +57,20 @@ export interface Once {
  * and `then` runs at once; with none the effect does nothing more.
  */
 export const ask = (duel: Duel, player: Side, from: readonly number[], then: (duel: Duel, picked: number) => Duel): Duel => ({ ...duel, asking: { links: [], player, from, then } });
+
+/**
+ * A cost the player chooses how to pay: `pick` lists the ways (each a list of cards, e.g. one card of the hand for
+ * "discard 1 card"; default: one way, with no card), and `pay` pays one of them, giving the duel with it paid or `null`
+ * if that way cannot be paid. Every way is a separate action, combined with the targets read after paying it.
+ * `can` is an optional cheap pre-check run before the dry run: it must never say no to a cost that can be paid.
+ */
+export interface CostSpec {
+	readonly can?: (duel: Duel, ctx: EffectContext) => boolean;
+	readonly pick?: (duel: Duel, ctx: EffectContext) => readonly (readonly number[])[];
+	readonly pay: (duel: Duel, ctx: EffectContext, picked: readonly number[]) => Duel | null;
+}
+
+export type Cost = ((duel: Duel, ctx: EffectContext) => Duel | null) | CostSpec;
 
 export interface EffectRecord {
 	/**
@@ -90,16 +106,23 @@ export interface EffectRecord {
 	/** The activation condition, over the duel and its chain. Absent: always met. */
 	readonly condition?: (duel: Duel, ctx: EffectContext) => boolean;
 	/**
-	 * The cost, paid at activation after the card is placed and before the link is added; never refunded. It returns the
-	 * duel with the cost paid, or `null` when it cannot be paid. The listing runs it as a dry run: the duel is a value,
-	 * so nothing is spent. One way to pay only: a choice among cost cards is not offered yet.
+	 * The cost, paid at activation after the card is placed and before the link is added; never refunded. Either a
+	 * function returning the duel with the cost paid (or `null` when it cannot be paid): one way to pay. Or a `CostSpec`
+	 * with the player's choice of cards ("discard 1 card"). The listing runs it as a dry run on the immutable duel,
+	 * so nothing is spent.
 	 */
-	readonly cost?: (duel: Duel, ctx: EffectContext) => Duel | null;
+	readonly cost?: Cost;
 	/**
-	 * The cards that may be targeted, read on the duel with the cost paid (a cost can remove a target or make one).
-	 * When present, exactly one is chosen at activation, and one is needed.
+	 * The cards that may be targeted, read on the duel with the cost paid (a cost can remove a target or make one). The
+	 * player chooses `targetCount` of them at activation (one, unless it says otherwise).
 	 */
 	readonly target?: (duel: Duel, ctx: EffectContext) => readonly number[];
+	/**
+	 * How many cards are targeted: `{ min: 2, max: 2 }` "target 2 ...", `{ min: 1, max: 2 }` "target up to 2",
+	 * `{ min: 0, max: 1 }` "you can target 1" (the effect may be activated with no target). Default one. Each legal
+	 * combination is its own action, and the choice is checked again after the cost is paid.
+	 */
+	readonly targetCount?: { readonly min: number; readonly max: number };
 	/**
 	 * Applies the effect when its link resolves. `index` is the link's place in `duel.chain`, which still holds this
 	 * link and those below it. To negate, it calls `negateActivation` or `negateEffect` on a lower link; to make the

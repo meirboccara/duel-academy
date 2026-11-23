@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { cites } from "../../src";
-import { codes, offered, play, position, REAL_CARDS as defs } from "../rules/fixtures";
+import { codes, offered, play, position, REAL_CARDS, recordCards } from "../rules/fixtures";
 
 const options = { everyWindow: true };
+const defs = { ...REAL_CARDS, ...recordCards() };
 const card = "ash-blossom-joyous-spring";
 
 describe("Ash Blossom & Joyous Spring, written as an effect record", () => {
@@ -40,5 +41,17 @@ describe("Ash Blossom & Joyous Spring, written as an effect record", () => {
 		expect(codes(negated, "you", "deck")).toEqual(["umi"]);
 		expect(codes(negated, "you", "graveyard")).toEqual(["terraforming"]);
 		expect(negated.chain).toEqual([]);
+	});
+	// Structural, not a Konami ruling: chain links only ever go on top, so this passes with the old `index - 1` too. It
+	// records that a link freezes which link it answered, which only matters once step 5 can change the chain below it.
+	it("records on its link which link it answered, and negates that one whatever is chained on top of it", () => {
+		const start = position({ defs, options, you: { hand: ["terraforming"], set: ["log-quick"], deck: ["umi"] }, rival: { hand: [card] } });
+		const answered = play(start, "activate terraforming", `activate ${card}`);
+		expect(answered.chain.map((link) => link.answers)).toEqual([null, 0]);
+		const topped = play(answered, "activate log-quick");
+		expect(topped.chain.map((link) => link.answers)).toEqual([null, 0, 1]);
+		const done = play(topped, "pass", "pass");
+		expect(codes(done, "you", "hand")).toEqual([]);
+		expect(codes(done, "you", "deck")).toEqual(["umi"]);
 	});
 });

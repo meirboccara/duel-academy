@@ -51,6 +51,13 @@ export interface Link {
 	readonly targets: readonly number[];
 	/** Each target's `moves` at activation: a target that has moved since is a new card and is no longer the target (`targetsOf`). */
 	readonly targetMoves: readonly number[];
+	/**
+	 * The link on top of the chain when this was activated: the one it responds to (its place in `duel.chain`). `null` for
+	 * Chain Link 1, and for a trigger effect put on a chain at a trigger point, which answers nothing. Chain links only ever
+	 * go on top, so this is the link right below it today; it is kept so that an effect that negates "the effect it answered"
+	 * negates this link and never another once step 5 can change the chain from below.
+	 */
+	readonly answers: number | null;
 	/** The once-per-turn use this activation spent (its key in `duel.used`), if its effect has a limit. */
 	readonly spent: string | null;
 	/** What the effect declared it would do ("search", "draw"...), so another card can respond to "an effect that would...". */

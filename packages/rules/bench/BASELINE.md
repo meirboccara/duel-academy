@@ -101,3 +101,28 @@ New in step 4 (`bench/records.bench.ts`, real cards as effect records), mean per
 | `legalActions`: 3 hand cards, a Link Spider, 3 rival hand traps with costs and targets | 0.0015 ms |
 | `legalActions`: the rival's window with Ash Blossom (twice) and D.D. Crow in hand | 0.0032 ms |
 | Terraforming with 2 Field Spells: activate, both pass, the player chooses | 0.019 ms |
+
+# Rules core, step 4 follow-up (cost choices, several targets, cheaper `act`)
+
+Same machine and day (macOS, Node 20+, 2026-11-23). Mean time per call, one run of `bench/legal-moves.bench.ts`
+(today's engine measured in the same run):
+
+| Position | `legalActions` | list + `act` | today's engine | ratio |
+|---|---:|---:|---:|---:|
+| opening | 0.0006 ms | 0.0178 ms | 0.378 ms | 21× |
+| midgame | 0.0016 ms | 0.0262 ms | 1.566 ms | 60× |
+| crowdedHand | 0.0020 ms | 0.0522 ms | 0.745 ms | 14.3× |
+
+What changed, and how to read it:
+- The margin that was down to 10.4× on crowdedHand came back from `act`, not from the cost pre-check: `act` used to list every
+  action of the duel to check the one it was given; it now lists only what that action's own card could do (`isLegal`, a
+  `only` filter in `collect`). The listing itself is unchanged by it. list + `act` on crowdedHand went from 0.0701 ms to
+  about 0.052 ms.
+- The optional `CostSpec.can` pre-check is in (it costs nothing when absent) and used by one fixture, but it moves nothing on
+  the reference boards: their costed effects (hand traps) fail their condition before any dry run. Not a lever here.
+- Skipping the placement dry run for an effect with a target and no cost made `legalActions` about 20 % faster but nothing
+  else, and would let the listing and the activation read the targets on different boards, so it was not kept.
+- Runs are noisy (a second full run had crowdedHand at ±11 % and a mean of 0.0676 ms, which is 10.7× against today's
+  engine, with a median of 0.051 ms): the ratio to quote is 14× with the noise in mind, and the floor seen was 10.7×.
+- New benchmark rows (`bench/records.bench.ts`) are unchanged within noise (0.0016 to 0.0019 ms listing, 0.0028 ms for the
+  rival's window with Ash Blossom and D.D. Crow).
