@@ -206,3 +206,32 @@ New in step 6b (`bench/battle.bench.ts`), mean per call:
 |---|---:|
 | `legalActions`: Battle Step, 3 attackers × 3 targets, a Set Shrink on the other side | 0.0004 ms |
 | One attack from its declaration to the end of the Damage Step, nobody responding (5 trigger points, ATK/DEF read at damage calculation) | 0.0127 ms |
+
+# Rules core, step 7 (zones)
+
+Same Windows machine, 2026-11-23. One run of `bench/legal-moves.bench.ts` with `bench/triggers.bench.ts` and `bench/zones.bench.ts`,
+mean per call:
+
+| Position | `legalActions` | list + `act` | today's engine | ratio |
+|---|---:|---:|---:|---:|
+| opening | 0.0005 ms | 0.0171 ms | 0.806 ms | 47× |
+| midgame | 0.0017 ms | 0.0224 ms | 3.283 ms | 147× |
+| crowdedHand | 0.0020 ms | 0.0442 ms | 1.127 ms | **25.5×** |
+
+Every hand card that can be placed is listed once with its free `zones` (not once per zone); the free zones are read once per
+listing. `act` uses the zone listed, without listing again.
+
+New in step 7 (`bench/zones.bench.ts`), mean per call (the query rows from a first run, the listing rows after the free zones were cached per listing):
+
+| Case | Mean |
+|---|---:|
+| `pointedZones` of every monster on the field (3 Link Monsters, 1 other) | 0.0008 ms |
+| `summonZones`: a Link Monster from the Extra Deck (linked zones and the Extra Link path check) | 0.0050 ms |
+| `summonZones`: a Fusion Monster from the Extra Deck | 0.0003 ms |
+| `cardsInColumn`, all five columns | 0.0007 ms |
+| `legalActions`: four cards to place with their zones | 0.0016 ms |
+| the same under an Infinite Impermanence column negation | 0.0019 ms |
+
+`bench/triggers.bench.ts`'s crowded board had ten monsters a side, which exact zones no longer allow: it now has five a side
+(10 monsters swept, the same 6 mandatory triggers), so its sweep row is not comparable with earlier rows (0.0206 ms now).
+

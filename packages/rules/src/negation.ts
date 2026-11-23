@@ -1,6 +1,6 @@
 import type { Duel, Link, Side } from "./duel";
 import { effectOf, rangeOf } from "./effects";
-import { isNegated } from "./modifiers";
+import { isNegated, negatedWhere } from "./modifiers";
 
 /**
  * Step 5 of docs/rules-core-spec.md: negation. The pieces that are not about the chain live here; the chain's own
@@ -25,7 +25,9 @@ export function hitByCardNegation(duel: Duel, link: Pick<Link, "card" | "effect"
  * is still the card that was negated, and its effect does not say it cannot be negated (read now, when the immune effect resolves).
  */
 export function cardNegated(duel: Duel, link: Link): boolean {
-	return hitByCardNegation(duel, link) && isNegated(duel, link.card.id) && !immune(duel, link, "effect");
+	// Step 7: a Spell or Trap Card activated in a negated place (Infinite Impermanence's column), read where it was when activated.
+	const where = link.card.zone === "spell" && duel.modifiers.length > 0 && negatedWhere(duel, link.card);
+	return (where || (hitByCardNegation(duel, link) && isNegated(duel, link.card.id))) && !immune(duel, link, "effect");
 }
 
 /** Does the player control no cards at all: no monster, Spell, Trap or Field Spell on their side of the field? A monster being Summoned is not on the field yet. */

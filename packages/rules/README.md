@@ -133,12 +133,11 @@ Known limits of step 4 (what the tests do not prove):
   `index - 1`) and says so; the
   frozen link only matters once something can change the chain from below. Step 5 added "cannot be negated" (see below);
   two negations of one link are still not told apart (the one that resolves first takes).
-- A resolved Field or Continuous Spell is swept to the Graveyard like a Normal Spell until step 7 (zones) and the later
-  steps keep it on the field.
+- A resolved Continuous Spell stays on the field from step 6 (`stays`); a Field Spell, an equipped Equip Spell and a Pendulum Monster
+  in its Pendulum Zone stay from step 7.
 - A choice at resolution is one card from a list; "up to N" and "you may choose none" are not modelled as such (several cards
   are several `ask`s in a row), and a player cannot decline a mandatory search.
-- Zones: Link Spider summons "to your zone this card points to" into the Monster Zone with no zone choice (step 7); a Field
-  Spell is a Spell in the S/T pile (`facts.icon: "field"` is only used for searching).
+- Zones: see step 7 below (Link Spider's pointed zone, the Field Zone).
 - Droll & Lock Bird is not a card of the core yet: its lock "for the rest of this turn" is a continuous effect (step 6), so
   it would not play as printed. It waits for step 6 (its event, Draw Phase exception and cost are easy to write as a record).
 - Ash Blossom & Joyous Spring answers `search`, `summon-from-deck` and `send-from-deck` only: the printed list. Drawing is
@@ -182,12 +181,9 @@ Step 5 (negation):
 - `src/cards/`: Solemn Judgment, Solemn Strike and Infinite Impermanence, each with its Konami text (English and French) and
   tests in `test/cards`. New rule records: `src/negation-sources.ts`, with `SourceKind` `"jp-notes"` for the 補足情報 notes at
   the top of a card's Q&A page (they have no Q&A id).
-- **Infinite Impermanence is partial.** Its column clause ("if this card was Set before activation and is on the field at
-  resolution, for the rest of this turn all other Spell/Trap effects in this column are negated") needs columns (step 7) and
-  turn-long modifiers (step 6) and is not applied: a Set Infinite Impermanence negates the monster only. The card says so
-  (`CardDef.unmodelled`), its `CardSources.deferred` lists the printed part, and `coverage` reports it as **pending**, never as
-  done (a test citing a deferred part does not count). The card does not count as done until step 7. Step 10's port must refuse
-  a card with `unmodelled` parts.
+- Infinite Impermanence was partial until step 7 (its column clause); it is now applied in full (see step 7). `CardDef.unmodelled`
+  and `CardSources.deferred` stay for later cards: `coverage` reports a deferred part as **pending**, never as done, and step 10's
+  port must refuse a card with `unmodelled` parts.
 - `bench/negation.bench.ts`, and the step 5 table in `bench/BASELINE.md`.
 
 Known limits of step 5 (what the tests do not prove):
@@ -252,8 +248,9 @@ Known limits of step 6 (what the tests do not prove):
   (`draws-fail`), and that Drish's draw bullet cannot be chosen (`drish`, pending: not an Academy card). Each new card needs its own call.
 - `lingering` keeps the `added-to-hand` events the links of the chain raised, for the first window after the chain only; it is cleared by the next
   break or activation. Only Droll uses it.
-- With no zone layout (step 7) the owner of a returning monster does not choose its zone; the Graveyard for a full field and the
-  refusal to take onto a full field are the core's reading (no Konami page read). A taken monster that was turned face-down: not read.
+- From step 7 the players choose the zones of a taken and a returning monster. A returning monster with no free Main Monster Zone
+  is destroyed (YGOProJudge only); the refusal to take onto a full field is the core's reading (no Konami page read). A taken monster
+  that was turned face-down: not read.
 - Two negators that negate each other: a card being asked about counts as not negated (no Konami page; the guard only stops a loop).
 - Modifier durations are turn numbers; the Damage Step's durations come with the battle step.
 - `atk` on a board with continuous sources walks the field each time (0.007 ms in the bench): fine for damage calculation, worth a
@@ -292,3 +289,54 @@ Known limits of step 6b (what the tests do not prove):
   A target flipped face-up still has its flip raised then. An attacker changed to Defense Position during the Damage Step still
   battles with its ATK: no page read (no card of ours changes battle positions before step 8).
 - Konami's worked Damage Step examples (design slice 20) are not scripted as one test; each timing has its own test.
+
+Step 7 (zones; plan in `docs/rules-core/step7/design.md`, sources in `docs/rules-core/step7/sources.md`, records in
+`src/zone-sources.ts`):
+- `CardInstance.slot`: the exact zone on the field, `null` off it. Main Monster and Spell & Trap Zones 0 to 4 from the controller's
+  left; the two shared Extra Monster Zones are monster slots 5 and 6 as `you` see them, whoever controls the monster there; the
+  Field Zone is `field` slot 0. The piles stay keyed by controller (the Extra Monster Zone monster is in its controller's
+  `monster` pile), so every card written before step 7 reads the board as before. `moveCard` takes `slot`, refuses an occupied or
+  out-of-range one (the shared zones are checked on both sides) and defaults to the zone the card is in, then the first free one;
+  with none free it throws. `changeControl` takes a Main Monster Zone (a monster from an Extra Monster Zone goes to one, RB10).
+- Choices. `legalActions` lists a Summon, a Set and an activation from the hand with `zones` (the free zones it may go to); `act`
+  takes the `zone` the player names among them, or the first. Choices made while an effect resolves (`askZone`) or as the End
+  Phase gives a monster back (`returnControl`, the owner choosing) are listed as `{ type: "place", zone }`; one zone is taken
+  without asking. `Asking.resume` carries a choice made outside a chain.
+- Queries (`src/zones.ts`): `columnOf` / `cardsInColumn` / `sameColumn` from either player's side (the Extra Monster Zones are in the
+  second and fourth columns, the Field Zone in none); `pointedZones`, `pointsTo`, `coLinked`, `linkedZones`, `isLinked` from
+  `facts.arrows` (turned round for the rival's monsters; arrows into Spell & Trap Zones or the middle of the Extra Monster Zone
+  row point nowhere); `summonZones` (where a monster may be Summoned from where it is: the 2021 update for Fusion/Synchro/Xyz, the
+  Extra Monster Zone or linked zones for a Link or face-up Pendulum Monster from the Extra Deck, Main Monster Zones for anything
+  else, one Extra Monster Zone per player); `placingZones`; `pendulumZones`.
+- Field Zone: a Field Spell (`facts.icon: "field"`) is activated or Set there, outside the five Spell & Trap Zones; the one
+  already there is sent to the Graveyard (not destroyed) when the new one is placed; it stays after its chain.
+- Pendulum Zones: a Pendulum Monster (`facts.pendulum`) with an `activation` record is activated as a Spell (Spell Speed 1, own Main
+  Phase, open game state) into a free leftmost or rightmost Spell & Trap Zone, shared with ordinary Spells and Traps, and stays.
+  `range: "pendulum"` effects work only there; a monster card's `field` effects only in the Monster Zone (also for continuous
+  ones). From the field to the Graveyard it goes face-up to its owner's Extra Deck instead, unless its activation was negated.
+- Equip Cards: `equip(duel, equipId, monsterId)` and `CardInstance.equippedTo`; `equipsOf`. An equipped Equip Spell stays after
+  its chain; one that could not equip is sent to the Graveyard after it. The Equip Card is destroyed when its monster is destroyed,
+  leaves the field or is flipped face-down; the link ends when the Equip Card leaves; a control change keeps it.
+- Cards: Infinite Impermanence's column (`negateColumn`, `negatedWhere`, `Link.wasSet`), done; Link Spider's bottom arrow and
+  Summon to the zone it points to (`facts.arrows`, `askZone`).
+- `bench/zones.bench.ts` and the step 7 table in BASELINE.md.
+
+Known limits of step 7 (what the tests do not prove):
+- YGOProJudge only (asked 2026-11-23, no source cited): what a column is beyond RB10's mat; the Extra Link exception to "one Extra
+  Monster Zone per player" (a Link Monster completing a co-linked path, which may run through the rival's monsters) and the rival's
+  arrows opening your Main Monster Zones; a returning monster with no free zone is destroyed; an Equip Card stays equipped across a
+  control change; an Equip Spell that could not equip goes to the Graveyard after the chain, not destroyed; a negated Pendulum
+  activation goes to the Graveyard. Each test that rests on one says so in its title.
+- Infinite Impermanence's column rests on Konami's Japanese notes and Q&A (OCG only): no TCG page read. Its "successfully negated"
+  is "the monster was still face-up in the Monster Zone" (no card is unaffected by it yet). The column negates Spell & Trap Zone
+  cards only (Pendulum Zones included); Trap Monsters and monsters treated as Spells are step 11.
+- Summon procedures are step 8: `summonZones` is the zone rule only; Link Summons, Pendulum Summons, materials and Summons by effect
+  (Link Spider moves the monster; no `summoned` event for a Summon by effect yet) come then. Moving a monster to another zone by an
+  effect, and zone-locking effects, are not modelled.
+- A Summon whose chosen zone was taken during its window goes to the first free Main Monster Zone (the core's reading, no page
+  read); a Field Spell given to a player replaces theirs, as placing one does (RB10's one Field Spell a side).
+- `moveCard` is the low-level move: it checks occupancy, not the Extra Monster Zone rules (one per player), which belong to the
+  Summon (`summonZones`). Test boards may put a player in both Extra Monster Zones.
+- Equip Cards: only Equip Spells, with the relation set by the card's own operation; equip limits ("equip only to a monster you
+  control") and monsters as Equip Cards (step 11) are not modelled; when the monster leaves, its Equip Cards are destroyed one by one
+  after its move, not in the same batch.

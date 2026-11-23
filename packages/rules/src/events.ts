@@ -1,5 +1,5 @@
 import type { CardInstance, DamageStep, Duel, Phase, Side, Zone } from "./duel";
-import { effectOf, rangeOf } from "./effects";
+import { type CardDef, effectOf, inFieldRange, rangeOf } from "./effects";
 
 /**
  * Step 3 of docs/rules-core-spec.md: typed events. Every move of a card raises `moved`; effects raise the others with
@@ -62,7 +62,7 @@ function listeners(defs: Duel["defs"]): Listening {
 }
 
 /** Is the card where a trigger effect says it triggers from? Default: face-up on the field. */
-function placedFor(card: CardInstance, range: ReturnType<typeof rangeOf>): boolean {
+function placedFor(def: CardDef | undefined, card: CardInstance, range: ReturnType<typeof rangeOf>): boolean {
 	switch (range) {
 		case "hand":
 			return card.zone === "hand";
@@ -71,7 +71,7 @@ function placedFor(card: CardInstance, range: ReturnType<typeof rangeOf>): boole
 		case "banished":
 			return card.zone === "banished";
 		default:
-			return (card.zone === "monster" || card.zone === "spell" || card.zone === "field") && card.face === "up";
+			return inFieldRange(def, card, range);
 	}
 }
 
@@ -90,7 +90,7 @@ export function raiseEvent(duel: Duel, event: GameEvent): Duel {
 			const effects = duel.defs[card.code]!.effects!;
 			for (let index = 0; index < effects.length; index++) {
 				const effect = effects[index]!;
-				if (effect.type !== "trigger" || !placedFor(card, rangeOf(effect)) || !effect.event?.(duel, event, { player: card.controller, card })) continue;
+				if (effect.type !== "trigger" || !placedFor(duel.defs[card.code], card, rangeOf(effect)) || !effect.event?.(duel, event, { player: card.controller, card })) continue;
 				waiting = [...waiting, { card, effect: index, event }];
 			}
 		}

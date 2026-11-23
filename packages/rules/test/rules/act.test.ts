@@ -20,7 +20,7 @@ describe("act: activating", () => {
 		const duel = play(start, "activate spell");
 		const spell = cardsIn(duel, "you", "spell")[0]!;
 		expect(spell).toMatchObject({ code: "spell", zone: "spell", face: "up" });
-		expect(duel.chain).toEqual([{ player: "you", card: spell, effect: 0, speed: 1, targets: [], answers: null, targetMoves: [], spent: null, categories: [], activationNegated: false, effectNegated: false }]);
+		expect(duel.chain).toEqual([{ player: "you", card: spell, effect: 0, speed: 1, targets: [], answers: null, targetMoves: [], spent: null, categories: [], activationNegated: false, effectNegated: false, wasSet: false }]);
 		expect(duel.priority).toEqual({ holder: "rival", passed: [], open: false });
 	});
 	it("returns a new duel and leaves the one it was given untouched", () => {

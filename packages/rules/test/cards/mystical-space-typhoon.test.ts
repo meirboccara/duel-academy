@@ -19,7 +19,7 @@ describe("Mystical Space Typhoon, written as an effect record", () => {
 	it(`${cites("mystical-space-typhoon", "text")} destroys the target when it resolves`, () => {
 		const start = position({ defs, options, you: { hand: [card] }, rival: { set: ["umi"] } });
 		const targeted = play(start, `activate ${card} > umi`);
-		expect(targeted.chain[0]!.targets).toEqual([cardsIn(start, "rival", "spell")[0]!.id]);
+		expect(targeted.chain[0]!.targets).toEqual([cardsIn(start, "rival", "field")[0]!.id]);
 		const done = play(targeted, "pass", "pass");
 		expect(codes(done, "rival", "graveyard")).toEqual(["umi"]);
 		expect(codes(done, "you", "graveyard")).toEqual([card]);
@@ -36,7 +36,7 @@ describe("Mystical Space Typhoon, written as an effect record", () => {
 	it("leaves alone a target that left the field and came back as a new card (a core reading of that target, no Konami record)", () => {
 		const start = position({ defs: { ...defs, ...recordCards() }, options, you: { hand: [card] }, rival: { set: ["reset-backrow", "umi"] } });
 		const done = play(start, `activate ${card} > umi`, "activate reset-backrow", "pass", "pass");
-		expect(codes(done, "rival", "spell")).toEqual(["umi"]);
+		expect(codes(done, "rival", "field")).toEqual(["umi"]);
 		expect(codes(done, "rival", "graveyard")).toEqual(["reset-backrow"]);
 	});
 });

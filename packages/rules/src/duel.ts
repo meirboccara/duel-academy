@@ -34,6 +34,14 @@ export interface CardInstance {
 	readonly since: number;
 	/** Step 6b: its battle position in the Monster Zone (face-down monsters are in Defense Position). Elsewhere, `attack`. */
 	readonly position: Position;
+	/**
+	 * Step 7: its exact zone on the field, `null` off the field. Main Monster and Spell & Trap Zones: 0 to 4 from the controller's left.
+	 * Extra Monster Zones: 5 and 6, the two shared zones as seen by `you` (5 over your second column, 6 over your fourth), whoever controls
+	 * the monster there. Field Zone: 0.
+	 */
+	readonly slot: number | null;
+	/** Step 7: the monster this Equip Card is equipped to (its id), `null` when it equips nothing. */
+	readonly equippedTo: number | null;
 }
 
 export type Position = "attack" | "defense";
@@ -73,6 +81,8 @@ export interface Link {
 	readonly activationNegated: boolean;
 	/** The activation stands, but the effect is not applied. */
 	readonly effectNegated: boolean;
+	/** Step 7: a Spell or Trap Card activated from where it was Set (face-down on the field), not from the hand. */
+	readonly wasSet: boolean;
 }
 
 /**
@@ -184,6 +194,8 @@ export interface Summoning {
 	readonly player: Side;
 	readonly cards: readonly number[];
 	readonly how: "normal" | "special";
+	/** Step 7: the zone each monster was Summoned to (from the player's left), chosen when the Summon was attempted. */
+	readonly slots?: readonly number[];
 	/** A negator took: the Summon will not succeed. */
 	readonly negated: boolean;
 }
@@ -197,6 +209,10 @@ export interface Asking {
 	readonly then: (duel: Duel, picked: number) => Duel;
 	/** The events the links resolved before it raised (step 6, `Duel.lingering`): kept across the pause. */
 	readonly carried?: readonly GameEvent[];
+	/** Step 7: `from` holds zones (from the player's left), not cards: the choice is a `place` action. */
+	readonly zones?: true;
+	/** Step 7: a choice asked outside a chain (a monster going back to its owner): what happens once it is answered, instead of the chain. */
+	readonly resume?: (duel: Duel) => Duel;
 }
 
 export interface DeckSetup {
@@ -220,8 +236,29 @@ export const STARTING_LP = 8000;
 /** Priority in a closed game state with nobody having passed: after an action or a chain, `holder` may use a fast effect first. */
 export const closedPriority = (holder: Side): Priority => ({ holder, passed: [], open: false });
 
-/** Step 7 gives the exact zones; until then a side holds at most five monsters. */
+/** Each player has 5 Main Monster Zones and 5 Spell & Trap Zones (RB10); the two Extra Monster Zones (slots 5 and 6) are shared. */
 export const MONSTER_ZONES = 5;
+export const SPELL_ZONES = 5;
+export const EXTRA_MONSTER_SLOTS: readonly number[] = [5, 6];
+
+/** The card in an exact zone, if any: an Extra Monster Zone slot is looked up on both sides of the field. */
+export function occupant(duel: Duel, side: Side, zone: "monster" | "spell" | "field", slot: number): CardInstance | null {
+	const sides: readonly Side[] = zone === "monster" && slot >= MONSTER_ZONES ? ["you", "rival"] : [side];
+	for (const owner of sides) {
+		for (const id of duel.piles[owner][zone]) if (duel.cards[id]!.slot === slot) return duel.cards[id]!;
+	}
+	return null;
+}
+
+/** The free Main Monster Zones or Spell & Trap Zones of a player, from their left. */
+export function freeSlots(duel: Duel, side: Side, zone: "monster" | "spell"): number[] {
+	const taken = new Set(duel.piles[side][zone].map((id) => duel.cards[id]!.slot));
+	const free: number[] = [];
+	for (let slot = 0; slot < (zone === "monster" ? MONSTER_ZONES : SPELL_ZONES); slot++) if (!taken.has(slot)) free.push(slot);
+	return free;
+}
+
+const slotsOf = (zone: Zone): number => (zone === "monster" ? MONSTER_ZONES + EXTRA_MONSTER_SLOTS.length : zone === "spell" ? SPELL_ZONES : 1);
 
 export const other = (side: Side): Side => (side === "you" ? "rival" : "you");
 
@@ -243,7 +280,7 @@ export function createDuel(setup: DuelSetup): Duel {
 		for (const zone of ["deck", "extra"] as const) {
 			for (const code of setup[side][zone] ?? []) {
 				const id = nextId++;
-				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0, position: "attack" };
+				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0, position: "attack", slot: null, equippedTo: null };
 				piles[side][zone].push(id);
 			}
 		}
@@ -319,7 +356,8 @@ export function moveCard(duel: Duel, id: number, to: MoveTo): Duel {
 
 /** `negated`: the move of a Spell or Trap Card whose activation was negated, or of a monster whose Summon was negated (`GameEvent`). */
 /** `position`: in the Monster Zone (default: Defense Position face-down, else the position it had there, else Attack Position). `by`: a destruction by battle. */
-type MoveTo = { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: "destroyed"; by?: "battle"; position?: Position };
+/** `slot`: the exact zone on the field (step 7); by default the zone it is in when it stays in the same zone, else the first free one. */
+type MoveTo = { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: "destroyed"; by?: "battle"; position?: Position; slot?: number };
 
 /**
  * Destroys a card: it goes to the Graveyard and the move says it was destroyed (`moved.reason`), which "when destroyed" triggers
@@ -344,28 +382,80 @@ function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Du
 	const before = instance(duel, id);
 	if (before.zone === "deck" && to.zone === "hand" && locked(duel, "add-to-hand", before.owner)) return duel;
 	if (to.controller !== undefined && !isOnField(to.zone)) throw new Error("a controller can be chosen only on the field");
-	const zone = before.extraDeck && (to.zone === "deck" || to.zone === "hand") ? "extra" : to.zone;
+	// RB10: a Pendulum Monster Card on the field that would be sent to the Graveyard is placed face-up on its owner's Extra Deck instead.
+	// A card whose activation was negated was never on the field (record `negated-card-not-from-field`): it goes to the Graveyard.
+	const pendulumOut = to.zone === "graveyard" && !to.negated && isOnField(before.zone) && duel.defs[before.code]?.facts?.pendulum !== undefined;
+	const zone = pendulumOut ? "extra" : before.extraDeck && (to.zone === "deck" || to.zone === "hand") ? "extra" : to.zone;
 	const controller = isOnField(zone) ? (to.controller ?? before.controller) : before.owner;
-	const face = to.face ?? (FACE_DOWN_BY_DEFAULT.has(zone) ? "down" : "up");
+	const face = pendulumOut ? "up" : (to.face ?? (FACE_DOWN_BY_DEFAULT.has(zone) ? "down" : "up"));
 	const flippedDown = isOnField(zone) && before.face === "up" && face === "down";
 	const renewed = zone !== before.zone || controller !== before.controller || flippedDown;
 	// A card that comes face-up on the field starts to apply its continuous effects now (a move in the same zone, face-up, does not restart them).
 	const cameUp = isOnField(zone) && face === "up" && (before.face === "down" || !isOnField(before.zone) || controller !== before.controller);
 	const position: Position = zone !== "monster" ? "attack" : (to.position ?? (face === "down" ? "defense" : before.zone === "monster" ? before.position : "attack"));
-	const after = { ...before, zone, face, controller, position, moves: before.moves + (renewed ? 1 : 0), since: cameUp ? duel.clock + 1 : before.since };
+	const slot = isOnField(zone) ? slotFor(duel, before, zone as "monster" | "spell" | "field", controller, to.slot) : null;
+	// RB10: to use another Field Spell, the previous one is sent to the Graveyard (the core does it when the new one is placed).
+	const previousField = zone === "field" ? occupant(duel, controller, "field", 0) : null;
+	if (previousField && previousField.id !== before.id) duel = move(duel, previousField.id, { zone: "graveyard" }, batch);
+	const after = { ...before, zone, face, controller, position, slot, equippedTo: renewed && !(before.zone === "spell" && zone === "spell" && face === "up" && !flippedDown) ? null : before.equippedTo, moves: before.moves + (renewed ? 1 : 0), since: cameUp ? duel.clock + 1 : before.since };
 	const placed = place(duel, before, after, to.at ?? "top");
 	const moved = cameUp ? { ...placed, clock: placed.clock + 1 } : placed;
 	if (!renewed) return moved;
 	const raised = raiseEvent(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}), ...(to.by ? { by: to.by } : {}) });
-	return zone === "hand" && before.zone !== "hand" ? raiseEvent(raised, { type: "added-to-hand", card: after, from: before.zone, ...(batch === undefined ? {} : { batch }) }) : raised;
+	const added = zone === "hand" && before.zone !== "hand" ? raiseEvent(raised, { type: "added-to-hand", card: after, from: before.zone, ...(batch === undefined ? {} : { batch }) }) : raised;
+	// RB10: if the equipped monster is destroyed, flipped face-down or removed from the field, its Equip Cards are destroyed.
+	const unequipped = before.zone === "monster" && before.face === "up" && (zone !== "monster" || face === "down");
+	return unequipped ? equipsOf(added, before.id).reduce((next, equipId) => move(next, equipId, { zone: "graveyard", reason: "destroyed" }, undefined), added) : added;
+}
+
+/** The Equip Cards on the field equipped to the monster `id`. */
+export function equipsOf(duel: Duel, id: number): number[] {
+	const found: number[] = [];
+	for (const side of ["you", "rival"] as const) for (const zone of ["spell", "monster"] as const) for (const other of duel.piles[side][zone]) if (duel.cards[other]!.equippedTo === id) found.push(other);
+	return found;
+}
+
+/**
+ * Equips the Equip Card `equipId` to the monster `monsterId` (RB10, Equip Spell Cards): the Equip Card stays in its Spell & Trap Zone,
+ * linked to that monster. Nothing happens unless the Equip Card is face-up in a Spell & Trap Zone and the monster face-up in a Monster
+ * Zone: an Equip Spell left unequipped is then sent to the Graveyard after the chain like any other Spell (YGOProJudge, no source cited).
+ * The link ends when the Equip Card leaves (`move`); the Equip Card is destroyed when the monster leaves or turns face-down.
+ */
+export function equip(duel: Duel, equipId: number, monsterId: number | null): Duel {
+	const card = duel.cards[equipId]!;
+	if (monsterId === null || card.zone !== "spell" || card.face !== "up") return duel;
+	const monster = duel.cards[monsterId]!;
+	if (monster.zone !== "monster" || monster.face !== "up") return duel;
+	return { ...duel, cards: { ...duel.cards, [equipId]: { ...card, equippedTo: monsterId } } };
+}
+
+/** The exact zone a card goes to: the one asked for (in range and free), or the one it is in, or the first free one. */
+function slotFor(duel: Duel, before: CardInstance, zone: "monster" | "spell" | "field", controller: Side, asked: number | undefined): number {
+	if (asked !== undefined) {
+		if (!Number.isInteger(asked) || asked < 0 || asked >= slotsOf(zone)) throw new Error(`no slot ${asked} in the ${zone} zone`);
+		const there = occupant(duel, controller, zone, asked);
+		if (there && there.id !== before.id) throw new Error(`the ${zone} zone ${asked} of ${controller} is occupied`);
+		return asked;
+	}
+	if (before.zone === zone && before.controller === controller && before.slot !== null) return before.slot;
+	if (zone === "field") return 0;
+	const free = freeSlots(duel, controller, zone);
+	if (free.length === 0) throw new Error(`${controller} has no free ${zone} zone`);
+	return free[0]!;
 }
 
 /** Gives control of a card on the field to a player: it becomes a new card for them. Its owner never changes. */
-export function changeControl(duel: Duel, id: number, side: Side): Duel {
+export function changeControl(duel: Duel, id: number, side: Side, slot?: number): Duel {
 	const before = instance(duel, id);
 	if (!isOnField(before.zone)) throw new Error(`card ${id} is not on the field`);
 	if (before.controller === side) return duel;
-	const after = { ...before, controller: side, moves: before.moves + 1, since: before.face === "up" ? duel.clock + 1 : before.since };
+	// A monster in an Extra Monster Zone moves to a Main Monster Zone of its new controller, and back to one of its owner's (RB10).
+	if (slot !== undefined && before.zone === "monster" && slot >= MONSTER_ZONES) throw new Error("a monster whose control changes goes to a Main Monster Zone");
+	const placedSlot = slotFor(duel, { ...before, slot: null }, before.zone as "monster" | "spell" | "field", side, slot);
+	// A Field Spell given to a player replaces theirs: RB10, one Field Spell a side (the one there is sent to the Graveyard).
+	const previousField = before.zone === "field" ? occupant(duel, side, "field", 0) : null;
+	if (previousField) duel = move(duel, previousField.id, { zone: "graveyard" }, undefined);
+	const after = { ...before, controller: side, slot: placedSlot, moves: before.moves + 1, since: before.face === "up" ? duel.clock + 1 : before.since };
 	const placed = place(duel, before, after, "top");
 	return raiseEvent(before.face === "up" ? { ...placed, clock: placed.clock + 1 } : placed, { type: "moved", before, after });
 }

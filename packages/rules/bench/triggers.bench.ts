@@ -7,16 +7,17 @@ import { play, position, triggerCards } from "../test/rules/fixtures";
  * triggers into one chain. Run with `pnpm --filter @duel-academy/rules bench`; numbers in BASELINE.md.
  */
 const defs = triggerCards();
+/** Step 7: five Main Monster Zones a side (this board had ten monsters a side before zones were exact). */
 const crowded = (hand: string[]) =>
 	position({
 		defs,
-		you: { hand, monsters: ["forced-a", "forced-b", "forced-c", "if-a", "if-b", "when-a", "when-b", "standby-forced", "standby-optional", "set-watcher"] },
-		rival: { monsters: ["forced-a", "forced-b", "forced-c", "if-a", "if-b", "when-a", "when-b", "standby-forced", "standby-optional", "set-watcher"] },
+		you: { hand, monsters: ["forced-a", "forced-b", "forced-c", "if-a", "when-a"] },
+		rival: { monsters: ["forced-a", "forced-b", "forced-c", "if-a", "when-a"] },
 	});
 
 describe("trigger collection, rules core", () => {
 	const sweep = crowded(["sweep"]);
-	bench("sweep: 20 monsters sent, 6 mandatory triggers chained, optional ones asked", () => {
+	bench("sweep: 10 monsters sent, 6 mandatory triggers chained, optional ones asked", () => {
 		play(sweep, "activate sweep");
 	});
 	const asking = play(sweep, "activate sweep");

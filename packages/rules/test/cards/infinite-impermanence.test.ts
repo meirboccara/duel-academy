@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { cites, CARD_DEFS } from "../../src";
+import { act, type Action, type CardDef, cites, CARD_DEFS, legalActions, moveCard } from "../../src";
 import { negationCards } from "../rules/negation-fixtures";
-import { codes, offered, play, position } from "../rules/fixtures";
+import { codes, offered, plainCards, play, position } from "../rules/fixtures";
 
 const card = "infinite-impermanence";
 
-describe("Infinite Impermanence, written as an effect record (the column part waits for step 7)", () => {
+describe("Infinite Impermanence, written as an effect record", () => {
 	it(`${cites("infinite-impermanence", "negate")} a Set Infinite Impermanence negates the effects of a face-up monster: it can still activate its effect, which then does nothing`, () => {
 		const log: string[] = [];
 		const defs = { ...CARD_DEFS, ...negationCards(log) };
@@ -110,6 +110,92 @@ describe("Infinite Impermanence, written as an effect record (the column part wa
 		const holding = position({ defs, options: { everyWindow: true }, you: { ...sides, set: ["spell-b"] }, rival: { set: ["solemn-judgment"], monsters: ["ignition"] } });
 		expect(offered(play(holding, "summon normal-4", "pass", "activate solemn-judgment"))).toEqual(["pass"]);
 	});
-	// The column clause waits for steps 6 and 7 (`CardSources.deferred`): reported as pending, not tested.
-	it.todo(`${cites("infinite-impermanence", "column")} a Set Infinite Impermanence also negates the other Spell/Trap effects in its column for the rest of the turn`);
+});
+
+describe("Infinite Impermanence's column (step 7)", () => {
+	const columnCards = (log: string[]): Record<string, CardDef> => ({
+		...CARD_DEFS,
+		...negationCards(log),
+		...plainCards(log),
+		// Wonder Wand's shape: a Spell that stays on the field, whose effect sends itself to the Graveyard as its cost.
+		wand: {
+			code: "wand",
+			kind: "spell",
+			effects: [
+				{ type: "activation", stays: true, operation: (duel) => duel },
+				{ type: "ignition", cost: (duel, { card }) => moveCard(duel, card.id, { zone: "graveyard" }), operation: (duel) => (log.push("wand"), duel) },
+			],
+		},
+		umi: { code: "umi", kind: "spell", facts: { icon: "field" }, effects: [{ type: "activation", operation: (duel) => (log.push("umi"), duel) }] },
+	});
+	/** Your "ignition" monster; the rival's Impermanence Set in their Spell & Trap Zone 0 (column 4 as you see it); your Set Traps in your zones 4 and 3. */
+	const board = (log: string[], hand: string[] = []) => {
+		let duel = position({ defs: columnCards(log), you: { monsters: ["ignition"], set: ["trap", "other-trap"], faceupSpells: ["wand"], hand }, rival: { set: [card], hand: ["other-trap"] } });
+		const [trap, otherTrap] = duel.piles.you.spell.filter((id) => duel.cards[id]!.face === "down");
+		const wand = duel.piles.you.spell.find((id) => duel.cards[id]!.code === "wand")!;
+		duel = moveCard(duel, trap!, { zone: "spell", face: "down", slot: 4 });
+		duel = moveCard(duel, otherTrap!, { zone: "spell", face: "down", slot: 3 });
+		return moveCard(duel, wand, { zone: "spell", slot: 1 });
+	};
+	it(`${cites("infinite-impermanence", "column")} ${cites("infinite-impermanence", "column-notes")} a Set one that negated its target also negates, for the rest of the turn, the Spell and Trap effects in its column on both sides, cards that arrive there later included, and no other column`, () => {
+		const log: string[] = [];
+		const negated = play(board(log, ["spell"]), "activate ignition", `activate ${card} > ignition`, "pass");
+		expect(log).toEqual([]);
+		expect(codes(negated, "rival", "graveyard")).toEqual([card]);
+		// Your Trap in the same column (your zone 4) is negated; the one in the next column (zone 3) is not.
+		play(negated, "activate trap", "pass");
+		expect(log).toEqual([]);
+		play(negated, "activate other-trap", "pass");
+		expect(log).toEqual(["other-trap"]);
+		// The rival's Trap Set later in their zone 0, the same column on their side, is negated too.
+		const rivalTrap = negated.piles.rival.hand[0]!;
+		const rivalSet = moveCard(negated, rivalTrap, { zone: "spell", face: "down", slot: 0 });
+		log.length = 0;
+		play(rivalSet, "activate other-trap", "activate other-trap", "pass");
+		expect(log).toEqual(["other-trap"]);
+		// A Spell placed in that column afterwards is negated too (once the game state is open again).
+		log.length = 0;
+		const open = play(negated, "pass");
+		const spell = legalActions(open).find((action) => action.type === "activate" && open.cards[action.card]!.code === "spell")!;
+		expect((spell as { zones?: readonly number[] }).zones).toContain(0);
+		play(act(open, { ...spell, zone: 0 } as Action), "pass");
+		expect(log).toEqual(["spell"]);
+		log.length = 0;
+		// Your zone 0 is column 0: not the column. Move the Trap away so zone 4 is free, then place the Spell there.
+		const cleared = moveCard(open, open.piles.you.spell.find((id) => open.cards[id]!.slot === 4)!, { zone: "graveyard" });
+		const again = legalActions(cleared).find((action) => action.type === "activate" && cleared.cards[action.card]!.code === "spell")!;
+		play(act(cleared, { ...again, zone: 4 } as Action), "pass");
+		expect(log).toEqual([]);
+	});
+	it(`${cites("infinite-impermanence", "wand-column-effect")} an effect activated by a Spell in that column is negated even when the Spell left as its cost; the Field Zone is in no column`, () => {
+		const log: string[] = [];
+		const start = board(log, ["umi"]);
+		const wand = start.piles.you.spell.find((id) => start.cards[id]!.code === "wand")!;
+		// Put the Wand in the column: the Trap in zone 4 goes to zone 0, the Wand to zone 4.
+		const trap = start.piles.you.spell.find((id) => start.cards[id]!.slot === 4)!;
+		const swapped = moveCard(moveCard(start, trap, { zone: "spell", face: "down", slot: 0 }), wand, { zone: "spell", slot: 4 });
+		const negated = play(swapped, "activate ignition", `activate ${card} > ignition`, "pass", "pass");
+		play(negated, "activate wand", "pass");
+		expect(log).toEqual([]);
+		play(negated, "activate umi", "pass");
+		expect(log).toEqual(["umi"]);
+	});
+	it(`${cites("infinite-impermanence", "column-notes")} no column is negated when it was activated from the hand, or when its target's effects were not negated, and the negation of the column ends with the turn`, () => {
+		const log: string[] = [];
+		// From the hand (the rival controls no card).
+		const fromHand = position({ defs: columnCards(log), you: { monsters: ["ignition"], set: ["trap"] }, rival: { hand: [card] } });
+		const trap = fromHand.piles.you.spell[0]!;
+		const placed = moveCard(fromHand, trap, { zone: "spell", face: "down", slot: 4 });
+		const handNegated = play(placed, "activate ignition", `activate ${card} > ignition`, "pass");
+		expect(handNegated.modifiers.filter((modifier) => typeof modifier.affects === "function")).toEqual([]);
+		// Its target left before it resolved: nothing is negated, its column included.
+		const gone = play(board(log, ["reset"]), "activate reset");
+		expect(gone.modifiers).toEqual([]);
+		// The next turn, the column is free again.
+		let duel = play(board(log), "activate ignition", `activate ${card} > ignition`, "pass");
+		for (let guard = 0; guard < 40 && !(duel.turn.number === 5 && duel.turn.phase === "main1"); guard++) duel = play(duel, "pass");
+		log.length = 0;
+		play(duel, "activate trap", "pass");
+		expect(log).toEqual(["trap"]);
+	});
 });

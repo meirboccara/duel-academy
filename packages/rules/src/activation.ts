@@ -23,6 +23,8 @@ const EXACTLY_ONE_TARGET = { min: 1, max: 1 } as const;
 export interface Way {
 	readonly paid: readonly number[];
 	readonly targets: readonly number[];
+	/** Step 7: the zone a card activated from the hand is placed in (default: the first free one). */
+	readonly zone?: number;
 }
 
 /** A cost as the ways of paying it: a plain function is one way, with no card chosen. */
@@ -31,8 +33,15 @@ const costSpecOf = (cost: Cost): CostSpec => (typeof cost === "function" ? { pay
 /** The ways a cost can be paid, as lists of the cards chosen: the spec's `pick`, or the one way with no choice. */
 const waysToPay = (cost: CostSpec, duel: Duel, ctx: EffectContext) => (cost.pick ? cost.pick(duel, ctx) : PAY_WITH_NO_CHOSEN_CARDS);
 
-/** The card as it is once activated: a Spell or Trap Card is placed face-up on the field, a monster's effect leaves it in place. */
-const placed = (duel: Duel, effect: EffectRecord, card: CardInstance): Duel => (effect.type === "activation" ? moveCard(duel, card.id, { zone: "spell", face: "up" }) : duel);
+/**
+ * The card as it is once activated: a Spell or Trap Card is placed face-up on the field (a Set one where it is; from the hand, a Field
+ * Spell in the Field Zone, any other in the Spell & Trap Zone `slot`), a monster's effect leaves it in place.
+ */
+function placed(duel: Duel, effect: EffectRecord, card: CardInstance, slot?: number): Duel {
+	if (effect.type !== "activation") return duel;
+	if (card.zone === "spell" || card.zone === "field") return moveCard(duel, card.id, { zone: card.zone, face: "up" });
+	return duel.defs[card.code]?.facts?.icon === "field" ? moveCard(duel, card.id, { zone: "field", face: "up" }) : moveCard(duel, card.id, { zone: "spell", face: "up", slot });
+}
 
 /** A record that counts targets but has nothing to target is a mistake in the card, not something to ignore. */
 function checkDefinition(card: CardInstance, effect: EffectRecord): void {
@@ -94,12 +103,12 @@ function combinations(candidates: readonly number[], { min, max }: NonNullable<E
  * that is not one of the ways the cost offers (a plain function cost offers none but the empty one), a cost that cannot be
  * paid, or targets that are not a legal choice once the cost is paid.
  */
-export function activateEffect(duel: Duel, player: Side, card: CardInstance, index: number, { paid, targets }: Way, answering = true): Duel {
+export function activateEffect(duel: Duel, player: Side, card: CardInstance, index: number, { paid, targets, zone }: Way, answering = true): Duel {
 	const effect = effectOf(duel, { card, effect: index });
 	checkDefinition(card, effect);
 	// A monster whose effects are negated still activates its effect and pays the cost; the effect is negated (Konami's notes on Effect Veiler and Infinite Impermanence).
 	const negatedCard = hitByCardNegation(duel, { card, effect: index }) && isNegatedLasting(duel, card.id);
-	const placedDuel = placed(duel, effect, card);
+	const placedDuel = placed(duel, effect, card, zone);
 	// The link holds the card as it is when activated: placed face-up (for a card activation), before the cost.
 	const activated = placedDuel.cards[card.id]!;
 	let next = placedDuel;
@@ -120,7 +129,8 @@ export function activateEffect(duel: Duel, player: Side, card: CardInstance, ind
 	// A new activation: what the last chain left for a `lingers` effect to answer is over.
 	if (next.lingering.length > 0) next = { ...next, lingering: [] };
 	const key = keyOf(effect, player, card, index);
-	const link = { ...newLink(next, player, activated, index, targets, key, answering), effectNegated: negatedCard };
+	const wasSet = effect.type === "activation" && card.face === "down" && (card.zone === "spell" || card.zone === "field");
+	const link = { ...newLink(next, player, activated, index, targets, key, answering), effectNegated: negatedCard, wasSet };
 	return { ...spend(next, effect, key), chain: [...next.chain, link] };
 }
 
@@ -128,7 +138,7 @@ export function activateEffect(duel: Duel, player: Side, card: CardInstance, ind
 function newLink(duel: Duel, player: Side, card: CardInstance, index: number, targets: readonly number[], spent: string | null, answering: boolean): Link {
 	const effect = effectOf(duel, { card, effect: index });
 	const declared = typeof effect.categories === "function" ? effect.categories(duel, { player, card: duel.cards[card.id]! }, targets) : (effect.categories ?? []);
-	return { player, card, effect: index, speed: speedOf(duel.defs[card.code] as CardDef, effect), targets, answers: answering && duel.chain.length > 0 ? duel.chain.length - 1 : null, targetMoves: targets.map((id) => duel.cards[id]!.moves), spent, categories: [...declared], activationNegated: false, effectNegated: false };
+	return { player, card, effect: index, speed: speedOf(duel.defs[card.code] as CardDef, effect), targets, answers: answering && duel.chain.length > 0 ? duel.chain.length - 1 : null, targetMoves: targets.map((id) => duel.cards[id]!.moves), spent, categories: [...declared], activationNegated: false, effectNegated: false, wasSet: false };
 }
 
 /** The action that activates an effect that way; `paid` is left out when the cost has no choice. */

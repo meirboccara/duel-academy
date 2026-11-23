@@ -124,7 +124,8 @@ describe("control changes that last", () => {
 		const start = position({ defs: all, options, you: { hand: ["shrink", "take-control"] }, rival: { monsters: ["huge"] } });
 		const shrunk = play(start, "activate shrink > huge", "pass", "pass");
 		expect(atk(shrunk, idOf(shrunk, "huge"))).toBe(1500);
-		const taken = play(shrunk, "activate take-control > huge", "pass", "pass");
+		// Step 7: you choose the Main Monster Zone it comes to, and the rival the one it goes back to.
+		const taken = play(shrunk, "activate take-control > huge", "pass", "pass", "place 2");
 		const id = idOf(taken, "huge");
 		expect(codes(taken, "you", "monster")).toEqual(["huge"]);
 		expect([taken.cards[id]!.controller, taken.cards[id]!.owner]).toEqual(["you", "rival"]);
@@ -132,7 +133,8 @@ describe("control changes that last", () => {
 		expect(atk(taken, id)).toBe(3000);
 		// Still yours until the End Phase, back to the rival as it begins.
 		expect(codes(toPhase(taken, "main2"), "you", "monster")).toEqual(["huge"]);
-		const back = toPhase(taken, "end");
+		const back = play(toPhase(taken, "end"), "place 4");
+		expect(back.cards[id]!.slot).toBe(4);
 		expect(back.turn.number).toBe(3);
 		expect(codes(back, "rival", "monster")).toEqual(["huge"]);
 		expect(codes(back, "you", "monster")).toEqual([]);
@@ -141,7 +143,7 @@ describe("control changes that last", () => {
 	it(`${cites("rules", "control-read-at-resolution")} a monster taken by a link that resolved first counts as yours when a later link resolves`, () => {
 		const start = position({ defs: all, you: { hand: ["offer-up", "take-control"], monsters: ["big"] }, rival: { monsters: ["huge"] } });
 		// Chain Link 1: offer-up ("send 1 monster you control"); Chain Link 2: take-control, which resolves first.
-		const asked = play(start, "activate offer-up", "activate take-control > huge");
+		const asked = play(start, "activate offer-up", "activate take-control > huge", "place 1");
 		expect(offered(asked)).toEqual(["choose big", "choose huge"]);
 		const sent = play(asked, "choose huge");
 		expect(codes(sent, "rival", "graveyard")).toContain("huge");
@@ -154,7 +156,7 @@ describe("control changes that last", () => {
 	});
 	it("a monster that left the field before the End Phase does not come back to its owner's field", () => {
 		const start = position({ defs: all, options, you: { hand: ["take-control", "offer-up"] }, rival: { monsters: ["huge"] } });
-		const taken = play(start, "activate take-control > huge", "pass", "pass");
+		const taken = play(start, "activate take-control > huge", "pass", "pass", "place 0");
 		const sent = play(taken, "activate offer-up", "pass", "pass");
 		const later = nextTurn(sent, 4);
 		expect(codes(later, "rival", "graveyard")).toEqual(["huge"]);

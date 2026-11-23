@@ -1,8 +1,12 @@
 import { activateAction, activateEffect, activationWays } from "./activation";
-import { type Action, PASS, sameAction } from "./action";
-import { type CardInstance, closedPriority, destroyCard, MONSTER_ZONES, type Duel, type Link, moveCard, other, PHASES, type Side } from "./duel";
+import { type Action, PASS, sameAction, takes } from "./action";
+import { type CardInstance, closedPriority, destroyCard, type Duel, freeSlots, type Link, moveCard, other, PHASES, type Side } from "./duel";
+import { PENDULUM_SLOTS } from "./zones";
+
+/** The Field Zone: one zone, always open to a Field Spell (the one there is sent to the Graveyard). */
+const FIELD_ZONE: readonly number[] = Object.freeze([0]);
 import { breakEffect, type GameEvent, raiseEvent } from "./events";
-import { type CardDef, type EffectRecord, effectOf, rangeOf, speedOf } from "./effects";
+import { type CardDef, type EffectRecord, effectOf, inFieldRange, rangeOf, speedOf } from "./effects";
 import { returnControl, withoutEnded } from "./modifiers";
 import { cardNegated, immune } from "./negation";
 import { endChain, newTurn, refund } from "./once";
@@ -48,9 +52,6 @@ import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./
  * Field Zone comes with step 7). Known limit: a Spell or Trap whose control changed while on the chain is not swept
  * to the Graveyard (the sweep matches the card as activated, move count included).
  */
-/** Step 7 gives the exact zones; until then a side holds at most five cards in its Spell & Trap Zones. */
-const SPELL_ZONES = 5;
-
 /**
  * Every action open to the player who holds priority, "pass" first. A player who does not hold priority has none.
  * The teaching chain limit only shortens this list: once the chain has that many links, only "pass" is offered.
@@ -58,7 +59,7 @@ const SPELL_ZONES = 5;
 export function legalActions(duel: Duel): Action[] {
 	// The Duel is over: nothing more is offered.
 	if (duel.winner) return [];
-	if (duel.asking) return duel.asking.from.map((card): Action => ({ type: "choose", card }));
+	if (duel.asking) return duel.asking.zones ? duel.asking.from.map((zone): Action => ({ type: "place", zone })) : duel.asking.from.map((card): Action => ({ type: "choose", card }));
 	if (duel.building) return triggerActions(duel);
 	const actions: Action[] = [PASS];
 	collect(duel, actions);
@@ -75,8 +76,16 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 	/** Spell Speed 1 and Setting need an open game state, in the turn player's own Main Phase. */
 	const slow = topSpeed === 0 && priority.open && ownTurn && (turn.phase === "main1" || turn.phase === "main2");
 	const piles = duel.piles[player];
-	const room = piles.spell.length < SPELL_ZONES;
 	let found = false;
+	// Step 7: the player's free zones, read once per listing and only when a card from the hand needs them.
+	let spellSlots: readonly number[] | null = null;
+	let mainSlots: readonly number[] | null = null;
+	/** Where a card from the hand may be placed as a Spell or Trap Card (as `placingZones`). */
+	const placing = (def: CardDef): readonly number[] => {
+		if (def.facts?.icon === "field") return FIELD_ZONE;
+		spellSlots ??= freeSlots(duel, player, "spell");
+		return def.kind === "monster" ? spellSlots.filter((slot) => PENDULUM_SLOTS.includes(slot)) : spellSlots;
+	};
 
 	const offer = (card: CardInstance, def: CardDef, index: number, effect: EffectRecord): boolean => {
 		// In the window of a Summon (nothing on the chain), only effects that answer the Summon can be activated.
@@ -89,13 +98,15 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 		// An effect that answers an event needs that event to be the last thing that happened.
 		if (effect.event && !duel.live.some((event) => effect.event!(duel, event, ctx)) && !(effect.lingers && duel.lingering.some((event) => effect.event!(duel, event, ctx)))) return false;
 		const ways = activationWays(duel, ctx, index, effect, out === null);
-		if (out) for (const way of ways) out.push(activateAction(card.id, index, way));
+		// Step 7: a card activated from the hand is placed in a zone of the player's choice.
+		const zones = out && effect.type === "activation" && card.zone === "hand" ? placing(def) : null;
+		if (out) for (const way of ways) out.push(zones && zones.length > 0 ? { ...activateAction(card.id, index, way), zones } : activateAction(card.id, index, way));
 		return ways.length > 0;
 	};
 
 	/** Is the effect one this card can be activated with from its zone? `ready`: a Spell or Trap Card could be activated from here now. */
 	const listedHere = (effect: EffectRecord, card: CardInstance, zone: "hand" | "field", ready: boolean): boolean =>
-		effect.type === "activation" ? ready : effect.type !== "trigger" && effect.type !== "continuous" && rangeOf(effect) === zone && (zone === "hand" || card.face === "up");
+		effect.type === "activation" ? ready : effect.type !== "trigger" && effect.type !== "continuous" && (zone === "hand" ? rangeOf(effect) === "hand" : inFieldRange(defs[card.code], card, rangeOf(effect)));
 
 	for (const id of piles.hand) {
 		if (only !== undefined && id !== only) continue;
@@ -103,8 +114,10 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 		const def = defs[card.code];
 		if (!def) continue;
 		const isSpellOrTrap = def.kind !== "monster";
-		// A Spell goes from the hand to a free zone, in its controller's turn; a Trap must be Set first.
-		const fromHand = room && (def.kind === "spell" || (def.kind === "quick-play" && ownTurn));
+		// Step 7: where it may be placed as a Spell or Trap Card (a Field Spell always: it replaces the one there; a Pendulum Monster only in a Pendulum Zone).
+		const room = (isSpellOrTrap || def.facts?.pendulum !== undefined) && placing(def).length > 0;
+		// A Spell goes from the hand to a free zone, in its controller's turn; a Trap must be Set first; a Pendulum Monster is activated as a Spell in the Main Phase.
+		const fromHand = room && (def.kind === "spell" || (def.kind === "quick-play" && ownTurn) || (def.kind === "monster" && slow));
 		const effects = def.effects;
 		if (effects) {
 			for (let index = 0; index < effects.length; index++) {
@@ -116,24 +129,27 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 				}
 			}
 		}
-		// A Normal Summon with no Tribute: a Level 4 or lower monster, once a turn, in an open game state, into a free Monster Zone.
-		if (!isSpellOrTrap && slow && !duel.normalSummoned && piles.monster.length < MONSTER_ZONES && (def.facts?.level ?? Infinity) <= 4) {
+		// A Normal Summon with no Tribute: a Level 4 or lower monster, once a turn, in an open game state, into a free Main Monster Zone of the player's choice.
+		const summonable = !isSpellOrTrap && slow && ((!duel.normalSummoned && (def.facts?.level ?? Infinity) <= 4) || (def.builtInSummon !== undefined && (def.builtInSummon.condition?.(duel, { player, card }) ?? true)));
+		// A monster from the hand goes to a free Main Monster Zone (as `summonZones` says for it).
+		const zones = summonable ? (mainSlots ??= freeSlots(duel, player, "monster")) : null;
+		if (zones && zones.length > 0 && !duel.normalSummoned && (def.facts?.level ?? Infinity) <= 4) {
 			if (!out) return true;
-			out.push({ type: "summon", card: id, how: "normal" });
+			out.push({ type: "summon", card: id, how: "normal", zones });
 			found = true;
 		}
-		if (def.builtInSummon && slow && piles.monster.length < MONSTER_ZONES && (def.builtInSummon.condition?.(duel, { player, card }) ?? true)) {
+		if (zones && zones.length > 0 && def.builtInSummon && (def.builtInSummon.condition?.(duel, { player, card }) ?? true)) {
 			if (!out) return true;
-			out.push({ type: "summon", card: id, how: "special" });
+			out.push({ type: "summon", card: id, how: "special", zones });
 			found = true;
 		}
 		if (isSpellOrTrap && slow && room) {
 			if (!out) return true;
-			out.push({ type: "set", card: id });
+			out.push({ type: "set", card: id, zones: placing(def) });
 			found = true;
 		}
 	}
-	for (const zone of ["spell", "monster"] as const) {
+	for (const zone of ["spell", "field", "monster"] as const) {
 		for (const id of piles[zone]) {
 			if (only !== undefined && id !== only) continue;
 			const card = duel.cards[id]!;
@@ -141,7 +157,7 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 			if (!effects) continue;
 			const def = defs[card.code]!;
 			// A Set Spell can be activated at once; a Set Trap or Quick-Play Spell, not in the turn it was Set.
-			const setReady = zone === "spell" && card.face === "down" && def.kind !== "monster" && (def.kind === "spell" || !duel.setThisTurn.includes(id));
+			const setReady = zone !== "monster" && card.face === "down" && def.kind !== "monster" && (def.kind === "spell" || !duel.setThisTurn.includes(id));
 			for (let index = 0; index < effects.length; index++) {
 				const effect = effects[index]!;
 				if (!listedHere(effect, card, "field", setReady)) continue;
@@ -166,50 +182,66 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
  * who can only pass does so at once, so the duel returned always waits on a real decision.
  */
 export function act(duel: Duel, action: Action): Duel {
-	if (!isLegal(duel, action)) throw new Error(`not a legal action for ${duel.asking ? duel.asking.player : duel.priority.holder}: ${JSON.stringify(action)}`);
-	let next = apply(duel, action);
+	const listed = legalMatch(duel, action);
+	if (!listed) throw new Error(`not a legal action for ${duel.asking ? duel.asking.player : duel.priority.holder}: ${JSON.stringify(action)}`);
+	let next = apply(duel, withZone(action, listed));
 	while (!next.winner && !next.building && !next.asking && !next.options.everyWindow && !decides(next) && !collect(next, null)) next = pass(next);
 	return next;
 }
 
-/** Is the action among `legalActions(duel)`? An ordinary action is checked by listing only what its own card could do. */
-function isLegal(duel: Duel, action: Action): boolean {
+/**
+ * The action of `legalActions(duel)` that `action` is (with the zone it names among those listed), or `null`. An ordinary action is
+ * checked by listing only what its own card could do.
+ */
+function legalMatch(duel: Duel, action: Action): Action | null {
 	// The Duel is over: nothing, not even a pass.
-	if (duel.winner) return false;
-	if (duel.asking || duel.building) return legalActions(duel).some((legal) => sameAction(legal, action));
+	if (duel.winner) return null;
+	if (duel.asking || duel.building) return legalActions(duel).find((legal) => sameAction(legal, action)) ?? null;
 	// Passing is always open to the player who holds priority.
-	if (action.type === "pass") return true;
+	if (action.type === "pass") return PASS;
 	if (action.type === "attack") {
 		const attacks: Action[] = [];
 		attackActions(duel, attacks);
-		return attacks.some((legal) => sameAction(legal, action));
+		return attacks.find((legal) => sameAction(legal, action)) ?? null;
 	}
+	// A zone is placed only when a choice asks for it.
+	if (action.type === "place") return null;
 	const listed: Action[] = [];
 	collect(duel, listed, action.card);
-	return listed.some((legal) => sameAction(legal, action));
+	return listed.find((legal) => takes(legal, action)) ?? null;
+}
+
+/** A placing action as it will be done: with the zone it names, or else the first the listing gave (step 7). */
+function withZone(action: Action, listed: Action): Action {
+	if (action.type !== "summon" && action.type !== "set" && action.type !== "activate") return action;
+	const zone = action.zone ?? (listed as { zones?: readonly number[] }).zones?.[0];
+	return zone === undefined ? action : { ...action, zone };
 }
 
 function apply(duel: Duel, action: Action): Duel {
-	if (duel.asking) return answer(duel, (action as Extract<Action, { type: "choose" }>).card);
+	if (duel.asking) return answer(duel, action.type === "place" ? action.zone : (action as Extract<Action, { type: "choose" }>).card);
 	if (duel.building) return action.type === "pass" ? declineTriggers(duel) : chooseTrigger(duel, action as Extract<Action, { type: "activate" }>);
 	if (action.type === "pass") return pass(duel);
-	if (action.type === "summon") return beginSummon(duel, duel.priority.holder, action.card, action.how);
+	if (action.type === "summon") return beginSummon(duel, duel.priority.holder, action.card, action.how, action.zone);
 	if (action.type === "attack") return declareAttack(duel, action.card, action.target);
-	return action.type === "set" ? set(duel, action.card) : activate(duel, action as Extract<Action, { type: "activate" }>);
+	return action.type === "set" ? set(duel, action.card, action.zone) : activate(duel, action as Extract<Action, { type: "activate" }>);
 }
+
 
 /** In an open game state the turn player always decides for themselves, even when all they can do is end the phase. */
 const decides = (duel: Duel) => duel.chain.length === 0 && duel.priority.open && duel.priority.passed.length === 0 && duel.priority.holder === duel.turn.player;
 
-function set(duel: Duel, id: number): Duel {
-	const next = moveCard(breakEffect(duel), id, { zone: "spell", face: "down" });
+function set(duel: Duel, id: number, slot: number | undefined): Duel {
+	// A Field Spell is Set in the Field Zone (step 7), any other Spell or Trap in the Spell & Trap Zone chosen.
+	const field = duel.defs[duel.cards[id]!.code]?.facts?.icon === "field";
+	const next = moveCard(breakEffect(duel), id, field ? { zone: "field", face: "down" } : { zone: "spell", face: "down", slot });
 	// An action that starts no chain: trigger effects go first; then the turn player may use a fast effect, then the opponent (boxes B and C).
 	return triggerPoint({ ...next, setThisTurn: [...next.setThisTurn, id] }, closedPriority(duel.turn.player));
 }
 
 function activate(duel: Duel, action: Extract<Action, { type: "activate" }>): Duel {
 	const player = duel.priority.holder;
-	const next = activateEffect(duel, player, duel.cards[action.card]!, action.effect, { paid: action.paid ?? [], targets: action.targets });
+	const next = activateEffect(duel, player, duel.cards[action.card]!, action.effect, { paid: action.paid ?? [], targets: action.targets, zone: action.zone });
 	return { ...next, priority: closedPriority(other(player)) };
 }
 
@@ -267,10 +299,14 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 	}
 	for (const link of all) {
 		const activated = effectOf(next, link);
-		// A Continuous Spell or Trap Card stays on the field (`stays`), unless its activation was negated.
-		if (activated.type !== "activation" || (activated.stays && !link.activationNegated)) continue;
+		// A Continuous Spell or Trap Card stays on the field (`stays`), as does a Pendulum Monster in its Pendulum Zone (step 7), unless its activation was negated.
+		if (activated.type !== "activation" || ((activated.stays || next.defs[link.card.code]?.kind === "monster") && !link.activationNegated)) continue;
 		const now = next.cards[link.card.id]!;
-		if (now.zone === "spell" && now.face === "up" && now.moves === link.card.moves) next = moveCard(next, now.id, link.activationNegated ? { zone: "graveyard", negated: true } : { zone: "graveyard" });
+		// An Equip Card that equipped a monster stays with it (step 7).
+		if (now.equippedTo !== null && !link.activationNegated) continue;
+		// A Field Spell stays in the Field Zone, unless its activation was negated (step 7).
+		const sweepable = now.zone === "spell" || (now.zone === "field" && link.activationNegated);
+		if (sweepable && now.face === "up" && now.moves === link.card.moves) next = moveCard(next, now.id, link.activationNegated ? { zone: "graveyard", negated: true } : { zone: "graveyard" });
 	}
 	next = endChain(carried.length > 0 ? { ...next, lingering: carried } : next);
 	// The window of a Summon ends with the first chain started in it (lead from YGOProJudge, no Konami page found): the Summon succeeds,
@@ -282,9 +318,24 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 
 /** The player picked a card for the effect that was asking: it goes on, and the rest of the chain resolves. */
 function answer(duel: Duel, picked: number): Duel {
-	const { links, then, carried } = duel.asking!;
+	const { links, then, carried, resume } = duel.asking!;
 	const board = { ...duel, asking: null };
+	if (resume) return resumeAfter(then(board, picked), resume);
 	return resolveChain(board, links, then(board, picked), carried);
+}
+
+/**
+ * A choice asked outside a chain has been answered: once nothing more is asked (one candidate is taken at once, none skips the
+ * question), the duel goes on with `resume`.
+ */
+export function resumeAfter(duel: Duel, resume: (duel: Duel) => Duel): Duel {
+	let next = duel;
+	while (next.asking && next.asking.from.length <= 1) {
+		const { from, then } = next.asking;
+		const board = { ...next, asking: null };
+		next = from.length === 1 ? then(board, from[0]!) : board;
+	}
+	return next.asking ? { ...next, asking: { ...next.asking, resume: next.asking.resume ?? resume } } : resume(next);
 }
 
 /** The next phase, or the other player's next turn after the End Phase. The game state is open, the turn player first. */
@@ -295,9 +346,9 @@ function nextPhase(duel: Duel): Duel {
 	if (at < PHASES.length - 1) {
 		const phase = PHASES[at + 1]!;
 		const turn = { ...moved.turn, phase };
-		// Control taken "until the End Phase" goes back as it begins, before its triggers are put on a chain.
-		const entered = phase === "end" ? returnControl(moved, turn.number) : moved;
-		return triggerPoint(raiseEvent({ ...entered, turn }, { type: "phase", phase, player: turn.player }), { holder: turn.player, passed: [], open: true });
+		// Control taken "until the End Phase" goes back as it begins (its owner choosing the zone), before its triggers are put on a chain.
+		const begin = (entered: Duel) => triggerPoint(raiseEvent(entered, { type: "phase", phase, player: turn.player }), { holder: turn.player, passed: [], open: true });
+		return phase === "end" ? resumeAfter(returnControl({ ...moved, turn }, turn.number), begin) : begin({ ...moved, turn });
 	}
 	const player: Side = other(duel.turn.player);
 	const turn = { player, number: duel.turn.number + 1, phase: PHASES[0]! };

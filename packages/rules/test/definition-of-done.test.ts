@@ -39,7 +39,8 @@ describe("cards the core plays only in part", () => {
 	it("reports every unmodelled part of a card as pending, never as done, and names none that has no deferred source", () => {
 		const report = coverage(CARD_SOURCES, [...testFiles("cards"), ...testFiles("rules")], RULE_SOURCES);
 		expect(report.gaps).toEqual([]);
-		expect(report.pending.filter((entry) => entry.card === "infinite-impermanence").map((entry) => entry.source)).toEqual(["column"]);
+		// Step 7 applies Infinite Impermanence's column: nothing of it is pending any more.
+		expect(report.pending.filter((entry) => entry.card === "infinite-impermanence")).toEqual([]);
 		// A card written with `unmodelled` parts has a deferred source for each, and the other way round.
 		for (const def of Object.values(CARD_DEFS)) {
 			const deferred = CARD_SOURCES.find((card) => card.code === def.code)!.deferred?.map((part) => part.source) ?? [];

@@ -13,7 +13,7 @@ describe("legalActions in an open game state", () => {
 	});
 	it(`${cites("rules", "turn-player-priority")} offers only the cards of the player who holds priority`, () => {
 		const duel = position({ defs, you: { hand: ["spell"], set: ["quick-play"] }, rival: { hand: ["hand-quick"], set: ["trap"], monsters: ["field-quick"] } });
-		const controllers = legalActions(duel).flatMap((action) => (action.type === "pass" ? [] : [duel.cards[action.card]!.controller]));
+		const controllers = legalActions(duel).flatMap((action) => (action.type === "pass" || action.type === "place" ? [] : [duel.cards[action.card]!.controller]));
 		expect(controllers).toEqual(["you", "you", "you"]);
 	});
 	it(`${cites("rules", "spell-main-phase")} ${cites("rules", "quick-play")} outside the Main Phase, offers no Spell Speed 1 card and no Set, but still a Quick-Play Spell from the hand`, () => {
@@ -46,7 +46,7 @@ describe("legalActions when the other player may respond", () => {
 		expect(offered(duel)).toEqual(["activate field-quick", "activate hand-quick", "activate quick-play", "activate trap", "pass"]);
 	});
 	it(`${cites("rules", "response-speed")} offers every response at least as fast as the top link: Set Traps and Quick-Play Spells, Quick Effects in the hand and on the field, Counter Traps`, () => {
-		const start = position({ defs, options, you: { hand: ["spell"] }, rival: { hand: ["hand-quick", "aimed", "monster"], set: ["quick-play", "trap", "answer", "counter"], setThisTurn: ["other-trap", "other-quick-play"], monsters: ["field-quick"] } });
+		const start = position({ defs, options, you: { hand: ["spell"] }, rival: { hand: ["hand-quick", "aimed", "monster"], set: ["quick-play", "trap", "answer", "counter"], setThisTurn: ["other-quick-play"], monsters: ["field-quick"] } });
 		const duel = play(start, "activate spell");
 		expect(duel.priority.holder).toBe("rival");
 		expect(offered(duel)).toEqual(["activate answer", "activate counter", "activate field-quick", "activate hand-quick", "activate quick-play", "activate trap", "pass"]);

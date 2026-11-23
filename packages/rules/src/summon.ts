@@ -1,4 +1,4 @@
-import { closedPriority, destroyCard, type Duel, moveCard, type Side } from "./duel";
+import { closedPriority, destroyCard, type Duel, moveCard, occupant, type Side } from "./duel";
 import { breakEffect, raiseEvent } from "./events";
 import { triggerPoint } from "./triggers";
 
@@ -14,9 +14,9 @@ import { triggerPoint } from "./triggers";
  * chain, the Summon succeeds (`finishSummon`). `player` is who Summons (always the turn player in step 5); whoever it is, the turn player
  * has priority first.
  */
-export function beginSummon(duel: Duel, player: Side, id: number, how: "normal" | "special"): Duel {
+export function beginSummon(duel: Duel, player: Side, id: number, how: "normal" | "special", slot?: number): Duel {
 	const next = breakEffect(duel);
-	return { ...next, summoning: { player, cards: [id], how, negated: false }, normalSummoned: how === "normal" ? true : next.normalSummoned, priority: closedPriority(duel.turn.player) };
+	return { ...next, summoning: { player, cards: [id], how, negated: false, ...(slot === undefined ? {} : { slots: [slot] }) }, normalSummoned: how === "normal" ? true : next.normalSummoned, priority: closedPriority(duel.turn.player) };
 }
 
 /**
@@ -27,8 +27,11 @@ export function finishSummon(duel: Duel): Duel {
 	const summoning = duel.summoning!;
 	let next: Duel = { ...duel, summoning: null };
 	if (!summoning.negated) {
-		for (const id of summoning.cards) {
-			next = moveCard(next, id, { zone: "monster", face: "up" });
+		for (const [i, id] of summoning.cards.entries()) {
+			// The zone chosen when the Summon was attempted; if something took it in the Summon's window, the first free one (the core's reading).
+			const chosen = summoning.slots?.[i];
+			const slot = chosen !== undefined && occupant(next, summoning.player, "monster", chosen) === null ? chosen : undefined;
+			next = moveCard(next, id, { zone: "monster", face: "up", controller: summoning.player, slot });
 			next = raiseEvent(next, { type: "summoned", card: next.cards[id]!, how: summoning.how });
 		}
 	}

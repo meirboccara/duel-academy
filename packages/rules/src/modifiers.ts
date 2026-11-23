@@ -1,5 +1,6 @@
-import { type CardInstance, changeControl, type Duel, MONSTER_ZONES, moveCard, type Side } from "./duel";
-import type { CardDef, EffectRecord } from "./effects";
+import { type CardInstance, changeControl, destroyCard, type Duel, freeSlots, type Side } from "./duel";
+import { askZone, type CardDef, type EffectRecord, inFieldRange, rangeOf } from "./effects";
+import { cardColumn } from "./zones";
 
 /**
  * Step 6 of docs/rules-core-spec.md: continuous effects as one list of timestamped modifiers, read as queries.
@@ -55,27 +56,35 @@ const reaches = (duel: Duel, affects: Affects, target: CardInstance, source: Car
 
 /** The modifiers that end with turn number `endedTurn` are gone (a control change still standing is given back first). */
 export function withoutEnded(duel: Duel, endedTurn: number): Duel {
-	const returned = returnControl(duel, endedTurn);
+	// Between two turns nobody is asked: a monster still to give back (taken during the End Phase) takes its owner's first free zone.
+	const returned = returnControl(duel, endedTurn, false);
 	return returned.modifiers.some((modifier) => modifier.until <= endedTurn) ? { ...returned, modifiers: returned.modifiers.filter((modifier) => modifier.until > endedTurn) } : returned;
 }
 
 /**
  * The End Phase of turn number `turn` begins: each control change "until the End Phase" ends, and the card goes back to the player it
  * was taken from, if it is still the card that was taken (`moves` unchanged); it is then a new card for them (record
- * `control-until-end-phase`). Konami's notes say that player chooses the zone: zones are step 7, so it just goes to their field.
- * With no free Monster Zone it is sent to the Graveyard: the core's reading, no Konami page read.
+ * `control-until-end-phase`). That player chooses one of their free Main Monster Zones (Konami's notes; a monster from an Extra Monster
+ * Zone goes to a Main Monster Zone, record `control-extra-zone-to-main`): the duel returned may be asking them (`Duel.asking`, `place`),
+ * one card after the other. With no free Main Monster Zone the monster is destroyed: YGOProJudge (no source cited), no Konami page read.
  */
-export function returnControl(duel: Duel, turn: number): Duel {
+export function returnControl(duel: Duel, turn: number, choose = true): Duel {
 	const ending = duel.modifiers.filter((modifier) => modifier.layer.kind === "control" && modifier.until <= turn);
 	if (ending.length === 0) return duel;
-	let next: Duel = { ...duel, modifiers: duel.modifiers.filter((modifier) => !ending.includes(modifier)) };
-	for (const modifier of ending) {
-		if (modifier.layer.kind !== "control" || typeof modifier.affects === "function") continue;
-		const card = next.cards[modifier.affects.card]!;
-		if (card.moves !== modifier.affects.moves || card.zone !== "monster") continue;
-		next = next.piles[modifier.layer.to].monster.length < MONSTER_ZONES ? changeControl(next, card.id, modifier.layer.to) : moveCard(next, card.id, { zone: "graveyard" });
-	}
-	return next;
+	return giveBack({ ...duel, modifiers: duel.modifiers.filter((modifier) => !ending.includes(modifier)) }, ending, choose);
+}
+
+function giveBack(duel: Duel, ending: readonly Modifier[], choose: boolean): Duel {
+	const [modifier, ...rest] = ending;
+	if (!modifier) return duel;
+	if (modifier.layer.kind !== "control" || typeof modifier.affects === "function") return giveBack(duel, rest, choose);
+	const card = duel.cards[modifier.affects.card]!;
+	if (card.moves !== modifier.affects.moves || card.zone !== "monster") return giveBack(duel, rest, choose);
+	const to = modifier.layer.to;
+	const zones = freeSlots(duel, to, "monster");
+	if (zones.length === 0) return giveBack(destroyCard(duel, card.id), rest, choose);
+	const back = (board: Duel, slot: number) => giveBack(changeControl(board, card.id, to, slot), rest, choose);
+	return zones.length === 1 || !choose ? back(duel, zones[0]!) : askZone(duel, to, zones, back);
 }
 
 /**
@@ -85,10 +94,15 @@ export function returnControl(duel: Duel, turn: number): Duel {
  */
 export function takeControl(duel: Duel, id: number, side: Side, until: number): Duel {
 	const before = duel.cards[id]!;
-	// With no free Monster Zone the card cannot come over (step 7 gives the zones).
-	if (before.zone !== "monster" || before.controller === side || duel.piles[side].monster.length >= MONSTER_ZONES) return duel;
-	const taken = changeControl(duel, id, side);
-	return addModifier(taken, { affects: { card: id, moves: taken.cards[id]!.moves }, until, layer: { kind: "control", to: before.controller } });
+	const zones = freeSlots(duel, side, "monster");
+	// With no free Main Monster Zone the card cannot come over (the core's reading, no Konami page read).
+	if (before.zone !== "monster" || before.controller === side || zones.length === 0) return duel;
+	// The player taking it chooses a free Main Monster Zone, also for a monster in an Extra Monster Zone (record `control-extra-zone-to-main`).
+	const take = (board: Duel, slot: number) => {
+		const taken = changeControl(board, id, side, slot);
+		return addModifier(taken, { affects: { card: id, moves: taken.cards[id]!.moves }, until, layer: { kind: "control", to: before.controller } });
+	};
+	return zones.length === 1 ? take(duel, zones[0]!) : askZone(duel, side, zones, take);
 }
 
 /**
@@ -99,6 +113,29 @@ export function negateCardEffects(duel: Duel, id: number, until: number): Duel {
 	const card = duel.cards[id]!;
 	if (card.zone !== "monster" || card.face !== "up") return duel;
 	return addModifier(duel, { affects: { card: id, moves: card.moves }, until, layer: { kind: "negate" } });
+}
+
+/**
+ * Step 7: "for the rest of this turn, all other Spell/Trap effects in this column are negated" (Infinite Impermanence). The column is
+ * the one `source` is in now (Konami's notes: where the card is when it applies); every other card in a Spell & Trap Zone of that
+ * column, on either side, is negated until the end of turn `until`, those that come there later included. A Spell or Trap effect
+ * activated there stays negated if its card leaves as the cost (`negatedWhere`).
+ */
+export function negateColumn(duel: Duel, source: number, until: number): Duel {
+	const column = cardColumn(duel.cards[source]!);
+	if (column === null) return duel;
+	const self = duel.cards[source]!;
+	const other = (target: CardInstance) => target.id !== source || target.moves !== self.moves;
+	return addModifier(duel, { affects: (_duel, target) => target.zone === "spell" && other(target) && cardColumn(target) === column, until, layer: { kind: "negate" } });
+}
+
+/**
+ * Step 7: is a card negated where it was, as it was (`card` is a snapshot, as a link holds it): by a lasting negation of a place (a
+ * column), even if the card has left since. Konami's Q&A on Wonder Wand and Infinite Impermanence: an effect activated in the column is
+ * negated though the card was sent to the Graveyard as its cost.
+ */
+export function negatedWhere(duel: Duel, card: CardInstance): boolean {
+	return duel.modifiers.some((modifier) => modifier.layer.kind === "negate" && typeof modifier.affects === "function" && modifier.affects(duel, card, null));
 }
 
 const printed = (duel: Duel, id: number, stat: Stat): number => duel.defs[duel.cards[id]!.code]?.facts?.[stat] ?? 0;
@@ -156,6 +193,8 @@ function entriesFor(duel: Duel, target: CardInstance, seen: ReadonlySet<number>)
 
 /** Does a continuous record of a face-up card apply now: the condition holds and the card's effects are not negated. */
 function appliesNow(duel: Duel, source: CardInstance, record: EffectRecord, seen: ReadonlySet<number>): boolean {
+	// Step 7: a monster card's effect works from the zone its range names (the Monster Zone, or a Pendulum Zone).
+	if (!inFieldRange(duel.defs[source.code], source, rangeOf(record))) return false;
 	if (record.condition && !record.condition(duel, { player: source.controller, card: source })) return false;
 	return seen.has(source.id) || !negatedBy(duel, source, seen);
 }

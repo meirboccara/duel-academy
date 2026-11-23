@@ -14,3 +14,4 @@ export * from "./modifiers";
 export * from "./life";
 export * from "./summon";
 export * from "./battle";
+export * from "./zones";

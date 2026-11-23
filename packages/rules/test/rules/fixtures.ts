@@ -82,6 +82,8 @@ export interface SideSpec {
 	facedown?: string[];
 	/** Face-up monsters in Defense Position. */
 	defense?: string[];
+	/** Step 7: a face-up monster in an Extra Monster Zone (yours: the one over your second column, slot 5; the rival's: slot 6). */
+	extraZone?: string[];
 	graveyard?: string[];
 	deck?: string[];
 }
@@ -95,6 +97,7 @@ export function position(spec: { defs: Record<string, CardDef>; you?: SideSpec; 
 		["monsters", "monster", "up"],
 		["facedown", "monster", "down"],
 		["defense", "monster", "up", "defense"],
+		["extraZone", "monster", "up"],
 		["faceupSpells", "spell", "up"],
 		["graveyard", "graveyard", undefined],
 		["deck", "deck", undefined],
@@ -107,7 +110,9 @@ export function position(spec: { defs: Record<string, CardDef>; you?: SideSpec; 
 	for (const side of ["you", "rival"] as const) {
 		for (const [key, zone, face, battlePosition] of places) {
 			for (const _code of sides[side][key] ?? []) {
-				if (zone !== "deck") duel = moveCard(duel, id, { zone, face, ...(battlePosition ? { position: battlePosition } : {}) });
+				// Step 7: a Field Spell is placed in the Field Zone.
+				const placed = zone === "spell" && spec.defs[_code]?.facts?.icon === "field" ? "field" : zone;
+				if (zone !== "deck") duel = moveCard(duel, id, { zone: placed, face, ...(battlePosition ? { position: battlePosition } : {}), ...(key === "extraZone" ? { slot: side === "you" ? 5 : 6 } : {}) });
 				if (key === "setThisTurn") setThisTurn.push(id);
 				id++;
 			}
@@ -123,6 +128,7 @@ export const codes = (duel: Duel, side: Side, zone: Zone) => cardsIn(duel, side,
 /** One line per action, sorted: "pass", "set trap", "activate quick-play", "activate aimed > monster". */
 export function label(duel: Duel, action: Action): string {
 	if (action.type === "pass") return "pass";
+	if (action.type === "place") return `place ${action.zone}`;
 	const code = duel.cards[action.card]!.code;
 	if (action.type === "set") return `set ${code}`;
 	if (action.type === "summon") return `${action.how === "special" ? "special-summon" : "summon"} ${code}`;
@@ -423,7 +429,8 @@ export function recordCards(log: string[] = []): Record<string, CardDef> {
 		{
 			code: "reset-backrow",
 			kind: "quick-play",
-			effects: [{ type: "activation", operation: (duel, link) => duel.piles[link.player].spell.filter((id) => id !== link.card.id).reduce((board, id) => moveCard(moveCard(board, id, { zone: "hand" }), id, { zone: "spell", face: "down" }), duel) }],
+			// Step 7: a Field Spell goes back to the Field Zone.
+			effects: [{ type: "activation", operation: (duel, link) => [...duel.piles[link.player].spell, ...duel.piles[link.player].field].filter((id) => id !== link.card.id).reduce((board, id) => { const zone = board.cards[id]!.zone; return moveCard(moveCard(board, id, { zone: "hand" }), id, { zone, face: "down" }); }, duel) }],
 		},
 		// "Return all cards in your GY to the hand, then send them to the GY again."
 		{

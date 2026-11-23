@@ -25,8 +25,11 @@ export interface EffectContext {
 /** A card's own reaction to something that happened: a typed event (src/events.ts). */
 export type EventMatcher = (duel: Duel, event: GameEvent, ctx: EffectContext) => boolean;
 
-/** Where the card must be for the effect: `field` means face-up on its controller's field. */
-export type Range = "hand" | "field" | "graveyard" | "banished";
+/**
+ * Where the card must be for the effect: `field` means face-up on its controller's field (for a monster card, in the Monster Zone);
+ * `pendulum` (step 7), a Pendulum Monster's Pendulum Effect: face-up in a Pendulum Zone.
+ */
+export type Range = "hand" | "field" | "graveyard" | "banished" | "pendulum";
 
 /**
  * How often an effect may be used, as the printed wording says it (each wording has a card-text record in
@@ -58,6 +61,12 @@ export interface Once {
  * and `then` runs at once; with none the effect does nothing more.
  */
 export const ask = (duel: Duel, player: Side, from: readonly number[], then: (duel: Duel, picked: number) => Duel): Duel => ({ ...duel, asking: { links: [], player, from, then } });
+
+/**
+ * Step 7: a zone chosen while an effect resolves ("Special Summon it to your zone this card points to"): as `ask`, with zones (from the
+ * player's left) instead of cards; `legalActions` lists them as `place`. With one zone nothing is asked; with none, `then` is not run.
+ */
+export const askZone = (duel: Duel, player: Side, zones: readonly number[], then: (duel: Duel, zone: number) => Duel): Duel => ({ ...duel, asking: { links: [], player, from: zones, then, zones: true } });
 
 /**
  * A cost the player chooses how to pay: `pick` lists the ways (each a list of cards, e.g. one card of the hand for
@@ -183,9 +192,19 @@ export interface EffectRecord {
 	readonly affects?: (duel: Duel, target: CardInstance, source: CardInstance) => boolean;
 }
 
+/** A Link Arrow as printed, read with the card upright for its controller. */
+export type Arrow = "top-left" | "top" | "top-right" | "left" | "right" | "bottom-left" | "bottom" | "bottom-right";
+
 /** What a card says about itself that the core reads: its Spell or Trap icon, a monster's printed Level, ATK and DEF, a Normal Monster. */
 export interface Facts {
-	readonly icon?: "field";
+	/** The Spell icon: a Field Spell goes to the Field Zone (step 7), an Equip Spell is equipped to a monster. */
+	readonly icon?: "field" | "equip";
+	/** An Extra Deck monster's frame (step 7: where it may be Summoned from the Extra Deck). */
+	readonly frame?: "fusion" | "synchro" | "xyz" | "link";
+	/** A Link Monster's arrows. */
+	readonly arrows?: readonly Arrow[];
+	/** A Pendulum Monster: it can be placed in a Pendulum Zone, and goes face-up to the Extra Deck instead of the Graveyard from the field. */
+	readonly pendulum?: { readonly scale: number };
 	readonly level?: number;
 	/** The printed ATK and DEF: the original ATK and DEF (RB10, Glossary). */
 	readonly atk?: number;
@@ -225,7 +244,8 @@ export function speedOf(def: CardDef, effect: EffectRecord): SpellSpeed {
 	if (effect.type === "quick") return 2;
 	if (effect.type !== "activation") return 1;
 	if (def.kind === "counter-trap") return 3;
-	return def.kind === "spell" ? 1 : 2;
+	// A Pendulum Monster activated as a Spell Card in a Pendulum Zone: Spell Speed 1, as a Spell Card (step 7).
+	return def.kind === "spell" || def.kind === "monster" ? 1 : 2;
 }
 
 /** The effect a link or a waiting trigger points at: the card's code and the effect's index in its card. */
@@ -237,6 +257,19 @@ export const effectOf = (duel: Duel, from: { readonly card: CardInstance; readon
  * target" has to still meet the targeting requirements; a card that became a new card is not the same one: R2021 and step 1.)
  */
 export const targetsOf = (duel: Duel, link: Link): CardInstance[] => link.targets.flatMap((id, i) => (duel.cards[id]!.moves === link.targetMoves[i] ? [duel.cards[id]!] : []));
+
+/**
+ * Is a face-up card on the field where an effect of range `field` or `pendulum` applies? A monster card's `field` effects work in the
+ * Monster Zone only, its `pendulum` ones only in a Pendulum Zone (the leftmost or rightmost Spell & Trap Zone); a Spell or Trap Card's
+ * `field` effects anywhere on the field.
+ */
+export function inFieldRange(def: CardDef | undefined, card: CardInstance, range: Range): boolean {
+	if (card.face !== "up") return false;
+	if (range === "pendulum") return def?.facts?.pendulum !== undefined && card.zone === "spell" && (card.slot === 0 || card.slot === 4);
+	if (range !== "field") return false;
+	if (def?.kind === "monster") return card.zone === "monster";
+	return card.zone === "monster" || card.zone === "spell" || card.zone === "field";
+}
 
 /** Where the card must be for the effect: the field unless the record says otherwise. */
 export const rangeOf = (effect: EffectRecord): Range => effect.range ?? "field";
