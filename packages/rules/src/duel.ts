@@ -268,7 +268,16 @@ export function moveCard(duel: Duel, id: number, to: MoveTo): Duel {
 }
 
 /** `negated`: the move of a Spell or Trap Card whose activation was negated, or of a monster whose Summon was negated (`GameEvent`). */
-type MoveTo = { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true };
+type MoveTo = { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: "destroyed" };
+
+/**
+ * Destroys a card: it goes to the Graveyard and the move says it was destroyed (`moved.reason`), which "when destroyed" triggers
+ * look at. `negated`: the card never reached the field (a negated activation or Summon). Konami: destroying is an action that
+ * sends a card to the Graveyard (rule record `trigger-sent-to-graveyard`).
+ */
+export function destroyCard(duel: Duel, id: number, options: { negated?: true } = {}): Duel {
+	return move(duel, id, { zone: "graveyard", reason: "destroyed", ...options }, undefined);
+}
 
 /**
  * Moves several cards at the same time, as one effect does ("send all monsters ... to the Graveyard"). Each moves like
@@ -290,7 +299,8 @@ function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Du
 	const renewed = zone !== before.zone || controller !== before.controller || flippedDown;
 	const after = { ...before, zone, face, controller, moves: before.moves + (renewed ? 1 : 0) };
 	const moved = place(duel, before, after, to.at ?? "top");
-	return renewed ? raiseEvent(moved, to.negated ? { type: "moved", before, after, batch, negated: true } : { type: "moved", before, after, batch }) : moved;
+	if (!renewed) return moved;
+	return raiseEvent(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}) });
 }
 
 /** Gives control of a card on the field to a player: it becomes a new card for them. Its owner never changes. */

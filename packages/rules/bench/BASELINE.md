@@ -154,3 +154,16 @@ New in step 5 (`bench/negation.bench.ts`, real Solemn Judgment / Solemn Strike /
 Re-measured after the step 5 review fixes (same machine, one run of `legal-moves.bench.ts`, today's engine in the same run):
 crowdedHand 0.0556 ms list + `act` against 0.746 ms: **13.4×** (opening 0.0211 ms vs 0.365 ms, 17×; midgame 0.0277 ms vs 1.691 ms, 61×).
 A full `pnpm bench` run earlier the same minute was noisy (today's engine ±35 % on crowdedHand) and is not quoted.
+
+# Rules core, step 6 (destruction event, half LP)
+
+Same machine and day (macOS, Node 20+, 2026-11-23), one run of `bench/legal-moves.bench.ts` (today's engine in the same run):
+
+| Position | `legalActions` | list + `act` | today's engine | ratio |
+|---|---:|---:|---:|---:|
+| opening | 0.0006 ms | 0.0186 ms | 0.350 ms | 19× |
+| midgame | 0.0018 ms | 0.0275 ms | 1.542 ms | 56× |
+| crowdedHand | 0.0022 ms | 0.0577 ms | 0.711 ms | **12.3×** |
+
+crowdedHand stays above 10× (a full `pnpm bench` run just before had a noisy today's-engine mean of 0.727 ms against 0.0659 ms,
+11.0×). Step 6's change in the move path is one optional field on `moved`; the listing is untouched.

@@ -1,4 +1,4 @@
-import { closedPriority, type Duel, moveCard, type Side } from "./duel";
+import { closedPriority, destroyCard, type Duel, moveCard, type Side } from "./duel";
 import { breakEffect, raiseEvent } from "./events";
 import { triggerPoint } from "./triggers";
 
@@ -59,5 +59,5 @@ export function negateSummon(duel: Duel): Duel {
 export function negateSummonAndDestroy(duel: Duel): Duel {
 	if (!summonNegatable(duel)) return duel;
 	const negated = negateSummon(duel);
-	return negated.summoning!.cards.reduce((next, id) => moveCard(next, id, { zone: "graveyard", negated: true }), negated);
+	return negated.summoning!.cards.reduce((next, id) => destroyCard(next, id, { negated: true }), negated);
 }

@@ -1,6 +1,6 @@
 import { activateAction, activateEffect, activationWays } from "./activation";
 import { type Action, PASS, sameAction } from "./action";
-import { type CardInstance, closedPriority, type Duel, type Link, moveCard, other, PHASES, type Side } from "./duel";
+import { type CardInstance, closedPriority, destroyCard, type Duel, type Link, moveCard, other, PHASES, type Side } from "./duel";
 import { breakEffect, raiseEvent } from "./events";
 import { type CardDef, type EffectRecord, effectOf, rangeOf, speedOf } from "./effects";
 import { cardNegated, immune, withoutEnded } from "./negation";
@@ -300,7 +300,7 @@ export const activationNegated = (duel: Duel, index: number): boolean => duel.ch
  * "Negate the activation, and if you do, destroy that card." Nothing more happens when the negation did not take (an
  * activation that cannot be negated). It destroys only what is on the field: a monster whose effect was activated from the
  * hand is normally already in the Graveyard as the cost (Konami's Q&A, record `hand-effect-negated-card-already-in-graveyard`);
- * a hand monster that stays in the hand is not destroyed, and no Konami page found says whether it should be. A Spell or Trap Card whose activation was negated goes to the Graveyard without
+ * a hand monster that stays in the hand is not destroyed, and no Konami page found says whether it should be (README limits). A Spell or Trap Card whose activation was negated goes to the Graveyard without
  * being sent from the field (`moved.negated`: record `negated-card-not-from-field`); a monster whose effect was negated is
  * destroyed where it is, if it is still there.
  */
@@ -311,5 +311,5 @@ export function negateActivationAndDestroy(duel: Duel, index: number): Duel {
 	const now = negated.cards[link.card.id]!;
 	const onField = (now.zone === "monster" || now.zone === "spell" || now.zone === "field") && now.moves === link.card.moves;
 	if (!onField) return negated;
-	return moveCard(negated, now.id, effectOf(duel, link).type === "activation" ? { zone: "graveyard", negated: true } : { zone: "graveyard" });
+	return destroyCard(negated, now.id, effectOf(duel, link).type === "activation" ? { negated: true } : {});
 }

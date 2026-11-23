@@ -26,6 +26,8 @@ export const NEGATION_SOURCES: readonly SourceRecord[] = [
 	qa("impermanence-negates-effect-activated-in-monster-zone", 13631, 8398, "効果自体はモンスターゾーンで発動していますので、無効化されます。"),
 	// OCG only. Same Q&A: an effect activated in the Graveyard (Critter's "sent to the GY") is not negated.
 	qa("impermanence-only-monster-zone", 13631, 8398, "「無限泡影」の効果によって無効化される効果は、モンスターゾーンで発動する効果と、モンスターゾーンに存在する限り適用される永続効果のみとなります。"),
+	// OCG only (no TCG page found). Dinomorphia Intact (cid 18539, Q&A dated 2023-02-01): paying half of an odd number of Life Points leaves the rounded-up half (125 LP leaves 63).
+	qa("half-lp-odd-rounds-remaining-up", 18539, 23944, "奇数のライフポイントから半分を払った場合、残りのライフポイントが整数になるように四捨五入されます"),
 	// FET chart: a Normal Summon is an action in the open game state (box A), and after it, an action that does not start a chain.
 	{ id: "normal-summon-is-an-action", kind: "tcg-rule", url: "https://www.yugioh-card.com/en/play/fast-effect-timing/", read, quote: "Normal Summon (including Tribute Summon) Set a card Perform a Special Summon that does not start a Chain (including Xyz Summon, Synchro Summon) Change a monster’s Battle Position" },
 	// OCG only. Obelisk the Tormentor's notes (cid 4998, dated 2024-03-23): "This card's Normal Summon cannot be negated" means no negating effect can be activated against it.

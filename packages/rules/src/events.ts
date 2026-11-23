@@ -9,8 +9,9 @@ export type GameEvent =
 	/** A card became a new card by moving (zone, control or flipped face-down): `before` and `after` are its two states.
 	 * Cards moved at the same time (`moveCards`) share a `batch`. `negated`: a Spell or Trap Card whose activation was
 	 * negated, or a monster whose Summon was negated, going to the Graveyard: Konami does not treat it as sent from the
-	 * field (rule records `negated-card-not-from-field`, `negated-summon-not-from-field`). */
-	| { readonly type: "moved"; readonly before: CardInstance; readonly after: CardInstance; readonly batch?: number; readonly negated?: true }
+	 * field (rule records `negated-card-not-from-field`, `negated-summon-not-from-field`). `reason: "destroyed"`: the card was
+	 * destroyed (`destroyCard`); a card sent to the Graveyard otherwise (discarded, sent by an effect, Tributed) has none. */
+	| { readonly type: "moved"; readonly before: CardInstance; readonly after: CardInstance; readonly batch?: number; readonly negated?: true; readonly reason?: "destroyed" }
 	| { readonly type: "summoned"; readonly card: CardInstance; readonly how: "normal" | "flip" | "special" }
 	/** A phase starts; `player` is the turn player. */
 	| { readonly type: "phase"; readonly phase: Phase; readonly player: Side };

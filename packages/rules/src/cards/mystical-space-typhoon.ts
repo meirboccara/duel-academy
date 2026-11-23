@@ -1,4 +1,4 @@
-import { moveCard } from "../duel";
+import { destroyCard } from "../duel";
 import { type CardDef, targetsOf } from "../effects";
 import type { CardSources } from "../coverage";
 import { spellsAndTraps } from "./helpers";
@@ -18,7 +18,7 @@ export const MYSTICAL_SPACE_TYPHOON: CardDef = {
 			operation: (duel, link) => {
 				// "that target": it must still be on the field as a Spell or Trap when this resolves.
 				const target = targetsOf(duel, link)[0];
-				return target && (target.zone === "spell" || target.zone === "field") ? moveCard(duel, target.id, { zone: "graveyard" }) : duel;
+				return target && (target.zone === "spell" || target.zone === "field") ? destroyCard(duel, target.id) : duel;
 			},
 		},
 	],

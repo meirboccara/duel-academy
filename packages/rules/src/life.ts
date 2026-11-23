@@ -6,9 +6,9 @@ export function payLp(duel: Duel, side: Side, amount: number): Duel | null {
 }
 
 /**
- * "Pay half your LP". The amount paid is rounded up for an odd number of Life Points: this is the core's reading; no
- * Konami page found says how an odd number is halved (tests use even Life Points).
+ * "Pay half your LP". An odd number of Life Points leaves the rounded-up half, so the amount paid is rounded down
+ * (125 LP leaves 63). Source: Konami's Japanese Q&A for Dinomorphia Intact, OCG only (record half-lp-odd-rounds-remaining-up).
  */
 export function payHalfLp(duel: Duel, side: Side): Duel | null {
-	return payLp(duel, side, Math.ceil(duel.lp[side] / 2));
+	return payLp(duel, side, Math.floor(duel.lp[side] / 2));
 }

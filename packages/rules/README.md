@@ -145,7 +145,7 @@ Known limits of step 4 (what the tests do not prove):
   not on it. Academy's old engine also lets Ash answer a draw; that is a difference of data, not settled here.
 - Pot of Greed needs 2 cards in the Deck (kept from the old engine; no Konami page read). Link Spider needs a Normal Monster
   of Level 4 or lower in the hand to be activated (an analogy with `search-needs-a-card`; no Konami page read).
-- Mystical Space Typhoon cannot target itself and "destroys" by moving to the Graveyard (no destruction event yet). The
+- Mystical Space Typhoon cannot target itself and "destroys" with `destroyCard` (the `moved` event carries `reason: "destroyed"`). The
   rulings of its Q&A that need a card on the field after the cost (Xyz Reborn) are only in the step 2 rule records.
 - The cost dry run makes the listing 1.5 to 2× slower (BASELINE.md). `act` now checks an action by listing only what its own
   card could do, which more than pays for it; the optional `CostSpec.can` pre-check showed no gain on the reference boards.
@@ -205,9 +205,15 @@ Known limits of step 5 (what the tests do not prove):
   step 5 never opens the window for an effect's Summon. Also for step 8: a negated Summon is not "successful" (the monster
   cannot be revived by a "must first be Special Summoned" clause: fid 21297), and a negated Flip Summon is destroyed on the field
   (fid 17662).
-- "Pay half your LP" rounds the amount paid up for an odd LP: unsourced (tests use even LP).
+- "Pay half your LP" pays the half rounded down for an odd LP and keeps the rounded-up half (125 LP leaves 63): Konami's Japanese
+  Q&A for Dinomorphia Intact (cid 18539, fid 23944), OCG only; no TCG page found.
 - The Damage Step's limits are not modelled (Counter Traps there, Infinite Impermanence not).
 - Infinite Impermanence's targets exclude a Normal Monster and an already negated monster: that is Konami's Japanese note only; the
   TCG text has no such sentence. Whether a negated monster's trigger effects trigger is YGOProJudge's answer only (yes).
-- Destroying is a move to the Graveyard (no destruction event): Solemn Strike's destroyed monster is an ordinary move.
+- Destruction is a `moved` event with `reason: "destroyed"` (`destroyCard`): MST, and the card or monster a negator destroys
+  (even a negated Summon or activation, which is destroyed but "not sent from the field"). A move that is not a destruction
+  (discard, send, Tribute, a cost) has no reason. Destroying the monster of a negated effect when it stayed in the hand (an
+  effect whose cost is not the card itself): not settled. Konami's Q&A for Solemn Strike (cid 12187, 27 entries, all titles
+  read) has no entry on it, and Solemn Judgment's 105 were not read; the core destroys only a card on the field. A YGOProJudge
+  question was not asked (the key lives in another project's env file and the sandbox refused the read).
 - A negated monster's Continuous effects, and any other source of negation (Skill Drain), are step 6's modifiers.
