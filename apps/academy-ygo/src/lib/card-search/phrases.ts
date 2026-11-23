@@ -9,13 +9,13 @@ import { jargonIn } from "./jargon";
 export const PHRASES = {
 	/** Someone can answer before the card works; the last card played happens first. */
 	answer: {
-		en: "Your friend can still answer with a card first, and the last card played happens first.",
+		en: "Your opponent can still answer with a card first, and the last card played happens first.",
 		fr: "Ton adversaire peut encore répondre avec une carte avant, et la dernière carte jouée passe en premier.",
 		he: "היריב עוד יכול לענות קודם עם קלף, והקלף האחרון ששוחק קורה ראשון.",
 	},
 	/** After the sentence saying what you must give up first: that stays given up even if the card is stopped. */
 	cost: {
-		en: "This happens even if your friend stops the card afterwards.",
+		en: "This happens even if your opponent stops the card afterwards.",
 		fr: "Ça reste fait, même si ton adversaire arrête la carte ensuite.",
 		he: "זה נשאר כך, גם אם היריב עוצר את הקלף אחר כך.",
 	},
@@ -27,13 +27,13 @@ export const PHRASES = {
 	},
 	/** A Trap must be Set first, and cannot be used the turn it is Set; from the next turn on it can, either player's. */
 	"set-trap": {
-		en: "Place this Trap face-down first: you can use it from the next turn on, even your friend's.",
+		en: "Place this Trap face-down first: you can use it from the next turn on, even your opponent's.",
 		fr: "Pose d’abord ce Piège face cachée : tu peux t’en servir dès le tour suivant, même celui de ton adversaire.",
 		he: "קודם הניחו את המלכודת הזו עם הפנים למטה: אפשר להשתמש בה מהתור הבא, גם בתור של היריב.",
 	},
 	/** When a Quick-Play Spell can be used. */
 	"quick-play": {
-		en: "You can play it on your turn, or place it face-down and surprise your friend on a later turn, even theirs.",
+		en: "You can play it on your turn, or place it face-down and surprise your opponent on a later turn, even theirs.",
 		fr: "Tu peux la jouer pendant ton tour, ou la poser face cachée pour surprendre ton adversaire à un tour suivant, même le sien.",
 		he: "אפשר לשחק אותו בתור שלכם, או להניח אותו עם הפנים למטה ולהפתיע את היריב בתור מאוחר יותר, גם בתור שלו.",
 	},
@@ -81,7 +81,7 @@ export const PHRASES = {
 	},
 	/** "(Quick Effect)". */
 	"quick-effect": {
-		en: "This monster can use its power even on your friend's turn, even right after they play a card.",
+		en: "This monster can use its power even on your opponent's turn, even right after they play a card.",
 		fr: "Ce monstre peut utiliser son pouvoir même pendant le tour de ton adversaire, même juste après qu’il a joué une carte.",
 		he: "המפלצת הזו יכולה להשתמש בכוח שלה גם בתור של היריב, גם מיד אחרי שהוא שיחק קלף.",
 	},
@@ -163,7 +163,7 @@ export const PHRASES = {
 	},
 	/** "Set": face-down, hidden from the other player. */
 	set: {
-		en: "Setting a card means placing it face-down so your friend can't see it.",
+		en: "Setting a card means placing it face-down so your opponent can't see it.",
 		fr: "Poser une carte veut dire la placer face cachée pour que ton adversaire ne la voie pas.",
 		he: "להניח קלף פירושו לשים אותו עם הפנים למטה כדי שהיריב לא יראה אותו.",
 	},
@@ -193,7 +193,7 @@ const HAND_WRITTEN: Partial<Record<PhraseKey, Record<Locale, RegExp>>> = {
 	when: { en: /\bvery last thing\b/i, fr: /toute dernière chose/i, he: /הדבר האחרון שקרה/ },
 	"once-per-turn-name": { en: /\bseveral copies\b/i, fr: /plusieurs exemplaires/i, he: /כמה עותקים/ },
 	"once-per-turn": { en: /\bonce (?:each|per|a) turn\b/i, fr: /une fois par tour/i, he: /פעם אחת בכל תור/ },
-	"quick-effect": { en: /\beven on your friend.s turn\b/i, fr: /même pendant le tour de ton adversaire/i, he: /גם בתור של היריב, גם מיד/ },
+	"quick-effect": { en: /\beven on your opponent.s turn\b/i, fr: /même pendant le tour de ton adversaire/i, he: /גם בתור של היריב, גם מיד/ },
 	answer: { en: /\b(?:can still )?answer with\b|\bcard to answer\b/i, fr: /répondre avec|pour répondre/i, he: /לענות/ },
 	cost: { en: /\beven if\b.*\bstops?\b/i, fr: /\bmême si\b.*\barrête/i, he: /גם אם.*עוצר/ },
 	"if-gone": { en: /\bstill there\b|\bis gone\b/i, fr: /toujours là|a disparu/i, he: /עדיין שם|נעלמ/ },
@@ -210,8 +210,11 @@ export function checkExplanation(text: string, locale: Locale): string[] {
 	const handWritten = (matched.includes("once-per-turn-name") ? matched.filter((key) => key !== "once-per-turn") : matched)
 		.map((key) => `write {${key}} instead of saying it in your own words`);
 	/* On the text a child reads, shared sentences included. */
-	const jargon = jargonIn(expandPhrases(text, locale), locale);
-	return [...unknown, ...handWritten, ...(jargon.length ? [`game words to explain instead: ${jargon.join(", ")}`] : [])];
+	const childText = expandPhrases(text, locale);
+	const jargon = jargonIn(childText, locale);
+	/* The cards say "your opponent" (fr "ton adversaire", he "היריב"): the explanation does too ("friendly" is fine). */
+	const calledFriend = locale === "en" && /(?<!\p{L})friends?(?!\p{L})/iu.test(childText) ? ['say "opponent", not "friend"'] : [];
+	return [...unknown, ...handWritten, ...(jargon.length ? [`game words to explain instead: ${jargon.join(", ")}`] : []), ...calledFriend];
 }
 
 /** The text a child reads: each `{token}` becomes its shared sentence in `locale`. */

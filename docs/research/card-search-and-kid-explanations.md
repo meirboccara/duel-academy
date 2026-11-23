@@ -415,7 +415,7 @@ So the card data, the pictures and the daily refresh Duel Academy needs already 
 - **An AI model drafts every kid explanation.**
 - **No game jargon in the explanation.** The text must not use words like "Target", "Chain" or "Cost". It says what they mean in plain words a child understands, written fresh in each language (`en`, `fr`, `he`), not translated word for word. **This overrides §C.3**, which kept the official terms. The official card text stays visible on the page (and on YGOProJudge) for grown-ups.
 
-  Example for Mystical Space Typhoon (English, draft style): "Pick one Spell or Trap card on the field. Your friend can still play a card to answer. When it's this card's turn, the card you picked is destroyed, if it's still there."
+  Example for Mystical Space Typhoon (English, draft style): "Pick one Spell or Trap card on the field. Your opponent can still play a card to answer. When it's this card's turn, the card you picked is destroyed, if it's still there."
 
 ### E.8 Fifth round of decisions (2026-11-23)
 

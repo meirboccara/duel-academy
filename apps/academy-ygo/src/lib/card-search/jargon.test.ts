@@ -20,7 +20,7 @@ describe("game words in explanations for children", () => {
 	});
 
 	it("accepts the plain-words version", () => {
-		const mst = "Pick one Spell or Trap card on the field. Your friend can still play a card to answer. When it's this card's turn, the card you picked is destroyed, if it's still there.";
+		const mst = "Pick one Spell or Trap card on the field. Your opponent can still play a card to answer. When it's this card's turn, the card you picked is destroyed, if it's still there.";
 		expect(jargonIn(mst, "en")).toEqual([]);
 	});
 });

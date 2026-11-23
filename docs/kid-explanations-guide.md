@@ -29,11 +29,11 @@ changes it on every card at once (the text is stored with its tokens).
 
 | Token | Use it when | English |
 | --- | --- | --- |
-| `{answer}` | the other player can answer before the card works (the "chain") | Your friend can still answer with a card first, and the last card played happens first. |
-| `{cost}` | right after the sentence saying what you must give up first (the "cost") | This happens even if your friend stops the card afterwards. |
+| `{answer}` | the other player can answer before the card works (the "chain") | Your opponent can still answer with a card first, and the last card played happens first. |
+| `{cost}` | right after the sentence saying what you must give up first (the "cost") | This happens even if your opponent stops the card afterwards. |
 | `{if-gone}` | the card picked at the start may be gone when the card works | If the card you picked is gone by then, nothing happens to it. |
-| `{set-trap}` | a Trap: set first, not usable the turn it is set, usable from the next turn on (either player's) | Place this Trap face-down first: you can use it from the next turn on, even your friend's. |
-| `{quick-play}` | a Quick-Play Spell: when it can be played | You can play it on your turn, or place it face-down and surprise your friend on a later turn, even theirs. |
+| `{set-trap}` | a Trap: set first, not usable the turn it is set, usable from the next turn on (either player's) | Place this Trap face-down first: you can use it from the next turn on, even your opponent's. |
+| `{quick-play}` | a Quick-Play Spell: when it can be played | You can play it on your turn, or place it face-down and surprise your opponent on a later turn, even theirs. |
 
 **How an effect works**
 
@@ -45,7 +45,7 @@ changes it on every card at once (the text is stored with its tokens).
 | `{if}` | optional "If … : You can" | It still works even if other things happened just after. |
 | `{once-per-turn}` | "Once per turn:" (this copy; resets if it leaves the field or is turned face-down) | You can use this once each turn. If this card leaves the field or is turned face-down and comes back, it is like a new card and can use it again this turn. |
 | `{once-per-turn-name}` | "You can only use this effect of [name] once per turn" (all copies together) | You can use this only once each turn, even with several copies of this card, and even if it leaves the field and comes back. |
-| `{quick-effect}` | "(Quick Effect)" | This monster can use its power even on your friend's turn, even right after they play a card. |
+| `{quick-effect}` | "(Quick Effect)" | This monster can use its power even on your opponent's turn, even right after they play a card. |
 | `{then}` | "…, then …" | First the first part happens, then the second. If the first part doesn't happen, the second doesn't either. |
 | `{also}` | "…, also …" | Both parts happen at the same time, and each one happens even if the other can't. |
 | `{if-you-do}` | "…, and if you do, …" | Both parts happen at the same time, but the second part only happens if the first one did. |
@@ -70,11 +70,12 @@ encore répondre avec une carte avant" instead of `{answer}`).
    paying anything); "first you must give up …" then `{cost}`; `{answer}` for the chain; "then …" for resolving.
    `explanations:save` checks for these words, in the shared sentences too.
 4. **Short:** besides the shared sentences, 1 to 3 sentences of the card's own, one idea each, present tense, "you"
-   (fr: "tu"; he: plural imperative, as in the app). Card names, Monster, Spell and Trap stay as the child sees them.
+   (fr: "tu"; he: plural imperative, as in the app). The other player is "your opponent", as on the cards
+   (fr "ton adversaire", he "היריב"); `explanations:save` refuses "friend" in English. Card names, Monster, Spell and Trap stay as the child sees them.
 5. **Written for the language**, not translated word for word. Hebrew has no official card text: keep card names in
    English.
 6. Keep the timing exactly right (when the card can be played, what happens first, what happens if the picked card is
    gone).
 
-Example, Mystical Space Typhoon (en): *"Pick one Spell or Trap card on the field, yours or your friend's. {answer}
+Example, Mystical Space Typhoon (en): *"Pick one Spell or Trap card on the field, yours or your opponent's. {answer}
 Then the card you picked is destroyed. {if-gone} {quick-play}"*
