@@ -1,3 +1,4 @@
+import { CONTINUOUS_SOURCES } from "./continuous-sources";
 import { NEGATION_SOURCES } from "./negation-sources";
 import { konamiCardUrl, type SourceRecord } from "./sources";
 
@@ -283,4 +284,5 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 	// per Duel"): that I used a copy's effect does not stop the other player from activating it in that Duel.
 	qa("duel-per-player-effect-used", 7095, 8114, "相手プレイヤーがそのデュエル中に「 D-HERO ディスクガイ 」のモンスター効果が発動できなくなる事はありません。"),
 	...NEGATION_SOURCES,
+	...CONTINUOUS_SOURCES,
 ];

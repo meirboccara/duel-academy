@@ -1,5 +1,6 @@
 import type { CardInstance, Duel, Link, Side } from "./duel";
 import type { GameEvent } from "./events";
+import type { Layer } from "./modifiers";
 
 /**
  * Step 4 of docs/rules-core-spec.md: effect records. A card is data: a `CardDef` with one `EffectRecord` per printed
@@ -93,6 +94,11 @@ export interface EffectRecord {
 	 * Summon's window (YGOProJudge's lead, no Konami page found); anything else waits until the Summon has succeeded.
 	 */
 	readonly answersSummon?: boolean;
+	/**
+	 * `activation` of a Continuous Spell or Trap Card (step 6): the card stays on the field face-up after the chain, instead of being
+	 * sent to the Graveyard. Its continuous effect is another record, `type: "continuous"`.
+	 */
+	readonly stays?: boolean;
 	/** "This activation cannot be negated." */
 	readonly activationCannotBeNegated?: Immunity;
 	/** "This effect cannot be negated." */
@@ -104,9 +110,14 @@ export interface EffectRecord {
 	 * `trigger`: a Trigger Effect (Spell Speed 1), put on a chain at a trigger point after `event` matched; never
 	 * listed as an ordinary action.
 	 */
-	readonly type: "activation" | "ignition" | "quick" | "trigger";
+	readonly type: "activation" | "ignition" | "quick" | "trigger" | "continuous";
 	/** For `ignition`, `quick` and `trigger`; default `field`. Ignored for `activation`. */
 	readonly range?: Range;
+	/**
+	 * `event` of a Quick Effect worded "If ...": it may also answer an event of the chain that has just resolved, in the first window
+	 * after it (`Duel.lingering`), not only the last thing that happened. Konami's Japanese notes on Droll & Lock Bird (OCG only).
+	 */
+	readonly lingers?: boolean;
 	/** Trigger: the event it triggers on; for a card activation or Quick Effect, the event it can answer while that is the last thing that happened. */
 	readonly event?: EventMatcher;
 	/**
@@ -155,12 +166,23 @@ export interface EffectRecord {
 	readonly operation: (duel: Duel, link: Link, index: number) => Duel;
 	/** The once-per-turn (or Duel, or chain) limit, as printed. */
 	readonly once?: Once;
+	/**
+	 * `continuous` (step 6): what the effect does while it applies, as modifiers (src/modifiers.ts). It is never activated or put on a
+	 * chain: it is read from the board when a query asks, while the card is face-up on the field (`range` `field`), its effects are
+	 * not negated and `condition` holds. Its stamp is the moment the card came face-up on the field.
+	 */
+	readonly modifies?: (duel: Duel, source: CardInstance) => readonly Layer[];
+	/** `continuous`: which cards the modifiers reach; default the source card itself. */
+	readonly affects?: (duel: Duel, target: CardInstance, source: CardInstance) => boolean;
 }
 
-/** What a card says about itself that the core reads: its Spell or Trap icon, a monster's Level, a Normal Monster. */
+/** What a card says about itself that the core reads: its Spell or Trap icon, a monster's printed Level, ATK and DEF, a Normal Monster. */
 export interface Facts {
 	readonly icon?: "field";
 	readonly level?: number;
+	/** The printed ATK and DEF: the original ATK and DEF (RB10, Glossary). */
+	readonly atk?: number;
+	readonly def?: number;
 	readonly normal?: true;
 }
 

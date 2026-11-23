@@ -1,9 +1,10 @@
 import { activateAction, activateEffect, activationWays } from "./activation";
 import { type Action, PASS, sameAction } from "./action";
 import { type CardInstance, closedPriority, destroyCard, type Duel, type Link, moveCard, other, PHASES, type Side } from "./duel";
-import { breakEffect, raiseEvent } from "./events";
+import { breakEffect, type GameEvent, raiseEvent } from "./events";
 import { type CardDef, type EffectRecord, effectOf, rangeOf, speedOf } from "./effects";
-import { cardNegated, immune, withoutEnded } from "./negation";
+import { withoutEnded } from "./modifiers";
+import { cardNegated, immune } from "./negation";
 import { endChain, newTurn, refund } from "./once";
 import { beginSummon, finishSummon } from "./summon";
 import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./triggers";
@@ -82,7 +83,7 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 		if (speed === 1 ? !slow : speed < topSpeed) return false;
 		const ctx = { player, card };
 		// An effect that answers an event needs that event to be the last thing that happened.
-		if (effect.event && !duel.live.some((event) => effect.event!(duel, event, ctx))) return false;
+		if (effect.event && !duel.live.some((event) => effect.event!(duel, event, ctx)) && !(effect.lingers && duel.lingering.some((event) => effect.event!(duel, event, ctx)))) return false;
 		const ways = activationWays(duel, ctx, index, effect, out === null);
 		if (out) for (const way of ways) out.push(activateAction(card.id, index, way));
 		return ways.length > 0;
@@ -90,7 +91,7 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 
 	/** Is the effect one this card can be activated with from its zone? `ready`: a Spell or Trap Card could be activated from here now. */
 	const listedHere = (effect: EffectRecord, card: CardInstance, zone: "hand" | "field", ready: boolean): boolean =>
-		effect.type === "activation" ? ready : effect.type !== "trigger" && rangeOf(effect) === zone && (zone === "hand" || card.face === "up");
+		effect.type === "activation" ? ready : effect.type !== "trigger" && effect.type !== "continuous" && rangeOf(effect) === zone && (zone === "hand" || card.face === "up");
 
 	for (const id of piles.hand) {
 		if (only !== undefined && id !== only) continue;
@@ -220,6 +221,8 @@ function pass(duel: Duel): Duel {
 function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | null): Duel {
 	// The links as they stand once each has come up for resolution: a lower link carries the negation a higher one gave it.
 	const all = [...activated];
+	/** Events raised by the links resolved so far that a `lingers` effect may answer after the whole chain. */
+	const carried: GameEvent[] = [];
 	let next = duel;
 	let result = pending;
 	for (;;) {
@@ -242,11 +245,14 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 		result = null;
 	}
 	for (const link of all) {
-		if (effectOf(next, link).type !== "activation") continue;
+		const activated = effectOf(next, link);
+		// A Continuous Spell or Trap Card stays on the field (`stays`), unless its activation was negated.
+		if (activated.type !== "activation" || (activated.stays && !link.activationNegated)) continue;
 		const now = next.cards[link.card.id]!;
 		if (now.zone === "spell" && now.face === "up" && now.moves === link.card.moves) next = moveCard(next, now.id, link.activationNegated ? { zone: "graveyard", negated: true } : { zone: "graveyard" });
 	}
-	next = endChain(next);
+	for (const event of next.live) if (event.type === "added-to-hand" && !carried.includes(event)) carried.push(event);
+	next = endChain(carried.length > 0 ? { ...next, lingering: carried } : next);
 	// The window of a Summon ends with the first chain started in it (lead from YGOProJudge, no Konami page found): the Summon succeeds,
 	// unless it was negated, in which case the monster was destroyed by the negator and nothing was Summoned.
 	if (next.summoning && !next.summoning.negated) return finishSummon(next);

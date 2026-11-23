@@ -1,7 +1,8 @@
 import { targetsOf, type CardDef } from "../effects";
 import type { CardSources } from "../coverage";
 import { other } from "../duel";
-import { controlsNoCards, isNegated, negateCardEffects } from "../negation";
+import { isNegated, negateCardEffects } from "../modifiers";
+import { controlsNoCards } from "../negation";
 import { konamiCardUrl } from "../sources";
 
 /**

@@ -1,4 +1,4 @@
-import type { CardInstance, Duel, Phase, Side } from "./duel";
+import type { CardInstance, Duel, Phase, Side, Zone } from "./duel";
 import { effectOf, rangeOf } from "./effects";
 
 /**
@@ -12,6 +12,8 @@ export type GameEvent =
 	 * field (rule records `negated-card-not-from-field`, `negated-summon-not-from-field`). `reason: "destroyed"`: the card was
 	 * destroyed (`destroyCard`); a card sent to the Graveyard otherwise (discarded, sent by an effect, Tributed) has none. */
 	| { readonly type: "moved"; readonly before: CardInstance; readonly after: CardInstance; readonly batch?: number; readonly negated?: true; readonly reason?: "destroyed" }
+	/** A card went to a hand from another zone (a draw, a search, a recovery): `card` is the card in the hand, `from` where it was. Raised after its `moved`. */
+	| { readonly type: "added-to-hand"; readonly card: CardInstance; readonly from: Zone; readonly batch?: number }
 	| { readonly type: "summoned"; readonly card: CardInstance; readonly how: "normal" | "flip" | "special" }
 	/** A phase starts; `player` is the turn player. */
 	| { readonly type: "phase"; readonly phase: Phase; readonly player: Side };
@@ -105,5 +107,5 @@ export function dropWhen(duel: Duel): Duel {
  */
 export function breakEffect(duel: Duel): Duel {
 	const dropped = dropWhen(duel);
-	return dropped.live.length === 0 ? dropped : { ...dropped, live: [] };
+	return dropped.live.length === 0 && dropped.lingering.length === 0 ? dropped : { ...dropped, live: [], lingering: [] };
 }

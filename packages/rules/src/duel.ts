@@ -1,6 +1,7 @@
 import type { CardDef, SpellSpeed } from "./effects";
 import { type GameEvent, raiseEvent, type Waiting } from "./events";
 import { NOTHING_USED, type Used } from "./once";
+import { locked, type Modifier } from "./modifiers";
 import type { Building } from "./triggers";
 import { createRng } from "./rng";
 
@@ -29,6 +30,8 @@ export interface CardInstance {
 	readonly moves: number;
 	/** It starts in the Extra Deck, and goes back there instead of the Deck or the hand. */
 	readonly extraDeck: boolean;
+	/** Step 6: the stamp (`Duel.clock`) of the moment it came face-up on the field: when its continuous effects began to apply. */
+	readonly since: number;
 }
 
 /** Step 2 only tells a Main Phase from the others; steps inside the Battle Phase come later. */
@@ -104,6 +107,11 @@ export interface Duel {
 	readonly options: TeachingOptions;
 	/** The last things that happened (step 3): events since the last break, which a fast effect may still answer. */
 	readonly live: readonly GameEvent[];
+	/**
+	 * Step 6: events of the chain that has just resolved that an effect marked `lingers` may still answer (Droll & Lock Bird: Konami's
+	 * notes say it can be activated after the chain in which the card was added). Cleared by the next break or activation.
+	 */
+	readonly lingering: readonly GameEvent[];
 	/** Trigger effects whose condition was met and which wait for the next trigger point. */
 	readonly waiting: readonly Waiting[];
 	/** While trigger effects are being put on a chain: whose choice it is is in `priority.holder`. */
@@ -116,28 +124,20 @@ export interface Duel {
 	readonly summoning: Summoning | null;
 	/** The turn player has used their Normal Summon this turn (a Normal Set of a monster is not in step 5, and `set` does not touch this). */
 	readonly normalSummoned: boolean;
-	/** The cards whose effects are negated until the end of a turn (step 5). */
-	readonly negations: readonly Negation[];
+	/**
+	 * Step 6: what resolved effects leave behind for a while (negation of a card's effects, Shrink, Droll & Lock Bird's lock, a
+	 * control change), as one list. `clock` stamps them in the order they began to apply. The continuous effects of cards on the
+	 * field are not in the list: they are read from the board when asked (src/modifiers.ts).
+	 */
+	readonly modifiers: readonly Modifier[];
+	/** The last stamp given: modifiers and cards that came face-up on the field take the next one. */
+	readonly clock: number;
 	/** While a link resolves and its effect waits for a choice that is not a target: the whole chain, and the choice. */
 	readonly asking: Asking | null;
 	/** How many groups of simultaneous moves (`moveCards`) have happened: the last one's number tags its events. */
 	readonly batches: number;
 	/** What each card code does, as effect records (src/effects.ts): shared by reference, never copied, never changed. */
 	readonly defs: Readonly<Record<string, CardDef>>;
-}
-
-/**
- * A card whose effects are negated until the end of the turn it names (Infinite Impermanence, Effect Veiler). It is the
- * card as it was when negated (`moves`): a card that was turned face-down, left the field or changed control is a new card
- * and is no longer negated (Konami: Effect Veiler's notes). `stamp` is the place in the order of negations; step 6 folds
- * this list into the one list of timestamped modifiers.
- */
-export interface Negation {
-	readonly card: number;
-	readonly moves: number;
-	/** The number of the turn in which it ends: it lasts until the end of that turn. */
-	readonly until: number;
-	readonly stamp: number;
 }
 
 /** The Summon in progress: it has been attempted and has not succeeded yet (step 5). The monster stays where it was, not on the field. */
@@ -199,7 +199,7 @@ export function createDuel(setup: DuelSetup): Duel {
 		for (const zone of ["deck", "extra"] as const) {
 			for (const code of setup[side][zone] ?? []) {
 				const id = nextId++;
-				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra" };
+				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0 };
 				piles[side][zone].push(id);
 			}
 		}
@@ -224,13 +224,15 @@ export function createDuel(setup: DuelSetup): Duel {
 		setThisTurn: [],
 		options,
 		live: [],
+		lingering: [],
 		waiting: [],
 		building: null,
 		used: NOTHING_USED,
 		lp: { you: STARTING_LP, rival: STARTING_LP },
 		summoning: null,
 		normalSummoned: false,
-		negations: [],
+		modifiers: [],
+		clock: 0,
 		asking: null,
 		batches: 0,
 		defs: setup.defs ?? {},
@@ -291,16 +293,21 @@ export function moveCards(duel: Duel, ids: readonly number[], to: MoveTo): Duel 
 
 function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Duel {
 	const before = instance(duel, id);
+	if (before.zone === "deck" && to.zone === "hand" && locked(duel, "add-to-hand")) return duel;
 	if (to.controller !== undefined && !isOnField(to.zone)) throw new Error("a controller can be chosen only on the field");
 	const zone = before.extraDeck && (to.zone === "deck" || to.zone === "hand") ? "extra" : to.zone;
 	const controller = isOnField(zone) ? (to.controller ?? before.controller) : before.owner;
 	const face = to.face ?? (FACE_DOWN_BY_DEFAULT.has(zone) ? "down" : "up");
 	const flippedDown = isOnField(zone) && before.face === "up" && face === "down";
 	const renewed = zone !== before.zone || controller !== before.controller || flippedDown;
-	const after = { ...before, zone, face, controller, moves: before.moves + (renewed ? 1 : 0) };
-	const moved = place(duel, before, after, to.at ?? "top");
+	// A card that comes face-up on the field starts to apply its continuous effects now (a move in the same zone, face-up, does not restart them).
+	const cameUp = isOnField(zone) && face === "up" && (before.face === "down" || !isOnField(before.zone) || controller !== before.controller);
+	const after = { ...before, zone, face, controller, moves: before.moves + (renewed ? 1 : 0), since: cameUp ? duel.clock + 1 : before.since };
+	const placed = place(duel, before, after, to.at ?? "top");
+	const moved = cameUp ? { ...placed, clock: placed.clock + 1 } : placed;
 	if (!renewed) return moved;
-	return raiseEvent(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}) });
+	const raised = raiseEvent(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}) });
+	return zone === "hand" && before.zone !== "hand" ? raiseEvent(raised, { type: "added-to-hand", card: after, from: before.zone, ...(batch === undefined ? {} : { batch }) }) : raised;
 }
 
 /** Gives control of a card on the field to a player: it becomes a new card for them. Its owner never changes. */
@@ -308,6 +315,7 @@ export function changeControl(duel: Duel, id: number, side: Side): Duel {
 	const before = instance(duel, id);
 	if (!isOnField(before.zone)) throw new Error(`card ${id} is not on the field`);
 	if (before.controller === side) return duel;
-	const after = { ...before, controller: side, moves: before.moves + 1 };
-	return raiseEvent(place(duel, before, after, "top"), { type: "moved", before, after });
+	const after = { ...before, controller: side, moves: before.moves + 1, since: before.face === "up" ? duel.clock + 1 : before.since };
+	const placed = place(duel, before, after, "top");
+	return raiseEvent(before.face === "up" ? { ...placed, clock: placed.clock + 1 } : placed, { type: "moved", before, after });
 }
