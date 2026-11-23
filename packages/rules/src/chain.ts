@@ -1,6 +1,6 @@
 import { type CardInstance, type Duel, type Link, moveCard, other, PHASES, type Side } from "./duel";
 import { breakEffect, dropWhen, raiseEvent } from "./events";
-import { type CardDef, type Effect, speedOf } from "./effects";
+import { type CardDef, type Effect, effectOf, newLink, speedOf } from "./effects";
 import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./triggers";
 
 /**
@@ -157,14 +157,13 @@ function set(duel: Duel, id: number): Duel {
 function activate(duel: Duel, action: Extract<Action, { type: "activate" }>): Duel {
 	const player = duel.priority.holder;
 	const before = duel.cards[action.card]!;
-	const def = duel.defs[before.code]!;
-	const effect = def.effects![action.effect]!;
+	const effect = effectOf(duel, { card: before, effect: action.effect });
 	// A Spell or Trap Card is placed face-up on the field (or flipped face-up); a monster's effect leaves it in place.
 	let next = effect.activates === "card" ? moveCard(duel, before.id, { zone: "spell", face: "up" }) : duel;
 	const card = next.cards[before.id]!;
 	if (effect.cost) next = effect.cost.pay(next, { player, card });
 	next = dropWhen(next);
-	const link: Link = { player, card, effect: action.effect, speed: speedOf(def, effect), targets: action.targets, categories: effect.categories ?? [], activationNegated: false, effectNegated: false };
+	const link = newLink(next, player, card, action.effect, action.targets);
 	return { ...next, chain: [...next.chain, link], priority: { holder: other(player), passed: [], open: false } };
 }
 
@@ -183,9 +182,8 @@ function pass(duel: Duel): Duel {
  * Resolves the whole chain, the last link first. A link whose activation or effect was negated applies nothing. While
  * a link resolves, `duel.chain` still holds it and the links below it. Afterwards, every Spell or Trap Card activated
  * in the chain that is still face-up on the field goes to the Graveyard, negated or not.
- * (When exactly such a card leaves, after its own link or after the whole chain, is not written on a Konami page we
- * could cite: the rulebook only says "After resolving the effect, send the card to the Graveyard." We send them once
- * the chain has resolved; to be confirmed with a Q&A when a card depends on it.)
+ * (When: after the whole chain, not after its own link. Konami's Japanese Q&A says so for Quick-Play Spells and Traps
+ * chained to an effect: rule record `chained-card-after-chain`; the core applies it to every Spell and Trap Card.)
  */
 function resolveChain(duel: Duel): Duel {
 	let next = duel;
@@ -202,8 +200,6 @@ function resolveChain(duel: Duel): Duel {
 	}
 	return next;
 }
-
-const effectOf = (duel: Duel, link: Link): Effect => duel.defs[link.card.code]!.effects![link.effect]!;
 
 /** The next phase, or the other player's next turn after the End Phase. The game state is open, the turn player first. */
 function nextPhase(duel: Duel): Duel {

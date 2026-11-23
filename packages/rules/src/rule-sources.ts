@@ -18,7 +18,7 @@ const read = "2026-11-23";
 const rb10 = (id: string, quote: string): SourceRecord => ({ id, kind: "tcg-rule", url: RB10, read, quote });
 const fet = (id: string, quote: string): SourceRecord => ({ id, kind: "tcg-rule", url: FET, read, quote });
 
-const page = (id: string, url: string, quote: string): SourceRecord => ({ id, kind: "tcg-rule", url, read, quote });
+const konamiPage = (id: string, url: string, quote: string): SourceRecord => ({ id, kind: "tcg-rule", url, read, quote });
 
 export const RULE_SOURCES: readonly SourceRecord[] = [
 	// RB10 p. 45, "Spell Speeds".
@@ -67,17 +67,17 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 	// quote is the cell of the first row; the chart is a table, read across its cells.
 	fet("trigger-after-chain", "If there is an effect that is triggered. Yes The player who did NOT activate the last effect on the Chain. (Follow the normal Chain rules.)"),
 	// UCT7 (Understanding Card Text, part 7), "Timing".
-	page("last-thing-that-happened", UCT7, "it might only be usable in response to a triggering event that was ‘the last thing that happened’."),
+	konamiPage("last-thing-that-happened", UCT7, "it might only be usable in response to a triggering event that was ‘the last thing that happened’."),
 	// UCT7, "The Four Conjunctives": THEN.
-	page("then-is-sequential", UCT7, "THEN: <Do A, then do B> Timeline: B happens after A, even though they’re part of one card effect. These things happen in sequence, not simultaneously."),
+	konamiPage("then-is-sequential", UCT7, "THEN: <Do A, then do B> Timeline: B happens after A, even though they’re part of one card effect. These things happen in sequence, not simultaneously."),
 	// UCT7, "The Four Conjunctives": AND.
-	page("and-is-simultaneous", UCT7, "AND: <Do A and B> Timeline: Considered simultaneous. Both happen at the same time."),
+	konamiPage("and-is-simultaneous", UCT7, "AND: <Do A and B> Timeline: Considered simultaneous. Both happen at the same time."),
 	// UCT7, the Heraldry Change example under THEN.
-	page("then-hides-the-summon", UCT7, "The last thing was NOT a monster being Summoned. Which means neither player can activate cards like Torrential Tribute that activate “WHEN” a monster is Summoned."),
+	konamiPage("then-hides-the-summon", UCT7, "The last thing was NOT a monster being Summoned. Which means neither player can activate cards like Torrential Tribute that activate “WHEN” a monster is Summoned."),
 	// UCT6, on Quickdraw Synchron: "and Special Summon" instead of "then".
-	page("and-keeps-the-timing", UCT6, "it also means that pitching a card and Summoning Quickdraw happen simultaneously. This means that you will not miss the timing for any “when… you can” optional effects of the card you sent to the Graveyard"),
+	konamiPage("and-keeps-the-timing", UCT6, "it also means that pitching a card and Summoning Quickdraw happen simultaneously. This means that you will not miss the timing for any “when… you can” optional effects of the card you sent to the Graveyard"),
 	// R2021, on trigger effects "saved for later".
-	page("saved-trigger-moved", R2021, "BUT its location* changes between the time its Trigger Effect activation is met, and the time it actually has a chance to activate, its effect does not activate."),
+	konamiPage("saved-trigger-moved", R2021, "BUT its location* changes between the time its Trigger Effect activation is met, and the time it actually has a chance to activate, its effect does not activate."),
 	/**
 	 * Konami's Japanese Q&A on "Hieratic Seal of the Heavenly Spheres" (the answer lists Critter, cid 4054, among the cards it
 	 * holds for): a trigger that goes on the chain only after the whole chain has resolved does not activate if
@@ -92,6 +92,76 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 		url: "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=24070&request_locale=ja",
 		read,
 		quote: "②の効果は、リリースされた一連のチェーン処理後に最初に送られたところで発動する効果ですので、リリースされたのち②の効果を発動する前に最初に送られたところから離れている場合には発動しません。",
+	},
+	/**
+	 * Konami's Japanese Q&A on an effect worded "each time" (度に): a trigger effect so worded counts how many times its
+	 * condition was met and can activate that many times (a mandatory one does so every time). Filed under Kshatri-La
+	 * Shangri-La (cid 17800), whose Q&A it is. Only for effects worded "each time"; the pages say nothing for others.
+	 */
+	{
+		id: "each-time-counts-events",
+		kind: "jp-qa",
+		cid: 17800,
+		fid: 24018,
+		url: "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=24018&request_locale=ja",
+		read,
+		quote: "『度に～発動できる』と記載されている誘発効果は、条件を満たした回数を数えてその回数まで発動できます。（必ず発動する効果の場合は条件を満たした回数だけ発動します。）",
+	},
+	/**
+	 * Konami's Japanese Q&A, Yokai beast Q&A (cid 14469): the "each time" effect's condition was met by two separate
+	 * links of one chain, and after that chain it activates twice, on one chain.
+	 */
+	{
+		id: "each-time-across-chain",
+		kind: "jp-qa",
+		cid: 14469,
+		fid: 22573,
+		url: "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=22573&request_locale=ja",
+		read,
+		quote: "②のモンスター効果は同一チェーン上で２回発動します。",
+	},
+	/**
+	 * Konami's Japanese Q&A under Reload (cid 5849): Quick-Play Spell and Trap Cards activated in a chain are sent to
+	 * the Graveyard after the whole chain has been processed, not after their own link. The Q&A is about a Quick-Play
+	 * Spell and Normal Traps chained to a monster effect; the rulebook's "After resolving the effect, send the card to
+	 * the Graveyard" (`spell-to-graveyard`) says nothing about when, and no page we found says it for a Normal Spell
+	 * at Chain Link 1, so the core applies this to every Spell and Trap Card of a chain.
+	 */
+	{
+		id: "chained-card-after-chain",
+		kind: "jp-qa",
+		cid: 5849,
+		fid: 11919,
+		url: "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=11919&request_locale=ja",
+		read,
+		quote: "その発動した魔法・罠カードは一連のチェーン処理が完了した後に墓地へ送られる事になります",
+	},
+	/**
+	 * Konami's Japanese Q&A under Torrential Tribute (cid 5114): a Trap such as Torrential Tribute or Bottomless Trap
+	 * Hole, or a Quick-Play Spell, can be chained to a trigger effect that itself triggered on that Summon.
+	 */
+	{
+		id: "answer-the-summon-in-the-chain",
+		kind: "jp-qa",
+		cid: 5114,
+		fid: 6537,
+		url: "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=6537&request_locale=ja",
+		read,
+		quote: "「 激流葬 」や「 奈落の落とし穴 」等の罠カードや、速攻魔法カードを発動する事ができます。",
+	},
+	/**
+	 * Konami's Japanese Q&A under Torrential Tribute (cid 5114): a monster is Summoned, its owner's trigger effect is
+	 * Chain Link 1, the opponent's Torrential Tribute Chain Link 2, and a hand effect of the owner that also answers the
+	 * Summon Chain Link 3: the Summon stays what chain links answer while the chain is built.
+	 */
+	{
+		id: "answer-the-summon-again",
+		kind: "jp-qa",
+		cid: 5114,
+		fid: 13782,
+		url: "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=13782&request_locale=ja",
+		read,
+		quote: "チェーン１：自分の「 ゴブリンドバーグ 」の効果の発動 チェーン２：相手の「 激流葬 」の発動 チェーン３：自分の「 カゲトカゲ 」の効果の発動",
 	},
 	// FET, introduction.
 	fet("fast-effects-either-turn", "Fast effects can be activated by either player – even during their opponent’s turn, as long as the conditions are appropriate."),

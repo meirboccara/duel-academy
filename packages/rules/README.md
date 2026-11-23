@@ -26,7 +26,7 @@ Step 3 (triggers + missing the timing):
   `raiseEvent`, and `breakEffect`: "something else happened", after which optional "when" triggers have missed the
   timing and a fast effect (`Effect.on`) can no longer answer the earlier events. Effects call it between the parts of
   a "then"; the core calls it before each link resolves, after a cost, before a phase and before a Set.
-- `src/triggers.ts`: `Effect.activates: "trigger"` (with `on`, `mandatory`, `timing: "when" | "if"`, `from`). After a
+- `src/triggers.ts` (with `Building`, the choice in progress): `Effect.activates: "trigger"` (with `on`, `mandatory`, `timing: "when" | "if"`, `from`). After a
   chain resolves, a Set, or the start of a phase, the waiting triggers go on one chain in Konami's order (turn player's
   mandatory, opponent's mandatory, turn player's optional, opponent's optional). The player chooses in any order within
   a group through `legalActions`/`act` (`activate`, and `pass` to decline the rest of their optional effects); a mandatory
@@ -38,17 +38,25 @@ Known limits of step 3 (to be honest about what the tests do not prove):
 - The trigger fixtures are test cards in the provisional effect shape; step 4 replaces the shape.
 - Nothing raises `summoned` yet but a card effect: Summons come with step 8. No attack, destruction or "leaves the field"
   events beyond `moved` (a destruction is a move to the Graveyard; its cause is not recorded).
-- Trigger occurrences are first filtered to those whose card has not moved since, then deduplicated by card and
-  effect: an effect of one card is put on the chain once per trigger point. Whether one effect may activate twice off
-  two separate events at one point is NOT settled by a Konami source we could cite; the once-per-point policy is a
-  choice, to be revisited with the effect records of step 4.
+- Trigger occurrences are first filtered to those whose card has not moved since. An effect worded "each time" (`each:
+  true`) then goes on the chain once for every time its condition was met, as Konami's Japanese Q&A says (records
+  `each-time-counts-events`, `each-time-across-chain`; 24018 and 22573 are about "each time" effects only). Any other effect
+  goes on the chain once per trigger point: no Konami page we found says whether such an effect can activate twice
+  off two events, so the once-per-point policy is a choice, not a ruling. Simultaneous moves are one event each, so an
+  "each time" effect counts a sweep of two cards twice; Konami counts simultaneous sends once. Batched events are not
+  modelled yet.
 - The teaching chain limit stops optional triggers from being offered once the chain is full; mandatory triggers still
   go on the chain (dropping them would change how a card resolves), so a trigger chain can exceed the limit.
-- When a Spell Card goes to the Graveyard after its link (own link, or after the whole chain) is not written on any
-  Konami page we found; and whether a fast effect may answer an event that a trigger chain has already answered
-  (a second response to the same event) is not tested. Both are unresolved.
-- A Quick Effect that "can" activate "when" something happens is only offered while the event is the last thing that
-  happened, in the response windows after the chain or action. It is not treated as a trigger and is not collected.
+- A Spell or Trap Card of a chain goes to the Graveyard after the whole chain (record `chained-card-after-chain`: Konami's
+  Japanese Q&A, about Quick-Play Spells and Traps chained to an effect). No page we found says it for a Normal Spell at
+  Chain Link 1; the core applies it to all of them.
+- An event stays the one that fast effects answer while the chain it triggered is built (a Trap can be Chain Link 2 to
+  the trigger of a Summon, and another response Chain Link 3: records `answer-the-summon-in-the-chain`,
+  `answer-the-summon-again`). That it stops once both pass or after the trigger chain resolves is not worded on a page
+  we found: it follows from "the last thing that happened", and the test says so.
+- An optional "each time" trigger that waits twice is declined as a whole by "pass"; Konami's "up to that many times"
+  does not say how a player declines, so this is a choice. An "each time" effect's targets are not tied to the event
+  that counted (no fixture needs it yet).
 - Where Konami's pages are silent the tests say so in `src/rule-sources.ts`: that a "when" trigger of a card paid as a cost
   misses the timing is derived (cost-not-chainable and the "last thing that happened" rule), not quoted. Konami's
   OCG Q&A orders simultaneous effects by "priority 1/2/3" with different grouping (face-up optional effects before

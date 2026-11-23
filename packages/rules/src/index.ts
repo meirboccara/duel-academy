@@ -7,3 +7,4 @@ export * from "./events";
 export * from "./rng";
 export * from "./rule-sources";
 export * from "./sources";
+export type { Building } from "./triggers";

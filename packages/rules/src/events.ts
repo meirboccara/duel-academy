@@ -1,5 +1,5 @@
-import type { CardInstance, Duel, Phase, Priority, Side } from "./duel";
-import type { Effect } from "./effects";
+import type { CardInstance, Duel, Phase, Side } from "./duel";
+import { type Effect, effectOf } from "./effects";
 
 /**
  * Step 3 of docs/rules-core-spec.md: typed events. Every move of a card raises `moved`; effects raise the others with
@@ -20,24 +20,11 @@ export interface Waiting {
 	readonly event: GameEvent;
 }
 
-/** The trigger effects being put on a chain; the players choose them in turn. */
-export interface Building {
-	/**
-	 * Konami's order: 0 the turn player's mandatory effects, 1 the opponent's mandatory, 2 the turn player's optional,
-	 * 3 the opponent's optional. Within a stage, a player chooses in any order.
-	 */
-	readonly stage: 0 | 1 | 2 | 3;
-	readonly remaining: readonly Waiting[];
-	/** Where priority goes if no trigger ends up on the chain. */
-	readonly after: Priority;
-	readonly added: boolean;
-}
-
 interface Listening {
 	/** The codes of the cards with a trigger effect. */
 	readonly triggers: readonly string[];
-	/** Does any card care about events: trigger effects, or effects that wait for one (`on`)? */
-	readonly any: boolean;
+	/** Does a card care about events: trigger effects, or effects that wait for one (`on`)? */
+	readonly listensToEvents: boolean;
 }
 
 const listening = new WeakMap<object, Listening>();
@@ -46,14 +33,14 @@ function listeners(defs: Duel["defs"]): Listening {
 	let found = listening.get(defs);
 	if (!found) {
 		const triggers: string[] = [];
-		let any = false;
+		let listensToEvents = false;
 		for (const def of Object.values(defs)) {
 			for (const effect of def.effects ?? []) {
 				if (effect.activates === "trigger") triggers.push(def.code);
-				if (effect.activates === "trigger" || effect.on) any = true;
+				if (effect.activates === "trigger" || effect.on) listensToEvents = true;
 			}
 		}
-		found = { triggers, any };
+		found = { triggers, listensToEvents };
 		listening.set(defs, found);
 	}
 	return found;
@@ -73,16 +60,14 @@ function placedFor(card: CardInstance, from: Effect["from"]): boolean {
 	}
 }
 
-export const effectOf = (duel: Duel, waiting: Waiting): Effect | undefined => duel.defs[waiting.card.code]?.effects?.[waiting.effect];
-
 /**
  * Notes that something happened. Each trigger effect whose card is in place and whose condition the event meets is
  * kept in `waiting` until the next trigger point, when it can be put on a chain. The event is also "live": the last
  * thing that happened, which effects that answer an event (`on`) can respond to.
  */
 export function raiseEvent(duel: Duel, event: GameEvent): Duel {
-	const { triggers, any } = listeners(duel.defs);
-	if (!any) return duel;
+	const { triggers, listensToEvents } = listeners(duel.defs);
+	if (!listensToEvents) return duel;
 	let waiting = duel.waiting;
 	if (triggers.length > 0) {
 		for (const card of Object.values(duel.cards)) {
@@ -99,14 +84,14 @@ export function raiseEvent(duel: Duel, event: GameEvent): Duel {
 }
 
 /** Mandatory triggers and "if" triggers stay for the next trigger point, however much happens before it. */
-const keeps = (duel: Duel, waiting: Waiting) => {
+const outlastsBreak = (duel: Duel, waiting: Waiting) => {
 	const effect = effectOf(duel, waiting);
-	return effect?.mandatory === true || effect?.timing === "if";
+	return effect.mandatory === true || effect.timing === "if";
 };
 
 /** Optional "when" triggers wait for nothing else to have happened: forget them (they missed the timing). */
 export function dropWhen(duel: Duel): Duel {
-	return duel.waiting.every((waiting) => keeps(duel, waiting)) ? duel : { ...duel, waiting: duel.waiting.filter((waiting) => keeps(duel, waiting)) };
+	return duel.waiting.every((waiting) => outlastsBreak(duel, waiting)) ? duel : { ...duel, waiting: duel.waiting.filter((waiting) => outlastsBreak(duel, waiting)) };
 }
 
 /**

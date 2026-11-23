@@ -257,3 +257,52 @@ describe("review regressions", () => {
 		expect(chainOf(play(mandatory, "activate forced-a"))).toEqual(["forced-a", "forced-c"]);
 	});
 });
+
+describe("one effect, two events at the same point", () => {
+	const twice = (counter: string) => {
+		const start = position({ defs: triggerCards(), options, you: { hand: ["hit-rival"], set: ["hit-rival-quick"], monsters: [counter] }, rival: { monsters: ["monster", "monster"] } });
+		return play(start, "activate hit-rival", "pass", "activate hit-rival-quick", "pass", "pass");
+	};
+
+	it(`${cites("rules", "each-time-counts-events")} ${cites("rules", "each-time-across-chain")} activates an "each time" trigger once for every time its condition was met, on one chain after the chain that met it twice`, () => {
+		expect(chainOf(twice("each-counter"))).toEqual(["each-counter", "each-counter"]);
+	});
+	// A choice, not a ruling: no Konami page we found says how often an effect not worded "each time" activates here.
+	it(`still puts an effect not worded "each time" on the chain once per trigger point`, () => {
+		expect(chainOf(twice("once-counter"))).toEqual(["once-counter"]);
+	});
+});
+
+describe("Spell Cards of a chain and the Graveyard", () => {
+	it(`${cites("rules", "chained-card-after-chain")} keeps the Spell and Trap Cards of a chain on the field until the whole chain has resolved, those whose links already resolved included`, () => {
+		const log: string[] = [];
+		const start = position({ defs: triggerCards(log), options, you: { hand: ["peek"], set: ["quick-play"] } });
+		const done = play(start, "activate peek", "pass", "activate quick-play", "pass", "pass");
+		// Link 2 (the Quick-Play Spell) resolved first, and was still on the field when link 1 looked.
+		expect(log).toEqual(["quick-play", "peek sees peek,quick-play"]);
+		expect(codes(done, "you", "graveyard").sort()).toEqual(["peek", "quick-play"]);
+		expect(codes(done, "you", "spell")).toEqual([]);
+	});
+});
+
+describe("answering a Summon whose trigger is on the chain", () => {
+	const start = () => position({ defs: triggerCards(), options, you: { hand: ["summon-and", "monster"], set: ["tribute-b"], monsters: ["summon-watcher"] }, rival: { set: ["tribute"] } });
+	const triggered = () => play(start(), "activate summon-and", "pass", "pass");
+
+	it(`${cites("rules", "answer-the-summon-in-the-chain")} ${cites("rules", "answer-the-summon-again")} lets a "when a monster is Summoned" Trap be chained to the trigger effect of that Summon, and lets another be chained after it`, () => {
+		const chained = triggered();
+		expect(chainOf(chained)).toEqual(["summon-watcher"]);
+		expect(offered(chained)).toEqual(["activate tribute", "pass"]);
+		const answered = play(chained, "activate tribute");
+		expect(chainOf(answered)).toEqual(["summon-watcher", "tribute"]);
+		expect(answered.priority.holder).toBe("you");
+		expect(offered(answered)).toEqual(["activate tribute-b", "pass"]);
+	});
+	// No Konami page we found says this case in words; it follows from "the last thing that happened".
+	it(`${cites("rules", "last-thing-that-happened")} no longer lets it be activated once the trigger chain has resolved`, () => {
+		const resolved = play(triggered(), "pass", "pass");
+		expect(resolved.chain).toEqual([]);
+		expect(offered(resolved)).toEqual(["pass"]);
+		expect(offered(play(resolved, "pass"))).toEqual(["pass"]);
+	});
+});

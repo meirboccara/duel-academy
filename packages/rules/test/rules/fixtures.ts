@@ -254,6 +254,9 @@ export function triggerCards(log: string[] = []): Record<string, CardDef> {
 			kind: "trap",
 			effects: [{ activates: "card", on: (_duel, event) => event.type === "summoned", resolve: (duel) => (log.push("tribute"), duel) }],
 		},
+		{ code: "tribute-b", kind: "trap", effects: [{ activates: "card", on: (_duel, event) => event.type === "summoned", resolve: (duel) => (log.push("tribute-b"), duel) }] },
+		// "When a monster is Summoned" (mandatory), the trigger that Torrential Tribute answers.
+		{ code: "summon-watcher", kind: "monster", effects: [{ activates: "trigger", mandatory: true, on: (_duel, event) => event.type === "summoned", resolve: logs("summon-watcher") }] },
 		{ code: "monster", kind: "monster" },
 		// "During your Standby Phase" (both players' monsters answer to the turn's Standby Phase, so any side's card may use it).
 		...[true, false].map((mandatory): CardDef => {
@@ -282,6 +285,24 @@ export function triggerCards(log: string[] = []): Record<string, CardDef> {
 		},
 		// A mandatory trigger whose cost banishes the card itself.
 		sentBy("forced-exile", true, "when", { cost: { pay: (duel, { card }) => moveCard(duel, card.id, { zone: "banished" }) } }),
+		// "Send 1 monster your opponent controls to the GY" (the rival's, whoever activates it): a Spell and a Quick-Play Spell.
+		...(["hit-rival", "hit-rival-quick"] as const).map((code): CardDef => ({
+			code,
+			kind: code === "hit-rival" ? "spell" : "quick-play",
+			effects: [{ activates: "card", resolve: (duel) => (duel.piles.rival.monster[0] === undefined ? duel : moveCard(duel, duel.piles.rival.monster[0], { zone: "graveyard" })) }],
+		})),
+		// "Each time a monster you do not control is sent to the GY" (mandatory), and the same without "each time".
+		...([true, false] as const).map((each): CardDef => {
+			const code = each ? "each-counter" : "once-counter";
+			return {
+				code,
+				kind: "monster",
+				effects: [{ activates: "trigger", mandatory: true, each, on: (_duel, event, { card }) => event.type === "moved" && event.before.zone === "monster" && event.after.zone === "graveyard" && event.after.controller !== card.controller, resolve: logs(code) }],
+			};
+		}),
+		// Writes what its controller's Spell & Trap Zones hold while it resolves.
+		{ code: "peek", kind: "spell", effects: [{ activates: "card", resolve: (duel) => (log.push(`peek sees ${duel.piles.you.spell.map((id) => duel.cards[id]!.code).sort().join(",")}`), duel) }] },
+		{ code: "quick-play", kind: "quick-play", effects: [{ activates: "card", resolve: logs("quick-play") }] },
 		// "Banish all cards in both Graveyards."
 		{ code: "vacuum", kind: "spell", effects: [{ activates: "card", resolve: banishGraveyards }] },
 		// A mandatory trigger that banishes both Graveyards as its cost.

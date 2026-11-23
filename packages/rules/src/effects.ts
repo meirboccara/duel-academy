@@ -44,6 +44,12 @@ export interface Effect {
 	 * does not (default "when"). A mandatory trigger never misses it.
 	 */
 	readonly timing?: "when" | "if";
+	/**
+	 * Trigger worded "each time ...": it activates once for every time its condition was met at the trigger point, not
+	 * once (Konami's Japanese Q&A, rule records `each-time-counts-events` and `each-time-across-chain`). Without it, the
+	 * core puts the effect on the chain once per point: no Konami page we found settles the other case.
+	 */
+	readonly each?: boolean;
 	/** What the effect would do, frozen on the link ("search", "draw"...). */
 	readonly categories?: readonly string[];
 	/** The activation condition, over the duel and its chain. Absent: always met. */
@@ -77,4 +83,16 @@ export function speedOf(def: CardDef, effect: Effect): SpellSpeed {
 	if (effect.activates === "effect") return effect.speed ?? 1;
 	if (def.kind === "counter-trap") return 3;
 	return def.kind === "spell" ? 1 : 2;
+}
+
+/** The effect a link or a waiting trigger points at: the card's code and the effect's index in its card. */
+export const effectOf = (duel: Duel, from: { readonly card: CardInstance; readonly effect: number }): Effect => duel.defs[from.card.code]!.effects![from.effect]!;
+
+/**
+ * A link for an activation, holding the card as it is when activated (placed, before the cost): used for card and effect
+ * activations in chain.ts and for triggers in triggers.ts.
+ */
+export function newLink(duel: Duel, player: Side, card: CardInstance, index: number, targets: readonly number[]): Link {
+	const effect = effectOf(duel, { card, effect: index });
+	return { player, card, effect: index, speed: speedOf(duel.defs[card.code]!, effect), targets, categories: effect.categories ?? [], activationNegated: false, effectNegated: false };
 }

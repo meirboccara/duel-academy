@@ -1,5 +1,6 @@
 import type { CardDef, SpellSpeed } from "./effects";
-import { type Building, type GameEvent, raiseEvent, type Waiting } from "./events";
+import { type GameEvent, raiseEvent, type Waiting } from "./events";
+import type { Building } from "./triggers";
 import { createRng } from "./rng";
 
 /**
