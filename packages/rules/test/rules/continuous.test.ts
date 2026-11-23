@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { atk, cites, def, isNegated, level, locked, originalAtk } from "../../src";
-import { moveCard } from "../../src";
+import { type Duel, type Link, moveCard } from "../../src";
 import { nextTurn, toPhase } from "./continuous-fixtures";
 import { codes, offered, play, position, REAL_CARDS } from "./fixtures";
 import { continuousCards } from "./continuous-fixtures";
@@ -148,11 +148,20 @@ describe("control changes that last", () => {
 		const sent = play(asked, "choose huge");
 		expect(codes(sent, "rival", "graveyard")).toContain("huge");
 	});
-	it("a monster cannot be taken onto a field with no free Monster Zone (zones are step 7: the core's reading)", () => {
-		const start = position({ defs: all, options, you: { hand: ["take-control"], monsters: ["big", "big", "big", "big", "big"] }, rival: { monsters: ["huge"] } });
-		const tried = play(start, "activate take-control > huge", "pass", "pass");
-		expect(codes(tried, "rival", "monster")).toEqual(["huge"]);
-		expect(tried.modifiers).toEqual([]);
+	// YGOProJudge only (chat, asked 2026-11-23, no source cited): with no free Main Monster Zone the card cannot be activated; if the
+	// zones fill up before it resolves, the monster is destroyed by the game's rules and sent to the Graveyard.
+	it("a card that takes control cannot be activated with no free Main Monster Zone (YGOProJudge lead)", () => {
+		const start = position({ defs: all, options, you: { set: ["take-control"], monsters: ["big", "big", "big", "big", "big"] }, rival: { monsters: ["huge"] } });
+		expect(offered(start)).not.toContain("activate take-control > huge");
+	});
+	it("a monster taken when no Main Monster Zone is left by then is destroyed and sent to its owner's Graveyard (YGOProJudge lead)", () => {
+		const fill = { ...all, "fill-zone": { code: "fill-zone", kind: "trap" as const, effects: [{ type: "activation" as const, operation: (duel: Duel, link: Link) => moveCard(duel, duel.piles[link.player].hand[0]!, { zone: "monster", face: "up" }) }] } };
+		const start = position({ defs: fill, options, you: { hand: ["small"], set: ["take-control", "fill-zone"], monsters: ["big", "big", "big", "big"] }, rival: { monsters: ["huge"] } });
+		// Chain Link 1: take-control; Chain Link 2: you fill your last Main Monster Zone; then take-control resolves with no zone left.
+		const done = play(start, "activate take-control > huge", "pass", "activate fill-zone", "pass", "pass");
+		expect(codes(done, "you", "monster")).toHaveLength(5);
+		expect(codes(done, "rival", "graveyard")).toEqual(["huge"]);
+		expect(done.modifiers.filter((modifier) => modifier.layer.kind === "control")).toEqual([]);
 	});
 	it("a monster that left the field before the End Phase does not come back to its owner's field", () => {
 		const start = position({ defs: all, options, you: { hand: ["take-control", "offer-up"] }, rival: { monsters: ["huge"] } });

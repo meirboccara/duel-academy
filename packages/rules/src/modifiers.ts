@@ -101,8 +101,11 @@ function giveBack(duel: Duel, ending: readonly Modifier[], choose: boolean): Due
 export function takeControl(duel: Duel, id: number, side: Side, until: number): Duel {
 	const before = duel.cards[id]!;
 	const zones = freeSlots(duel, side, "monster");
-	// With no free Main Monster Zone the card cannot come over (the core's reading, no Konami page read).
-	if (before.zone !== "monster" || before.controller === side || zones.length === 0) return duel;
+	if (before.zone !== "monster" || before.controller === side) return duel;
+	// With no free Main Monster Zone left when it resolves, the monster is destroyed by the game's rules and sent to its owner's
+	// Graveyard; a card that takes control needs a free zone to be activated at all (its condition). YGOProJudge's chat answer only
+	// (asked 2026-11-23, no source cited).
+	if (zones.length === 0) return destroyCard(duel, id);
 	// The player taking it chooses a free Main Monster Zone, also for a monster in an Extra Monster Zone (record `control-extra-zone-to-main`).
 	const take = (board: Duel, slot: number) => {
 		const taken = changeControl(board, id, side, slot);

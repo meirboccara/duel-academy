@@ -36,5 +36,17 @@ export const BATTLE_SOURCES: readonly SourceRecord[] = [
 	rule("attack-is-no-chain-action", FET, "Declare an attack"),
 	// OCG only: Konami's Japanese notes for Infinite Impermanence (cid 13631, dated 2021-05-15) and Solemn Strike (cid 12187, dated 2025-02-21).
 	{ id: "impermanence-not-in-damage-step", kind: "jp-notes", cid: 13631, url: notesUrl(13631), read, quote: "■ダメージステップ中には発動できません。" },
+	// OCG only. Konami's Japanese Q&A (fid 23968, 2025-01-25, listed under Superheavy Samurai Big Benkei, cid 11222): a monster attacking in
+	// Defense Position whose permission to do so is negated in the Damage Step, before damage calculation, can no longer attack: no damage
+	// calculation, the Damage Step ends. Applied by analogy to an attacker changed to Defense Position.
+	{
+		id: "defense-attacker-stops",
+		kind: "jp-qa",
+		cid: 11222,
+		fid: 23968,
+		url: "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=23968&request_locale=ja",
+		read,
+		quote: "ダメージステップに入ってからダメージ計算までの間に無効化された場合、その「 スケアクロー・クシャトリラ 」は攻撃を行えなくなり、ダメージ計算は行われずに、ダメージステップが終了します。",
+	},
 	{ id: "solemn-strike-in-damage-step", kind: "jp-notes", cid: 12187, url: notesUrl(12187), read, quote: "■ダメージステップでも発動できます。" },
 ];

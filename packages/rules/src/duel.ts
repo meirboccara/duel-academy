@@ -478,15 +478,18 @@ function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Du
 /**
  * Step 8: a monster turned face-down where it stands is a new card for what was applied to it (step 5: a negation ends), but it is
  * still the monster a control change "until the End Phase" must give back, and still the monster an attack in progress is about
- * (RB10: a replay needs the target removed or a new monster, record `replay-causes`). The control change following the flip is the
- * core's reading: no Konami page read, and YGOProJudge could not be asked (step 6's sources list the Konami Q&A on it as not read).
+ * (RB10: a replay needs the target removed or a new monster, record `replay-causes`), and still the monster that declared an attack
+ * this turn (it cannot attack again once face-up). The control change following the flip rests on
+ * YGOProJudge's chat answer only (asked 2026-11-23, no source cited); step 6's sources list the Konami Q&A on it as not read.
  */
 function keptThroughFlip(duel: Duel, id: number, was: number, now: number): Duel {
 	const same = (ref: CardRef): CardRef => (ref.id === id && ref.moves === was ? { id, moves: now } : ref);
 	const taken = (modifier: Modifier): boolean => modifier.layer.kind === "control" && typeof modifier.affects !== "function" && modifier.affects.card === id && modifier.affects.moves === was;
 	const modifiers = duel.modifiers.some(taken) ? duel.modifiers.map((modifier) => (taken(modifier) ? { ...modifier, affects: { card: id, moves: now } } : modifier)) : duel.modifiers;
 	const battle = duel.battle ? { ...duel.battle, attacker: same(duel.battle.attacker), target: duel.battle.target && same(duel.battle.target), defenders: duel.battle.defenders.map(same) } : null;
-	return modifiers === duel.modifiers && battle === null ? duel : { ...duel, modifiers, battle };
+	// It is still the card that declared an attack this turn (YGOProJudge's chat answer only, asked 2026-11-23, no source cited).
+	const attacked = duel.attacked.some((ref) => ref.id === id && ref.moves === was) ? duel.attacked.map(same) : duel.attacked;
+	return modifiers === duel.modifiers && battle === null && attacked === duel.attacked ? duel : { ...duel, modifiers, battle, attacked };
 }
 
 /** Step 8: the Xyz Materials attached to the monster `id`, in the order they were attached. */

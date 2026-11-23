@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { act, cites, legalActions, loseLp, PASS, type Duel } from "../../src";
+import { act, changePosition, cites, flipFaceDown, flipFaceUp, legalActions, loseLp, PASS, type Duel } from "../../src";
 import { battleCards, toStep } from "./battle-fixtures";
 import { nextTurn } from "./continuous-fixtures";
 import { codes, offered, play, position, type SideSpec } from "./fixtures";
@@ -40,6 +40,18 @@ describe("declaring an attack", () => {
 		expect(attacks(done)).toEqual([]);
 		// On your next turn it may attack again.
 		expect(attacks(toBattlePhase(nextTurn(done, 5)))).toEqual(["attack big directly"]);
+	});
+});
+
+// YGOProJudge only (chat, asked 2026-11-23, no source cited): turned face-down and face-up again where it stands, the monster is
+// still the card that declared an attack this turn.
+describe("a monster that attacked and was turned face-down and face-up again (YGOProJudge lead)", () => {
+	it("cannot declare another attack that turn", () => {
+		const done = play(battle({ monsters: ["big"] }), "attack big directly");
+		const id = done.piles.you.monster[0]!;
+		const again = flipFaceUp(flipFaceDown(done, id), id, "attack");
+		expect(again.cards[id]!.face).toBe("up");
+		expect(attacks(again)).toEqual([]);
 	});
 });
 
@@ -190,6 +202,15 @@ describe("what can be activated in the Damage Step", () => {
 		// The attacker is gone: no damage calculation, no damage.
 		expect(over.lp).toEqual({ you: 8000, rival: 6500 });
 		expect(codes(over, "rival", "monster")).toEqual(["big"]);
+	});
+	it(`${cites("rules", "defense-attacker-stops")} an attacker changed to Defense Position before damage calculation can no longer attack: no damage calculation, the Damage Step ends`, () => {
+		const start = battle({ monsters: ["big"] }, { monsters: ["small"] }, every);
+		const before = toStep(play(start, "attack big > small"), "before");
+		const attacker = before.battle!.attacker.id;
+		const turned = changePosition(before, attacker, "defense");
+		const over = toStep(turned, null);
+		expect(over.lp).toEqual({ you: 8000, rival: 8000 });
+		expect([codes(over, "you", "monster"), codes(over, "rival", "monster")]).toEqual([["big"], ["small"]]);
 	});
 	it(`${cites("rules", "damage-step-activation-limit")} ${cites("rules", "damage-atk-vs-atk")} an ATK change before damage calculation changes the result (ATK is read at damage calculation)`, () => {
 		const start = battle({ monsters: ["huge"] }, { monsters: ["big"], set: ["shrink"] }, every);

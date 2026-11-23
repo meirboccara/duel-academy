@@ -143,9 +143,12 @@ function damageCalculation(duel: Duel): Duel {
 	const defenderSide = other(attackerSide);
 	// A monster that left during the Damage Step does not battle: the attack ends with no damage calculation (the core's reading:
 	// "battled" needs damage calculation, record `battled-needs-calc`). A target flipped face-up still has its flip raised.
-	// An attacker changed to Defense Position in the Damage Step still battles with its ATK: no page read on it, and no card of
-	// ours changes battle positions yet (step 8).
-	if (!standing(duel, battle.attacker, attackerSide) || (battle.target && !standing(duel, battle.target, defenderSide))) return enter(duel, "end", raiseFlip);
+	// An attacker no longer face-up in Attack Position can no longer attack: no damage calculation, the Damage Step ends (Konami's
+	// Japanese Q&A on a Defense Position attacker whose permission is negated, record `defense-attacker-stops`, OCG only, applied by
+	// analogy; no card of ours lets a monster attack in Defense Position yet).
+	const attackerCard = duel.cards[battle.attacker.id]!;
+	const canStillAttack = attackerCard.face === "up" && attackerCard.position === "attack";
+	if (!standing(duel, battle.attacker, attackerSide) || !canStillAttack || (battle.target && !standing(duel, battle.target, defenderSide))) return enter(duel, "end", raiseFlip);
 	const attacker = duel.cards[battle.attacker.id]!;
 	const target = battle.target ? duel.cards[battle.target.id]! : null;
 	const power = atk(duel, attacker.id);

@@ -1,4 +1,4 @@
-import { addModifier, ask, moveCard, takeControl, type CardDef, type Duel, type EffectRecord, type Layer, other, targetsOf } from "../../src";
+import { addModifier, ask, freeSlots, moveCard, takeControl, type CardDef, type Duel, type EffectRecord, type Layer, other, targetsOf } from "../../src";
 import { play } from "./fixtures";
 
 /** Passes until the phase `phase` of the current turn (the game state open). */
@@ -93,6 +93,8 @@ export function continuousCards(log: string[] = []): Record<string, CardDef> {
 			effects: [
 				{
 					type: "activation",
+					// It needs a free Main Monster Zone to be activated (YGOProJudge lead, see takeControl).
+					condition: (duel, { player }) => freeSlots(duel, player, "monster").length > 0,
 					target: (duel, { player }) => duel.piles[other(player)].monster.filter((id) => duel.cards[id]!.face === "up"),
 					operation: (duel, link) => {
 						const target = targetsOf(duel, link)[0];

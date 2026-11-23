@@ -17,9 +17,9 @@ const monster = (duel: Duel, code: string, side: "you" | "rival" = "you") => car
 const summons = (duel: Duel) => offered(duel).filter((label) => label.startsWith("special-summon"));
 
 describe("a monster turned face-down is still the monster an earlier ruling of the turn was about", () => {
-	// Konami's notes give the return in the End Phase; that turning the monster face-down does not stop it is the core's reading
-	// (no Konami page read, YGOProJudge not asked). Before the fix the monster stayed with the player who took it, for good.
-	it(`${cites("rules", "control-until-end-phase")} a monster taken until the End Phase and turned face-down by an effect still goes back to its owner (the flip: the core's reading, no source)`, () => {
+	// Konami's notes give the return in the End Phase; that turning the monster face-down does not stop it is YGOProJudge's chat
+	// answer only (asked 2026-11-23, no source cited; no Konami page read). Before the fix the monster stayed with the player who took it, for good.
+	it(`${cites("rules", "control-until-end-phase")} a monster taken until the End Phase and turned face-down by an effect still goes back to its owner (the flip: YGOProJudge lead only)`, () => {
 		const { duel } = board({ you: { monsters: ["lv1", "lv1", "lv1", "lv1"] }, rival: { monsters: ["lv4"] } });
 		const id = monster(duel, "lv4", "rival").id;
 		let next = flipFaceDown(takeControl(duel, id, "you", duel.turn.number), id);

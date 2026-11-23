@@ -42,7 +42,7 @@ Known limits of step 3 (to be honest about what the tests do not prove):
   true`) then goes on the chain once for every time its condition was met, as Konami's Japanese Q&A says (records
   `each-time-counts-events`, `each-time-across-chain`; 24018 and 22573 are about "each time" effects only). Any other effect
   goes on the chain once per trigger point: no Konami page we found says whether such an effect can activate twice
-  off two events, so the once-per-point policy is a choice, not a ruling.
+  off two events; YGOProJudge's chat agrees (asked 2026-11-23, no source cited).
 - Cards moved at the same time by one effect (`moveCards`, events sharing a `batch`) are one occurrence for an "each time"
   effect (record `simultaneous-counts-once`: Konami's Japanese Q&A on Zeta Reticulant, two monsters banished at once, one
   activation; fid 6888 says the same for five cards). Separate moves (`moveCard`, or two links) count separately. A card
@@ -55,7 +55,7 @@ Known limits of step 3 (to be honest about what the tests do not prove):
   go on the chain (dropping them would change how a card resolves), so a trigger chain can exceed the limit.
 - A Spell or Trap Card of a chain goes to the Graveyard after the whole chain (record `chained-card-after-chain`: Konami's
   Japanese Q&A, about Quick-Play Spells and Traps chained to an effect). No page we found says it for a Normal Spell at
-  Chain Link 1; the core applies it to all of them.
+  Chain Link 1; the core applies it to all of them, and YGOProJudge's chat agrees (asked 2026-11-23, no source cited).
 - An event stays the one that fast effects answer while the chain it triggered is built (a Trap can be Chain Link 2 to
   the trigger of a Summon, and another response Chain Link 3: records `answer-the-summon-in-the-chain`,
   `answer-the-summon-again`). That it stops once both pass or after the trigger chain resolves is not worded on a page
@@ -127,7 +127,7 @@ Known limits of step 4 (what the tests do not prove):
   the first way when it only needs to know whether there is one). A record with `targetCount` and no `target` is a
   definition error and throws when the effect is read. No real card of ours needs several targets yet.
 - A target counts as the same card only while it has not moved (`targetsOf` compares `moves` with the value frozen on the
-  link); that a card that left and came back is no longer "that target" is the core's reading, no Konami page found.
+  link); that a card that left and came back is no longer "that target" has no Konami page; YGOProJudge's chat agrees (asked 2026-11-23, no source cited).
 - Every link freezes `answers`, the link on top of the chain when it was activated (`null` for Chain Link 1 and for trigger
   effects put on a chain at a trigger point, which answer nothing), and Ash Blossom & Joyous Spring negates that link. Chain links only go on top, so nothing can sit between Ash and the link it answered; the test for it is structural (it would pass with the old
   `index - 1`) and says so; the
@@ -142,8 +142,8 @@ Known limits of step 4 (what the tests do not prove):
   it would not play as printed. It waits for step 6 (its event, Draw Phase exception and cost are easy to write as a record).
 - Ash Blossom & Joyous Spring answers `search`, `summon-from-deck` and `send-from-deck` only: the printed list. Drawing is
   not on it. Academy's old engine also lets Ash answer a draw; that is a difference of data, not settled here.
-- Pot of Greed needs 2 cards in the Deck (kept from the old engine; no Konami page read). Link Spider needs a Normal Monster
-  of Level 4 or lower in the hand to be activated (an analogy with `search-needs-a-card`; no Konami page read).
+- Pot of Greed needs 2 cards in the Deck, and Link Spider a Level 4 or lower Normal Monster in the hand (and a free zone it
+  points to), to be activated: no Konami page read; YGOProJudge's chat agrees (asked 2026-11-23, no source cited) on both.
 - Mystical Space Typhoon cannot target itself and "destroys" with `destroyCard` (the `moved` event carries `reason: "destroyed"`). The
   rulings of its Q&A that need a card on the field after the cost (Xyz Reborn) are only in the step 2 rule records.
 - The cost dry run makes the listing 1.5 to 2× slower (BASELINE.md). `act` now checks an action by listing only what its own
@@ -231,7 +231,9 @@ Step 6 (continuous effects, as one list of timestamped modifiers; design in `doc
   answer what a link of the chain that has just resolved raised, in the first window after it (`Duel.lingering`; Droll's notes).
 - Control: `takeControl(duel, id, side, until)` moves the card (control stays physical, design D3) and adds a `control` modifier;
   as the End Phase of turn `until` begins, `returnControl` gives the card back if it is still the card taken (sent to the Graveyard
-  if its owner has no free Monster Zone: the core's reading). A card cannot be taken onto a full field.
+  if its owner has no free Monster Zone). With no free Main Monster Zone when it resolves, the monster taken is destroyed and
+  sent to its owner's Graveyard, and a card that takes control should not be activated with none (its condition): YGOProJudge's
+  chat answer only (asked 2026-11-23, no source cited).
 - `EffectRecord.stays`: a Continuous Spell or Trap Card stays on the field after its chain (Skill Drain).
 - `src/cards/`: Shrink, Muka Muka, Skill Drain, Droll & Lock Bird. `bench/continuous.bench.ts` and the step 6 table in BASELINE.md.
 
@@ -240,7 +242,7 @@ Known limits of step 6 (what the tests do not prove):
   those Q&As (Sacrifice, Megamorph: step 7). Two Konami cases are **not** modelled (design D2, an `it.todo`): an older *lasting*
   change of the original ATK (Gale, Apollousa's own effect) does not come back when a later one (Shrink) ends; the core brings back
   whatever still applies.
-- ATK and DEF are clamped at 0: the old engine does so; no Konami page read. The Level query (set, then add, in stamp order) is
+- ATK and DEF are clamped at 0 after every gain and loss is added (500 - 1000 + 700 = 200): no Konami page read; YGOProJudge's chat agrees (asked 2026-11-23, no source cited). The Level query (set, then add, in stamp order) is
   YGOProJudge's lead only (no source cited) and has no floor (a Level can go below 1); a Link monster's Level is not modelled (no
   `link` fact yet).
 - Which cards cannot be activated under Droll's lock (`requiresAddToHand`) is YGOProJudge's answer for Terraforming and Pot of Greed
@@ -249,8 +251,8 @@ Known limits of step 6 (what the tests do not prove):
 - `lingering` keeps the `added-to-hand` events the links of the chain raised, for the first window after the chain only; it is cleared by the next
   break or activation. Only Droll uses it.
 - From step 7 the players choose the zones of a taken and a returning monster. A returning monster with no free Main Monster Zone
-  is destroyed (YGOProJudge only); the refusal to take onto a full field is the core's reading (no Konami page read). A taken monster
-  that was turned face-down: not read.
+  is destroyed (YGOProJudge only), and so is a monster taken when no zone is left (YGOProJudge only). A taken monster
+  that was turned face-down still goes back (see step 8's limits: YGOProJudge only).
 - Two negators that negate each other: a card being asked about counts as not negated (no Konami page; the guard only stops a loop).
 - Modifier durations are turn numbers; the Damage Step's durations come with the battle step.
 - `atk` on a board with continuous sources walks the field each time (0.007 ms in the bench): fine for damage calculation, worth a
@@ -284,10 +286,12 @@ Known limits of step 6b (what the tests do not prove):
 - Changing battle positions, Flip Summons and FLIP effects as such are step 8 (the `flipped` event exists; a FLIP card is a trigger on
   it). Negate Attack and "end the Battle Phase" are not modelled (YGOProJudge lead in `docs/rules-core/battle/ygoprojudge-leads.json`).
 - Modifiers still end with the turn; "until the end of the Damage Step" durations are not modelled (no card needs them yet).
-- A monster that leaves during the Damage Step ends the attack with no damage calculation (the core's reading of "the monster
-  battled" needing damage calculation; no page read on what else happens).
-  A target flipped face-up still has its flip raised then. An attacker changed to Defense Position during the Damage Step still
-  battles with its ATK: no page read (no card of ours changes battle positions before step 8).
+- A monster that leaves during the Damage Step ends the attack with no damage calculation, the other has not battled, and the
+  Damage Step goes to its end: no Konami page read; YGOProJudge's chat agrees (asked 2026-11-23, no source cited).
+  A target flipped face-up still has its flip raised then. An attacker that is no longer face-up in Attack Position at damage
+  calculation (changed to Defense Position, turned face-down) can no longer attack: no damage calculation, the Damage Step ends.
+  Source: Konami's Japanese Q&A on a Defense Position attacker whose permission is negated (fid 23968, OCG only), applied by
+  analogy (record `defense-attacker-stops`). YGOProJudge gave two contradicting answers (DEF used; attack stops), no source.
 - Konami's worked Damage Step examples (design slice 20) are not scripted as one test; each timing has its own test.
 
 Step 7 (zones; plan in `docs/rules-core/step7/design.md`, sources in `docs/rules-core/step7/sources.md`, records in
@@ -334,7 +338,7 @@ Known limits of step 7 (what the tests do not prove):
   (Link Spider moves the monster; no `summoned` event for a Summon by effect yet) come then. Moving a monster to another zone by an
   effect, and zone-locking effects, are not modelled.
 - A Summon whose chosen zone was taken during its window goes to the first free Main Monster Zone (the core's reading, no page
-  read); a Field Spell given to a player replaces theirs, as placing one does (RB10's one Field Spell a side).
+  read; YGOProJudge says a Normal Summon's zone cannot become taken, since nothing can respond to the Summon itself); a Field Spell given to a player replaces theirs, as placing one does (RB10's one Field Spell a side).
 - `moveCard` is the low-level move: it checks occupancy, not the Extra Monster Zone rules (one per player), which belong to the
   Summon (`summonZones`). Test boards may put a player in both Extra Monster Zones.
 - Equip Cards: only Equip Spells, with the relation set by the card's own operation; equip limits ("equip only to a monster you
@@ -344,7 +348,8 @@ Known limits of step 7 (what the tests do not prove):
 Step 8 (Summon procedures as data; plan in `docs/rules-core/step8/design.md`, sources in `docs/rules-core/step8/sources.md`, records in
 `src/summon-sources.ts`):
 - `src/procedures.ts`. A procedure is data on the card (`CardDef.procedure`; `facts` gains `tuner`, `rank`, `link`, frame `ritual`):
-  `synchro` (1 Tuner + 1 or more non-Tuners, or the card's own filters; the Levels add up), `xyz` (2 monsters whose Level is the
+  `synchro` (1 Tuner + 1 or more non-Tuners, or the card's own filters; the Levels add up, a Level changed by an effect counting
+  as changed: no Konami page read, YGOProJudge's chat agrees, asked 2026-11-23, no source cited), `xyz` (2 monsters whose Level is the
   Rank, or the card's count and filter; `alternatives` for "you can also Xyz Summon this card by using...", with `transfer`), `link`
   (the card's count and filter; the materials count for the Link Rating, a Link Monster for 1 or its Rating), `fusion` (the listed
   materials; `contact` for a Fusion Monster Summoned by sending its materials away with no card effect), `ritual`. One search serves
@@ -406,13 +411,13 @@ Known limits of step 8 (what the tests do not prove):
   never offered a Normal Summon or Set.
 - A monster turned face-down where it stands is a new card for what was applied to it (step 5), but it still goes back to its owner
   when a control change "until the End Phase" ends, and an attack on it goes on with no replay (RB10's replay causes): the control
-  part is the core's reading, with no Konami page read and YGOProJudge not asked (its Q&A is listed as not read in step 6's
-  sources). A monster that attacked and was turned face-down and face-up again may attack again (`Duel.attacked` is by card as it
-  was): not read either.
-- A change of control keeps `arrived`, so a monster taken this turn may change position by hand (no page read). Any declared attack
+  part rests on YGOProJudge's chat answer only (asked 2026-11-23, no source cited; Konami's Q&A on it is listed as not read in step 6's sources). A monster that attacked and was turned face-down and face-up again where it stands cannot attack again that turn (YGOProJudge's
+  chat answer only, asked 2026-11-23, no source cited); one that left the field and came back is a new card and may.
+- A change of control keeps `arrived`, so a monster taken this turn may change position by hand (no Konami page read; YGOProJudge's chat agrees (asked 2026-11-23, no source cited)). Any declared attack
   stops the change of position for the rest of the turn, in Main Phase 2 as RB10 says (the attack being negated is not looked at).
 - The monster of a Summon whose zone was taken during its window goes to the first zone it may still use; with none left the Summon
-  fails and the monster is sent to the Graveyard without reaching the field, its stacked Xyz Materials with it (the core's reading). All monsters of a Pendulum Summon are negated together.
+  fails and the monster is sent to the Graveyard without reaching the field, its stacked Xyz Materials with it (the core's reading;
+  YGOProJudge says a Normal Summon's zone cannot become taken). All monsters of a Pendulum Summon are negated together.
 - A card that every legal set of materials needs is taken without asking, and the player is asked for a zone only when there are
   two or more: a choice of the core for fewer questions, not a rule. A `place` lists `positions` even when there is one (a Link
   Monster), and a monster in a Spell & Trap Zone (a Pendulum Monster in its Pendulum Zone) can be Special Summoned by an effect.
