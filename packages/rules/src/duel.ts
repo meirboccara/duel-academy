@@ -1,3 +1,4 @@
+import type { CardDef, SpellSpeed } from "./effects";
 import { createRng } from "./rng";
 
 /**
@@ -27,17 +28,89 @@ export interface CardInstance {
 	readonly extraDeck: boolean;
 }
 
+/** Step 2 only tells a Main Phase from the others; steps inside the Battle Phase come later. */
+export type Phase = "draw" | "standby" | "main1" | "battle" | "main2" | "end";
+export const PHASES: readonly Phase[] = ["draw", "standby", "main1", "battle", "main2", "end"];
+
+/**
+ * One activation on the chain (step 2 of docs/rules-core-spec.md). Link 1 is `chain[0]`; the last link is the top.
+ * Everything a later link or the resolution needs is frozen here when the card or effect is activated.
+ */
+export interface Link {
+	/** Who activated it. */
+	readonly player: Side;
+	/** The card as it was when activated (placed face-up for a card activation, before any cost): id, zone, `moves`. */
+	readonly card: CardInstance;
+	/** Which effect of the card: its index in the card's `effects`. */
+	readonly effect: number;
+	readonly speed: SpellSpeed;
+	/** The cards chosen as targets at activation. */
+	readonly targets: readonly number[];
+	/** What the effect declared it would do ("search", "draw"...), so another card can respond to "an effect that would...". */
+	readonly categories: readonly string[];
+	/** The activation itself was negated: the link does nothing, as if the card had not been activated. */
+	readonly activationNegated: boolean;
+	/** The activation stands, but the effect is not applied. */
+	readonly effectNegated: boolean;
+}
+
+/**
+ * Who may act now, following Konami's Fast Effect Timing chart.
+ * `open`: the game state is open (box A): the turn player is free to take any action, and if both players pass the
+ * turn moves on. It closes on any action and opens again once both players have passed with no chain.
+ * `passed`: who has passed since the last activation or action; when both have, the chain resolves.
+ */
+export interface Priority {
+	readonly holder: Side;
+	readonly passed: readonly Side[];
+	readonly open: boolean;
+}
+
+/** Teaching options limit what a player is offered; they never change how a card resolves. */
+export interface TeachingOptions {
+	/** The most links a chain may have; nothing is offered beyond it. `null`: no limit. */
+	readonly chainLimit: number | null;
+	/**
+	 * `false` (the default): a player with nothing to respond with passes automatically, so a response window only
+	 * shows when they hold a legal response. `true`: every chance to respond is shown, even when only "pass" is legal.
+	 */
+	readonly everyWindow: boolean;
+}
+
 export interface Duel {
 	readonly cards: Readonly<Record<number, CardInstance>>;
 	/** The ids in each pile, in order: index 0 is the top of the Deck. A card sits in its controller's pile. */
 	readonly piles: Readonly<Record<Side, Readonly<Record<Zone, readonly number[]>>>>;
 	readonly rng: { readonly seed: number; readonly state: number };
+	readonly turn: { readonly player: Side; readonly number: number; readonly phase: Phase };
+	readonly chain: readonly Link[];
+	readonly priority: Priority;
+	/** The Spells and Traps Set this turn (ids): a Trap or a Quick-Play Spell among them cannot be activated yet. */
+	readonly setThisTurn: readonly number[];
+	readonly options: TeachingOptions;
+	/**
+	 * What each card code does. Provisional (see effects.ts): shared by reference, never copied, never changed. Step 4
+	 * decides where effect records live.
+	 */
+	readonly defs: Readonly<Record<string, CardDef>>;
 }
 
 export interface DeckSetup {
 	deck: readonly string[];
 	extra?: readonly string[];
 }
+
+export interface DuelSetup {
+	seed: number;
+	you: DeckSetup;
+	rival: DeckSetup;
+	/** Who takes the first turn. Default: "you". */
+	first?: Side;
+	defs?: Readonly<Record<string, CardDef>>;
+	options?: Partial<TeachingOptions>;
+}
+
+export const other = (side: Side): Side => (side === "you" ? "rival" : "you");
 
 const ZONES: readonly Zone[] = ["deck", "hand", "extra", "monster", "spell", "field", "graveyard", "banished"];
 const ON_FIELD: ReadonlySet<Zone> = new Set(["monster", "spell", "field"]);
@@ -47,7 +120,8 @@ const emptyPiles = (): Record<Zone, number[]> => Object.fromEntries(ZONES.map((z
 
 export const isOnField = (zone: Zone) => ON_FIELD.has(zone);
 
-export function createDuel(setup: { seed: number; you: DeckSetup; rival: DeckSetup }): Duel {
+/** A new duel: both Decks shuffled, turn 1, Draw Phase, the game state open. Nothing is drawn yet. */
+export function createDuel(setup: DuelSetup): Duel {
 	const rng = createRng(setup.seed);
 	const cards: Record<number, CardInstance> = {};
 	const piles = { you: emptyPiles(), rival: emptyPiles() };
@@ -66,7 +140,22 @@ export function createDuel(setup: { seed: number; you: DeckSetup; rival: DeckSet
 			[deck[i], deck[j]] = [deck[j]!, deck[i]!];
 		}
 	}
-	return { cards, piles, rng: { seed: setup.seed, state: rng.state } };
+	const first = setup.first ?? "you";
+	const options: TeachingOptions = { chainLimit: null, everyWindow: false, ...setup.options };
+	if (options.chainLimit !== null && !(Number.isInteger(options.chainLimit) && options.chainLimit >= 1)) {
+		throw new RangeError(`a teaching chain limit needs at least one link, got ${options.chainLimit}`);
+	}
+	return {
+		cards,
+		piles,
+		rng: { seed: setup.seed, state: rng.state },
+		turn: { player: first, number: 1, phase: "draw" },
+		chain: [],
+		priority: { holder: first, passed: [], open: true },
+		setThisTurn: [],
+		options,
+		defs: setup.defs ?? {},
+	};
 }
 
 /** The cards in a player's pile, in order (the top of the Deck first). */

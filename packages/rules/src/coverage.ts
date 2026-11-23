@@ -24,9 +24,9 @@ export interface TestFile {
 }
 
 export type CoverageGap =
-	| { card: string; problem: "effect-untested" | "ruling-untested" | "unknown-source" | "source-other-card" | "duplicate-source"; source: string }
+	| { card: string; problem: "effect-untested" | "ruling-untested" | "rule-untested" | "unknown-source" | "source-other-card" | "duplicate-source"; source: string }
 	| { card: string; problem: "source-invalid"; source: string; details: SourceProblem[] }
-	| { card: string; problem: "french-missing" }
+	| { card: string; problem: "french-missing" | "reserved-code" }
 	| { card: string; problem: "french-invalid"; details: SourceProblem[] }
 	| { card: string; problem: "unknown-citation"; source: string; file: string }
 	| { card: "?"; problem: "citation-unreadable"; file: string };
@@ -35,6 +35,9 @@ export interface CoverageReport {
 	gaps: CoverageGap[];
 	pending: { card: string; source: string; reason: string }[];
 }
+
+/** What rule tests cite: cites("rules", "<id>") names a record of the rule registry (src/rule-sources.ts). */
+export const RULES = "rules";
 
 /**
  * How a test names what it checks: put it in the title of a test that runs, with both arguments written as literals,
@@ -62,7 +65,11 @@ function readCitations(file: TestFile) {
 	return { found, unreadable };
 }
 
-export function coverage(cards: readonly CardSources[], tests: readonly TestFile[]): CoverageReport {
+/**
+ * Checks the cards against their tests. With `rules` (the rule registry), also checks that every rule record is well
+ * formed, has its own id and is cited by a running test, and that each cites("rules", ...) names a record.
+ */
+export function coverage(cards: readonly CardSources[], tests: readonly TestFile[], rules?: readonly SourceRecord[]): CoverageReport {
 	const read = tests.map((file) => ({ file, ...readCitations(file) }));
 	const citations = read.flatMap((entry) => entry.found);
 	const cited = new Set(citations.map((citation) => `${citation.card}#${citation.source}`));
@@ -70,6 +77,7 @@ export function coverage(cards: readonly CardSources[], tests: readonly TestFile
 	const pending: CoverageReport["pending"] = [];
 
 	for (const card of cards) {
+		if (card.code === RULES) gaps.push({ card: RULES, problem: "reserved-code" });
 		const known = new Set<string>();
 		for (const source of card.sources) {
 			if (known.has(source.id)) gaps.push({ card: card.code, problem: "duplicate-source", source: source.id });
@@ -96,8 +104,19 @@ export function coverage(cards: readonly CardSources[], tests: readonly TestFile
 		}
 	}
 
+	const ruleIds = new Set<string>();
+	for (const rule of rules ?? []) {
+		const duplicate = ruleIds.has(rule.id);
+		if (duplicate) gaps.push({ card: RULES, problem: "duplicate-source", source: rule.id });
+		ruleIds.add(rule.id);
+		const details = validateSource(rule);
+		if (details.length > 0) gaps.push({ card: RULES, problem: "source-invalid", source: rule.id, details });
+		if (!duplicate && !cited.has(`${RULES}#${rule.id}`)) gaps.push({ card: RULES, problem: "rule-untested", source: rule.id });
+	}
+
 	const byCode = new Map(cards.map((card) => [card.code, card]));
 	for (const citation of citations) {
+		if (rules && citation.card === RULES && ruleIds.has(citation.source)) continue;
 		const card = byCode.get(citation.card);
 		if (!card || !card.sources.some((source) => source.id === citation.source)) {
 			gaps.push({ card: citation.card, problem: "unknown-citation", source: citation.source, file: citation.file });
