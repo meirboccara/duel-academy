@@ -1,4 +1,5 @@
 import type { CardInstance, Duel, Link, Side } from "./duel";
+import type { GameEvent } from "./events";
 
 /**
  * PROVISIONAL effect shape, just enough for step 2 (one chain + the priority loop). Step 4 of docs/rules-core-spec.md
@@ -14,18 +15,35 @@ export interface EffectContext {
 	readonly card: CardInstance;
 }
 
+/** A card's own reaction to something that happened: a typed event (src/events.ts). */
+export type EventMatcher = (duel: Duel, event: GameEvent, ctx: EffectContext) => boolean;
+
 export interface Effect {
 	/**
 	 * `card`: activating the Spell or Trap Card itself. Its Spell Speed and where it can be activated from follow from
 	 * the kind of card (see `CardDef.kind`), as the rulebook gives them.
 	 * `effect`: activating an effect of a card that stays where it is: a monster in the hand (a "hand trap") or a
 	 * face-up card on the field. It states its own `speed` and `from`.
+	 * `trigger`: a Trigger Effect (Spell Speed 1), put on a chain at a trigger point after `on` matched an event; see
+	 * `mandatory`, `timing` and `from`. It is never listed as an ordinary action.
 	 */
-	readonly activates: "card" | "effect";
+	readonly activates: "card" | "effect" | "trigger";
 	/** For `activates: "effect"`: 1 (Ignition) or 2 (Quick Effect). */
 	readonly speed?: SpellSpeed;
-	/** For `activates: "effect"`: where the card must be. `field` means face-up on its controller's field. */
-	readonly from?: "hand" | "field";
+	/**
+	 * Where the card must be. `field` means face-up on its controller's field. For `activates: "effect"`, only `hand`
+	 * and `field` are offered; a trigger can come from any of the four (default `field`).
+	 */
+	readonly from?: "hand" | "field" | "graveyard" | "banished";
+	/** Trigger: the event it triggers on; or, for a fast effect, the event it can answer while that is the last thing that happened. */
+	readonly on?: EventMatcher;
+	/** Trigger: a mandatory ("you must") effect, or optional ("you can"). Default optional. */
+	readonly mandatory?: boolean;
+	/**
+	 * Trigger: "when ... you can" misses the timing unless the event is the last thing that happened; "if ... you can"
+	 * does not (default "when"). A mandatory trigger never misses it.
+	 */
+	readonly timing?: "when" | "if";
 	/** What the effect would do, frozen on the link ("search", "draw"...). */
 	readonly categories?: readonly string[];
 	/** The activation condition, over the duel and its chain. Absent: always met. */

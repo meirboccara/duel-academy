@@ -1,4 +1,5 @@
 import type { CardDef, SpellSpeed } from "./effects";
+import { type Building, type GameEvent, raiseEvent, type Waiting } from "./events";
 import { createRng } from "./rng";
 
 /**
@@ -88,6 +89,12 @@ export interface Duel {
 	/** The Spells and Traps Set this turn (ids): a Trap or a Quick-Play Spell among them cannot be activated yet. */
 	readonly setThisTurn: readonly number[];
 	readonly options: TeachingOptions;
+	/** The last things that happened (step 3): events since the last break, which a fast effect may still answer. */
+	readonly live: readonly GameEvent[];
+	/** Trigger effects whose condition was met and which wait for the next trigger point. */
+	readonly waiting: readonly Waiting[];
+	/** While trigger effects are being put on a chain: whose choice it is is in `priority.holder`. */
+	readonly building: Building | null;
 	/**
 	 * What each card code does. Provisional (see effects.ts): shared by reference, never copied, never changed. Step 4
 	 * decides where effect records live.
@@ -154,6 +161,9 @@ export function createDuel(setup: DuelSetup): Duel {
 		priority: { holder: first, passed: [], open: true },
 		setThisTurn: [],
 		options,
+		live: [],
+		waiting: [],
+		building: null,
 		defs: setup.defs ?? {},
 	};
 }
@@ -192,7 +202,9 @@ export function moveCard(duel: Duel, id: number, to: { zone: Zone; face?: Face; 
 	const face = to.face ?? (FACE_DOWN_BY_DEFAULT.has(zone) ? "down" : "up");
 	const flippedDown = isOnField(zone) && before.face === "up" && face === "down";
 	const renewed = zone !== before.zone || controller !== before.controller || flippedDown;
-	return place(duel, before, { ...before, zone, face, controller, moves: before.moves + (renewed ? 1 : 0) }, to.at ?? "top");
+	const after = { ...before, zone, face, controller, moves: before.moves + (renewed ? 1 : 0) };
+	const moved = place(duel, before, after, to.at ?? "top");
+	return renewed ? raiseEvent(moved, { type: "moved", before, after }) : moved;
 }
 
 /** Gives control of a card on the field to a player: it becomes a new card for them. Its owner never changes. */
@@ -200,5 +212,6 @@ export function changeControl(duel: Duel, id: number, side: Side): Duel {
 	const before = instance(duel, id);
 	if (!isOnField(before.zone)) throw new Error(`card ${id} is not on the field`);
 	if (before.controller === side) return duel;
-	return place(duel, before, { ...before, controller: side, moves: before.moves + 1 }, "top");
+	const after = { ...before, controller: side, moves: before.moves + 1 };
+	return raiseEvent(place(duel, before, after, "top"), { type: "moved", before, after });
 }

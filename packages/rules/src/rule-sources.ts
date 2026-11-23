@@ -11,9 +11,14 @@ import type { SourceRecord } from "./sources";
  */
 const RB10 = "https://www.yugioh-card.com/en/downloads/rulebook/SD_RuleBook_EN_10.pdf";
 const FET = "https://www.yugioh-card.com/en/play/fast-effect-timing/";
+const UCT6 = "https://www.yugioh-card.com/eu/play/understanding-card-text/part-6-finding-clues-in-turbo-pack-6-and-generation-force/";
+const UCT7 = "https://www.yugioh-card.com/eu/play/understanding-card-text/part-7-conjunction-functions/";
+const R2021 = "https://www.yugioh-card.com/en/play/2021_rules_update/";
 const read = "2026-11-23";
 const rb10 = (id: string, quote: string): SourceRecord => ({ id, kind: "tcg-rule", url: RB10, read, quote });
 const fet = (id: string, quote: string): SourceRecord => ({ id, kind: "tcg-rule", url: FET, read, quote });
+
+const page = (id: string, url: string, quote: string): SourceRecord => ({ id, kind: "tcg-rule", url, read, quote });
 
 export const RULE_SOURCES: readonly SourceRecord[] = [
 	// RB10 p. 45, "Spell Speeds".
@@ -27,6 +32,8 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 	rb10("chain-until-both-pass", "Both players continue to add effects to the Chain until they both wish to add nothing else, then you resolve the outcome in reverse order"),
 	// RB10 p. 46, "How a Chain Works".
 	rb10("chain-resolves-backwards", "Once the Chain is completed, the outcome is resolved starting with the most recent card to be activated at the top of the Chain and proceeding down to Chain Link 1."),
+	// RB10 p. 45, "Spell Speed 1": the sentence this rule is read from ("simultaneously" is what a trigger chain is).
+	rb10("ss1-chain-simultaneous", "Typically, these effects cannot be Chain Link 2 or higher, unless multiple Spell Speed 1 effects are activated simultaneously."),
 	// RB10 p. 47, "Example of a Chain": a negated activation does nothing, and the links below still resolve.
 	rb10("negated-activation", '"Threatening Roar" (Chain Link 2) would then be resolved, but the effect of "Seven Tools of the Bandit" stops its activation.'),
 	// RB10 p. 48, "Turn Player's Priority".
@@ -45,6 +52,47 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 	rb10("cost-no-refund", "You have to pay any costs before you declare the activation of the card. Even if the activation of the card is negated, you cannot get a refund of the cost that you have paid."),
 	// RB10 p. 52-53, glossary, "Search your Deck".
 	rb10("search-needs-a-card", "You cannot activate an effect to search your Deck for a card if there are no cards that meet the requirements in your Deck."),
+	// RB10 p. 50, "When multiple cards are activated simultaneously".
+	rb10("segoc-order", "Then the opponent continues the Chain with their mandatory effects in any order. Afterwards, the turn player adds their optional effects in any order, and finally the opponent adds their optional effects in any order."),
+	// RB10 p. 10, "Trigger Effect".
+	rb10("trigger-effects", "These effects are activated at specific times, such as “during the Standby Phase” or “when this monster is destroyed”."),
+	// RB10 p. 51, "Actions which cannot be Chained to". No Konami page we could cite says in so many words that the
+	// "when" triggers of a card sent as a cost miss the timing: it follows from this (a cost is not an activation, so the
+	// activation that follows is the last thing that happened) and from the "last thing that happened" rule below.
+	rb10("cost-not-chainable", "Summoning a monster, Tributing, changing a monster’s battle position and paying costs are not effect activations and therefore you cannot respond to those actions using a Chain."),
+	// RB10 p. 55, glossary, "Send to the Graveyard".
+	rb10("trigger-sent-to-graveyard", "Destroying a card, discarding, and Tributing a monster are all actions that send a card to the Graveyard, and will normally activate “When this card is sent to the Graveyard…” Trigger Effects."),
+	// FET chart, rows "After a Chain resolves" and "After an action that does NOT start a Chain": with an effect
+	// triggered, the chain rules apply and the player who did not activate the last effect goes next (box D). The
+	// quote is the cell of the first row; the chart is a table, read across its cells.
+	fet("trigger-after-chain", "If there is an effect that is triggered. Yes The player who did NOT activate the last effect on the Chain. (Follow the normal Chain rules.)"),
+	// UCT7 (Understanding Card Text, part 7), "Timing".
+	page("last-thing-that-happened", UCT7, "it might only be usable in response to a triggering event that was ‘the last thing that happened’."),
+	// UCT7, "The Four Conjunctives": THEN.
+	page("then-is-sequential", UCT7, "THEN: <Do A, then do B> Timeline: B happens after A, even though they’re part of one card effect. These things happen in sequence, not simultaneously."),
+	// UCT7, "The Four Conjunctives": AND.
+	page("and-is-simultaneous", UCT7, "AND: <Do A and B> Timeline: Considered simultaneous. Both happen at the same time."),
+	// UCT7, the Heraldry Change example under THEN.
+	page("then-hides-the-summon", UCT7, "The last thing was NOT a monster being Summoned. Which means neither player can activate cards like Torrential Tribute that activate “WHEN” a monster is Summoned."),
+	// UCT6, on Quickdraw Synchron: "and Special Summon" instead of "then".
+	page("and-keeps-the-timing", UCT6, "it also means that pitching a card and Summoning Quickdraw happen simultaneously. This means that you will not miss the timing for any “when… you can” optional effects of the card you sent to the Graveyard"),
+	// R2021, on trigger effects "saved for later".
+	page("saved-trigger-moved", R2021, "BUT its location* changes between the time its Trigger Effect activation is met, and the time it actually has a chance to activate, its effect does not activate."),
+	/**
+	 * Konami's Japanese Q&A on "Hieratic Seal of the Heavenly Spheres" (the answer lists Critter, cid 4054, among the cards it
+	 * holds for): a trigger that goes on the chain only after the whole chain has resolved does not activate if
+	 * its card left the place it was sent to before then. Same rule as R2021 above, and it states "after the whole chain".
+	 * The record is filed under Critter because Konami's page lists the Q&A under that card.
+	 */
+	{
+		id: "after-chain-moved",
+		kind: "jp-qa",
+		cid: 4054,
+		fid: 24070,
+		url: "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=24070&request_locale=ja",
+		read,
+		quote: "②の効果は、リリースされた一連のチェーン処理後に最初に送られたところで発動する効果ですので、リリースされたのち②の効果を発動する前に最初に送られたところから離れている場合には発動しません。",
+	},
 	// FET, introduction.
 	fet("fast-effects-either-turn", "Fast effects can be activated by either player – even during their opponent’s turn, as long as the conditions are appropriate."),
 	// FET, "Turn Player Actions": box A.

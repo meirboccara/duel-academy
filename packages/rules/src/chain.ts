@@ -1,5 +1,7 @@
 import { type CardInstance, type Duel, type Link, moveCard, other, PHASES, type Side } from "./duel";
+import { breakEffect, dropWhen, raiseEvent } from "./events";
 import { type CardDef, type Effect, speedOf } from "./effects";
+import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./triggers";
 
 /**
  * Step 2 of docs/rules-core-spec.md: one chain and the priority loop, after Konami's Fast Effect Timing chart.
@@ -11,7 +13,12 @@ import { type CardDef, type Effect, speedOf } from "./effects";
  *   then the opponent (box C); when both pass, the game state is open again.
  * - When both pass in an open game state, the turn moves to the next phase.
  *
- * Not here yet: triggers (step 3), once per turn (step 4), "cannot be negated" (step 5), the Damage Step's limits,
+ * - Triggers (step 3, src/triggers.ts): after a chain resolves or an action that starts no chain, the trigger effects
+ *   waiting in `duel.waiting` go on a chain in Konami's order (turn player's mandatory, opponent's mandatory, turn
+ *   player's optional, opponent's optional), each player choosing in turn; the player who did not activate the last
+ *   one then has priority. Events (src/events.ts) are raised by every move and by effects.
+ *
+ * Not here yet: once per turn (step 4), "cannot be negated" (step 5), the Damage Step's limits,
  * Summons, attacks, the normal draw, and Continuous, Equip and Field cards that stay on the field (a Field Spell is
  * placed and swept like any Spell; the Field Zone comes with step 7). Known limits until step 4: targets are not
  * checked again after the cost is paid, and a Spell or Trap whose control changed while on the chain is not swept to
@@ -34,6 +41,7 @@ const SPELL_ZONES = 5;
  * The teaching chain limit only shortens this list: once the chain has that many links, only "pass" is offered.
  */
 export function legalActions(duel: Duel): Action[] {
+	if (duel.building) return triggerActions(duel);
 	const actions: Action[] = [PASS];
 	collect(duel, actions);
 	return actions;
@@ -56,6 +64,8 @@ function collect(duel: Duel, out: Action[] | null): boolean {
 		const speed = speedOf(def, effect);
 		if (speed === 1 ? !slow : speed < topSpeed) return false;
 		const ctx = { player, card };
+		// An effect that answers an event needs that event to be the last thing that happened.
+		if (effect.on && !duel.live.some((event) => effect.on!(duel, event, ctx))) return false;
 		if (effect.condition && !effect.condition(duel, ctx)) return false;
 		if (effect.cost?.can && !effect.cost.can(duel, ctx)) return false;
 		if (!effect.targets) {
@@ -78,7 +88,7 @@ function collect(duel: Duel, out: Action[] | null): boolean {
 		if (effects) {
 			for (let index = 0; index < effects.length; index++) {
 				const effect = effects[index]!;
-				if (effect.activates === "card" ? !fromHand : effect.from !== "hand") continue;
+				if (effect.activates === "trigger" || (effect.activates === "card" ? !fromHand : effect.from !== "hand")) continue;
 				if (offer(card, def, index, effect)) {
 					if (!out) return true;
 					found = true;
@@ -101,7 +111,7 @@ function collect(duel: Duel, out: Action[] | null): boolean {
 			const setReady = zone === "spell" && card.face === "down" && def.kind !== "monster" && (def.kind === "spell" || !duel.setThisTurn.includes(id));
 			for (let index = 0; index < effects.length; index++) {
 				const effect = effects[index]!;
-				if (effect.activates === "card" ? !setReady : effect.from !== "field" || card.face !== "up") continue;
+				if (effect.activates === "trigger" || (effect.activates === "card" ? !setReady : effect.from !== "field" || card.face !== "up")) continue;
 				if (offer(card, def, index, effect)) {
 					if (!out) return true;
 					found = true;
@@ -130,8 +140,8 @@ function sameAction(legal: Action, asked: Action): boolean {
  */
 export function act(duel: Duel, action: Action): Duel {
 	if (!legalActions(duel).some((legal) => sameAction(legal, action))) throw new Error(`not a legal action for ${duel.priority.holder}: ${JSON.stringify(action)}`);
-	let next = action.type === "pass" ? pass(duel) : action.type === "set" ? set(duel, action.card) : activate(duel, action);
-	while (!next.options.everyWindow && !decides(next) && !collect(next, null)) next = pass(next);
+	let next = duel.building ? (action.type === "pass" ? declineTriggers(duel) : chooseTrigger(duel, action as Extract<Action, { type: "activate" }>)) : action.type === "pass" ? pass(duel) : action.type === "set" ? set(duel, action.card) : activate(duel, action);
+	while (!next.building && !next.options.everyWindow && !decides(next) && !collect(next, null)) next = pass(next);
 	return next;
 }
 
@@ -139,9 +149,9 @@ export function act(duel: Duel, action: Action): Duel {
 const decides = (duel: Duel) => duel.chain.length === 0 && duel.priority.open && duel.priority.passed.length === 0 && duel.priority.holder === duel.turn.player;
 
 function set(duel: Duel, id: number): Duel {
-	const next = moveCard(duel, id, { zone: "spell", face: "down" });
-	// An action that starts no chain: the turn player may use a fast effect first, then the opponent (boxes B and C).
-	return { ...next, setThisTurn: [...next.setThisTurn, id], priority: { holder: duel.turn.player, passed: [], open: false } };
+	const next = moveCard(breakEffect(duel), id, { zone: "spell", face: "down" });
+	// An action that starts no chain: trigger effects go first; then the turn player may use a fast effect, then the opponent (boxes B and C).
+	return triggerPoint({ ...next, setThisTurn: [...next.setThisTurn, id] }, { holder: duel.turn.player, passed: [], open: false });
 }
 
 function activate(duel: Duel, action: Extract<Action, { type: "activate" }>): Duel {
@@ -153,6 +163,7 @@ function activate(duel: Duel, action: Extract<Action, { type: "activate" }>): Du
 	let next = effect.activates === "card" ? moveCard(duel, before.id, { zone: "spell", face: "up" }) : duel;
 	const card = next.cards[before.id]!;
 	if (effect.cost) next = effect.cost.pay(next, { player, card });
+	next = dropWhen(next);
 	const link: Link = { player, card, effect: action.effect, speed: speedOf(def, effect), targets: action.targets, categories: effect.categories ?? [], activationNegated: false, effectNegated: false };
 	return { ...next, chain: [...next.chain, link], priority: { holder: other(player), passed: [], open: false } };
 }
@@ -162,8 +173,9 @@ function pass(duel: Duel): Duel {
 	if (!passed.includes(other(holder))) return { ...duel, priority: { holder: other(holder), passed: [...passed, holder], open } };
 	// Both players have passed in a row.
 	const turnPlayer = duel.turn.player;
-	if (duel.chain.length > 0) return { ...resolveChain(duel), priority: { holder: turnPlayer, passed: [], open: false } };
-	if (!open) return { ...duel, priority: { holder: turnPlayer, passed: [], open: true } };
+	if (duel.chain.length > 0) return triggerPoint(resolveChain(duel), { holder: turnPlayer, passed: [], open: false });
+	// Nothing happened and both passed: the game state is open again, and the events before are no longer the last thing.
+	if (!open) return { ...breakEffect(duel), priority: { holder: turnPlayer, passed: [], open: true } };
 	return nextPhase(duel);
 }
 
@@ -178,6 +190,7 @@ function pass(duel: Duel): Duel {
 function resolveChain(duel: Duel): Duel {
 	let next = duel;
 	for (let index = duel.chain.length - 1; index >= 0; index--) {
+		next = breakEffect(next);
 		const link = next.chain[index]!;
 		if (!link.activationNegated && !link.effectNegated) next = effectOf(next, link).resolve(next, link, index);
 		next = { ...next, chain: next.chain.slice(0, index) };
@@ -195,9 +208,16 @@ const effectOf = (duel: Duel, link: Link): Effect => duel.defs[link.card.code]!.
 /** The next phase, or the other player's next turn after the End Phase. The game state is open, the turn player first. */
 function nextPhase(duel: Duel): Duel {
 	const at = PHASES.indexOf(duel.turn.phase);
-	if (at < PHASES.length - 1) return { ...duel, turn: { ...duel.turn, phase: PHASES[at + 1]! }, priority: { holder: duel.turn.player, passed: [], open: true } };
+	// A new phase is something that happens: nothing before it is the last thing any more, and its triggers are chained first.
+	const moved = breakEffect(duel);
+	if (at < PHASES.length - 1) {
+		const phase = PHASES[at + 1]!;
+		const turn = { ...moved.turn, phase };
+		return triggerPoint(raiseEvent({ ...moved, turn }, { type: "phase", phase, player: turn.player }), { holder: turn.player, passed: [], open: true });
+	}
 	const player: Side = other(duel.turn.player);
-	return { ...duel, turn: { player, number: duel.turn.number + 1, phase: PHASES[0]! }, setThisTurn: [], priority: { holder: player, passed: [], open: true } };
+	const turn = { player, number: duel.turn.number + 1, phase: PHASES[0]! };
+	return triggerPoint(raiseEvent({ ...moved, turn, setThisTurn: [] }, { type: "phase", phase: turn.phase, player }), { holder: player, passed: [], open: true });
 }
 
 const flag = (duel: Duel, index: number, change: Partial<Link>): Duel => (duel.chain[index] ? { ...duel, chain: duel.chain.map((link, i) => (i === index ? { ...link, ...change } : link)) } : duel);

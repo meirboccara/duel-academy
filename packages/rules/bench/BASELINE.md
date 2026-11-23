@@ -36,3 +36,33 @@ How to read it:
   14× / 46× / 6.5×. So listing alone is far past the target, while building every resulting duel is not yet 10× per
   move on crowdedHand. The spec's plan is to list without building each candidate; `act` has not been tuned.
 - The cards of `reference-duels.ts` are benchmark fixtures in the provisional effect shape, not cards of the core.
+
+# Rules core, step 3 (triggers + missing the timing)
+
+Same positions, same benchmarks, **macOS (Darwin 24.2, Apple silicon not recorded), Node 20+, 2026-11-23**: a different
+machine from the tables above, so only the ratios inside this table compare. Step 2 was re-measured on this machine
+(git stash of the step 3 work) in the same session. Mean time per call:
+
+| Position | `legalActions` step 2 | `legalActions` step 3 | list + `act` step 2 | list + `act` step 3 | today's engine | step 3 vs today's engine |
+|---|---:|---:|---:|---:|---:|---:|
+| opening | 0.0004 ms | 0.0005 ms | 0.0117 ms | 0.0143 ms | 0.342 ms | 24× |
+| midgame | 0.0007 ms | 0.0008 ms | 0.0151 ms | 0.0190 ms | 1.599 ms | 84× |
+| crowdedHand | 0.0009 ms | 0.0010 ms | 0.0370 ms | 0.0466 ms | 0.736 ms | 16× |
+
+How to read it:
+- Step 3 adds about 20 to 25 % to `act` (events on every move, a break before each link resolves, a trigger point after
+  each chain and Set). `legalActions` is unchanged within noise: it does one extra check, `duel.building`.
+- The like-for-like ratio is still above the step 2 target (10×) on the three positions; the spec's 30× is for step 9.
+- The reference cards have no trigger effect, so the benchmark does not measure trigger collection itself: when no card
+  of the duel listens to events (`events.ts`, `listeners`), `raiseEvent` returns at once. A duel with trigger cards
+  scans every card of the duel on each move; a benchmark for that belongs to the step that has real trigger cards.
+
+Trigger-heavy benchmark (`bench/triggers.bench.ts`), same machine and day, mean per call:
+
+| Case | Mean |
+|---|---:|
+| Sweep of 20 monsters with trigger effects: 6 mandatory triggers chained (the engine scans every card on each move), optional ones asked | 0.044 ms |
+| `legalActions` while the optional triggers are chosen | 0.0011 ms |
+| A Spell with 4 trigger cards on the field that never trigger | 0.0036 ms |
+
+The scan is linear in the cards of the duel for every move; this is the cost to watch when real trigger cards arrive.
