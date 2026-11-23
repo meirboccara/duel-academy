@@ -72,7 +72,31 @@ export interface CostSpec {
 
 export type Cost = ((duel: Duel, ctx: EffectContext) => Duel | null) | CostSpec;
 
+/**
+ * "Cannot be negated" as a condition read when the negation takes effect, not a flag (Konami's Japanese Q&A on a card
+ * whose activation and effect cannot be negated while a monster is in its linked zone, record
+ * `cannot-be-negated-checked-at-resolution`): for "negate the activation" and "negate the effect" it is read when the
+ * negating effect resolves; for a negation of the card's own effects (Infinite Impermanence), when the immune effect
+ * itself resolves.
+ */
+export type Immunity = boolean | ((duel: Duel, link: Link) => boolean);
+
 export interface EffectRecord {
+	/**
+	 * For `activation`: "if ..., you can activate this card from your hand", as well as the way its kind allows. The card is
+	 * placed face-up in a free Spell & Trap Zone and activated, in either player's turn (a Trap that was never Set has no
+	 * "not the turn it was Set" limit). Konami's notes on Infinite Impermanence: it is not an effect of the card.
+	 */
+	readonly handIf?: (duel: Duel, ctx: EffectContext) => boolean;
+	/**
+	 * Worded "when a monster(s) would be Summoned": it answers the Summon in progress. Only such effects can be activated in the
+	 * Summon's window (YGOProJudge's lead, no Konami page found); anything else waits until the Summon has succeeded.
+	 */
+	readonly answersSummon?: boolean;
+	/** "This activation cannot be negated." */
+	readonly activationCannotBeNegated?: Immunity;
+	/** "This effect cannot be negated." */
+	readonly effectCannotBeNegated?: Immunity;
 	/**
 	 * `activation`: activating the Spell or Trap Card itself (Spell Speed from the kind of card, see `CardDef.kind`; where
 	 * it can be activated from follows the rulebook). `ignition`: an Ignition Effect of a card that stays where it is
@@ -152,6 +176,19 @@ export interface CardDef {
 	readonly kind: "monster" | "spell" | "quick-play" | "trap" | "counter-trap";
 	readonly facts?: Facts;
 	readonly effects?: readonly EffectRecord[];
+	/**
+	 * "You can Special Summon this card (from your hand)": a built-in Special Summon, an action that starts no chain, in an open game
+	 * state, into a free Monster Zone, when `condition` holds. Step 5 only; the Summon procedures as data are step 8.
+	 */
+	readonly builtInSummon?: { readonly how: "special"; readonly condition?: (duel: Duel, ctx: EffectContext) => boolean };
+	/** Obelisk: "This card's Normal Summon cannot be negated": the negating cards are not even offered against such a Summon. */
+	readonly summon?: { readonly cannotBeNegated?: readonly ("normal" | "special")[] };
+	/**
+	 * Printed parts of the card the core does not apply yet (for Infinite Impermanence, `"column"`: step 7). The card is
+	 * playable but not done. This is the card as the game imports it (step 10's port refuses a card that has any); its
+	 * `CardSources.deferred` names the same parts at test time, and a definition-of-done test checks the two agree.
+	 */
+	readonly unmodelled?: readonly string[];
 }
 
 /** The Spell Speed of an effect of a card: fixed by the kind of card for a card activation, by the type otherwise. */

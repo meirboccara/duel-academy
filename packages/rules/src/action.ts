@@ -8,6 +8,12 @@ export type Action =
 	| { readonly type: "activate"; readonly card: number; readonly effect: number; readonly targets: readonly number[]; readonly paid?: readonly number[] }
 	/** Set a Spell or Trap from the hand. */
 	| { readonly type: "set"; readonly card: number }
+	/**
+	 * Summon a monster from the hand as an action (step 5: only a Normal Summon with no Tribute, and a built-in Special
+	 * Summon from the hand; Tributes and the other procedures are step 8). It starts no chain: the Summon is a moment
+	 * of its own that the opponent may answer ("would be Summoned") before it succeeds.
+	 */
+	| { readonly type: "summon"; readonly card: number; readonly how: "normal" | "special" }
 	/** The card an effect asked for while it resolves (a choice that is not a target). */
 	| { readonly type: "choose"; readonly card: number };
 
@@ -22,6 +28,7 @@ export function sameAction(a: Action, b: Action): boolean {
 	if (a.type === "pass") return true;
 	const other = b as typeof a;
 	if (a.card !== other.card) return false;
+	if (a.type === "summon") return a.how === (b as typeof a).how;
 	if (a.type !== "activate") return true;
 	const asked = b as typeof a;
 	return a.effect === asked.effect && sameIds(a.targets, asked.targets) && sameIds(a.paid ?? [], asked.paid ?? []);

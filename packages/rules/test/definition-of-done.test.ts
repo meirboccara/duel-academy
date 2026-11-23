@@ -34,3 +34,16 @@ describe("the definition of done, over every card the rules core plays and every
 		expect(Object.keys(CARD_DEFS).sort()).toEqual(CARD_SOURCES.map((card) => card.code).sort());
 	});
 });
+
+describe("cards the core plays only in part", () => {
+	it("reports every unmodelled part of a card as pending, never as done, and names none that has no deferred source", () => {
+		const report = coverage(CARD_SOURCES, [...testFiles("cards"), ...testFiles("rules")], RULE_SOURCES);
+		expect(report.gaps).toEqual([]);
+		expect(report.pending.filter((entry) => entry.card === "infinite-impermanence").map((entry) => entry.source)).toEqual(["column"]);
+		// A card written with `unmodelled` parts has a deferred source for each, and the other way round.
+		for (const def of Object.values(CARD_DEFS)) {
+			const deferred = CARD_SOURCES.find((card) => card.code === def.code)!.deferred?.map((part) => part.source) ?? [];
+			expect([...deferred].sort()).toEqual([...(def.unmodelled ?? [])].sort());
+		}
+	});
+});

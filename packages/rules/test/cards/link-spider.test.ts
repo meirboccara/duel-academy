@@ -8,7 +8,8 @@ const card = "link-spider";
 describe("Link Spider, written as an effect record", () => {
 	it(`${cites("link-spider", "text")} ${cites("rules", "choice-at-resolution")} Special Summons a Level 4 or lower Normal Monster from the hand, the player choosing it when the effect resolves`, () => {
 		const start = position({ defs, options, you: { monsters: [card], hand: ["normal-4", "normal-4-b", "normal-6", "effect-4"] } });
-		expect(offered(start)).toEqual([`activate ${card}`, "pass"]);
+		// The Level 4 or lower monsters of the hand can also be Normal Summoned (step 5).
+		expect(offered(start)).toEqual([`activate ${card}`, "pass", "summon effect-4", "summon normal-4", "summon normal-4-b"]);
 		const activated = play(start, `activate ${card}`);
 		expect(activated.chain[0]!.targets).toEqual([]);
 		const asked = play(activated, "pass", "pass");
@@ -22,7 +23,7 @@ describe("Link Spider, written as an effect record", () => {
 	it("takes the only candidate and cannot be activated with none", () => {
 		const one = position({ defs, options, you: { monsters: [card], hand: ["normal-4", "normal-6"] } });
 		expect(codes(play(one, `activate ${card}`, "pass", "pass"), "you", "monster").sort()).toEqual([card, "normal-4"]);
-		expect(offered(position({ defs, options, you: { monsters: [card], hand: ["normal-6", "effect-4"] } }))).toEqual(["pass"]);
+		expect(offered(position({ defs, options, you: { monsters: [card], hand: ["normal-6", "effect-4"] } }))).toEqual(["pass", "summon effect-4"]);
 	});
 	it(`${cites("link-spider", "text")} ${cites("rules", "open-state-only")} is an Ignition Effect: only in its controller's Main Phase, nothing else going on`, () => {
 		expect(offered(position({ defs, options, turn: "rival", you: { monsters: [card], hand: ["normal-4"] } }))).toEqual(["pass"]);

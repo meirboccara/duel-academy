@@ -3,9 +3,10 @@
  * - `card-text`: the card's official text on Konami's card database (needs the Konami card id, `cid`).
  * - `tcg-rule`: the TCG rulebook or one of Konami's rules pages.
  * - `jp-qa`: a Q&A entry of Konami's Japanese database for the card (needs `cid` and the Q&A id, `fid`).
+ * - `jp-notes`: the 補足情報 notes at the top of a card's Q&A list on the same database (needs `cid`; the notes have no Q&A id).
  * The record always points at Konami's own page; an aggregator is at most where the text was fetched from.
  */
-export type SourceKind = "card-text" | "tcg-rule" | "jp-qa";
+export type SourceKind = "card-text" | "tcg-rule" | "jp-qa" | "jp-notes";
 
 export interface SourceRecord {
 	/** Unique within its card (or rule set): what tests cite. */

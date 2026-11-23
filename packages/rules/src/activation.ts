@@ -6,6 +6,7 @@ import { type CardInstance, type Duel, type Link, moveCard, type Side } from "./
 import { type Action, sameIds } from "./action";
 import { dropWhen } from "./events";
 import { type CardDef, type Cost, type CostSpec, type EffectContext, type EffectRecord, effectOf, speedOf } from "./effects";
+import { hitByCardNegation, isNegated } from "./negation";
 import { isSpent, keyOf, spend } from "./once";
 
 const NO_CARDS: readonly number[] = Object.freeze([]);
@@ -94,6 +95,8 @@ function combinations(candidates: readonly number[], { min, max }: NonNullable<E
 export function activateEffect(duel: Duel, player: Side, card: CardInstance, index: number, { paid, targets }: Way, answering = true): Duel {
 	const effect = effectOf(duel, { card, effect: index });
 	checkDefinition(card, effect);
+	// A monster whose effects are negated still activates its effect and pays the cost; the effect is negated (Konami's notes on Effect Veiler and Infinite Impermanence).
+	const negatedCard = hitByCardNegation(duel, { card, effect: index }) && isNegated(duel, card.id);
 	const placedDuel = placed(duel, effect, card);
 	// The link holds the card as it is when activated: placed face-up (for a card activation), before the cost.
 	const activated = placedDuel.cards[card.id]!;
@@ -113,7 +116,7 @@ export function activateEffect(duel: Duel, player: Side, card: CardInstance, ind
 	}
 	next = dropWhen(next);
 	const key = keyOf(effect, player, card, index);
-	const link = newLink(next, player, activated, index, targets, key, answering);
+	const link = { ...newLink(next, player, activated, index, targets, key, answering), effectNegated: negatedCard };
 	return { ...spend(next, effect, key), chain: [...next.chain, link] };
 }
 

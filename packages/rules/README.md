@@ -131,8 +131,8 @@ Known limits of step 4 (what the tests do not prove):
 - Every link freezes `answers`, the link on top of the chain when it was activated (`null` for Chain Link 1 and for trigger
   effects put on a chain at a trigger point, which answer nothing), and Ash Blossom & Joyous Spring negates that link. Chain links only go on top, so nothing can sit between Ash and the link it answered; the test for it is structural (it would pass with the old
   `index - 1`) and says so; the
-  frozen link only matters once something can change the chain from below (step 5). Several negations of one link, and
-  "cannot be negated", also come with step 5.
+  frozen link only matters once something can change the chain from below. Step 5 added "cannot be negated" (see below);
+  two negations of one link are still not told apart (the one that resolves first takes).
 - A resolved Field or Continuous Spell is swept to the Graveyard like a Normal Spell until step 7 (zones) and the later
   steps keep it on the field.
 - A choice at resolution is one card from a list; "up to N" and "you may choose none" are not modelled as such (several cards
@@ -149,3 +149,65 @@ Known limits of step 4 (what the tests do not prove):
   rulings of its Q&A that need a card on the field after the cost (Xyz Reborn) are only in the step 2 rule records.
 - The cost dry run makes the listing 1.5 to 2× slower (BASELINE.md). `act` now checks an action by listing only what its own
   card could do, which more than pays for it; the optional `CostSpec.can` pre-check showed no gain on the reference boards.
+
+Step 5 (negation):
+- Four different things, kept apart (`src/negation.ts`, `src/summon.ts`, `src/life.ts`, the chain in `src/chain.ts`):
+  - **Activation negated / effect negated**: the two `Link` flags and `negateActivation` / `negateEffect`, as before. A negated
+    activation still pays its cost and still counts as an activation for "once per turn" limits (Konami's Japanese Q&A, records
+    `negated-activation-cost-stays`, `negated-activation-still-counts`); only a "You can only activate 1 ..." limit is given
+    back (step 4). `negateActivationAndDestroy` is "negate the activation, and if you do, destroy that card".
+  - **A card negated on the field** ("negate its effects until the end of this turn"): `Duel.negations`, a list of
+    `{ card, moves, until, stamp }`, read by `isNegated`. It is the card as it was (`moves`): a card turned face-down, gone and
+    back, or under another controller is new and no longer negated (record `negated-monster-state`). A negated monster still
+    activates its effects and pays the cost, and the effect is negated: when the link is made (`Link.effectNegated`, so a
+    monster that is its own cost is negated too) and again when it resolves (a negation chained to its effect). Only effects
+    activated in the Monster Zone are reached (`impermanence-only-monster-zone`). The list falls at the end of the turn. For now
+    it only stops the card's chain links: its Continuous effects stay applied until step 6 makes negation a modifier.
+  - **"Cannot be negated"**: `EffectRecord.activationCannotBeNegated` / `effectCannotBeNegated`, a boolean or a condition. A
+    negation that makes a chain block (`negateActivation`, `negateEffect`) reads it when the negating effect resolves; the
+    negation of the card's own effects reads it when the immune effect resolves (record
+    `cannot-be-negated-checked-at-resolution`). A Summon that cannot be negated (`CardDef.summon.cannotBeNegated`, Obelisk's
+    wording) is different: the negating card is not offered at all (`negate-summon-cannot-be-negated`).
+  - **A Summon negated**, as a moment of its own (`Duel.summoning`). The `summon` action (a Normal Summon of a Level 4 or lower
+    monster once a turn, or a built-in Special Summon from the hand, `CardDef.builtInSummon`) starts no chain
+    (`normal-summon-is-an-action`). The monster stays in the hand, not on the field. The turn player and then the opponent may
+    answer with an effect marked `answersSummon`; when both pass, the Summon succeeds (`summoned` is raised, so the "when
+    Summoned" triggers go on a chain). A negator marks the Summon negated and destroys the monster where it is; no `summoned`
+    is raised and no trigger happens. A Spell or Trap Card whose activation was negated, and a monster whose Summon was
+    negated, reach the Graveyard without being sent from the field (`moved.negated`; records `negated-card-not-from-field`,
+    `negated-summon-not-from-field`).
+- `Duel.lp` (8000 each) and `payLp`, `payHalfLp`: the costs of the Solemn cards. No damage yet.
+- `EffectRecord.handIf`: "if you control no cards, you can activate this card from your hand" (a Trap is listed from the hand,
+  in either turn, with no "Set this turn" limit).
+- `src/cards/`: Solemn Judgment, Solemn Strike and Infinite Impermanence, each with its Konami text (English and French) and
+  tests in `test/cards`. New rule records: `src/negation-sources.ts`, with `SourceKind` `"jp-notes"` for the 補足情報 notes at
+  the top of a card's Q&A page (they have no Q&A id).
+- **Infinite Impermanence is partial.** Its column clause ("if this card was Set before activation and is on the field at
+  resolution, for the rest of this turn all other Spell/Trap effects in this column are negated") needs columns (step 7) and
+  turn-long modifiers (step 6) and is not applied: a Set Infinite Impermanence negates the monster only. The card says so
+  (`CardDef.unmodelled`), its `CardSources.deferred` lists the printed part, and `coverage` reports it as **pending**, never as
+  done (a test citing a deferred part does not count). The card does not count as done until step 7. Step 10's port must refuse
+  a card with `unmodelled` parts.
+- `bench/negation.bench.ts`, and the step 5 table in `bench/BASELINE.md`.
+
+Known limits of step 5 (what the tests do not prove):
+- YGOProJudge (the owner's rules site, no source cited, asked 2026-11-23 in four sessions) is the only backing for: the Summon's
+  window offers only cards worded "would be Summoned" and is over once a chain started in it has resolved (asked twice, the
+  second time precisely); a monster whose effects are negated can still activate its Ignition, Quick and Trigger Effects and
+  pay the cost, and the effect resolves negated; once per turn: an activation negated gives back an "activate 1" use and not
+  the "Once per turn:" or "use this effect" ones. Konami's own pages cover the rest (see `src/negation-sources.ts`), but most of
+  that is Konami's Japanese Q&A (OCG), which has no formal authority over the TCG; the TCG pages say a Summon is an action with no
+  chain (FET, rulebook) and, in a 2011 article, that only a built-in Summon can be negated.
+- Summons: only a Normal Summon with no Tribute and a built-in Special Summon from the hand; no Flip Summon, Tribute Summon, Extra
+  Deck procedure or Summon by effect (step 8). **For step 8**: the 2011 TCG article (PSCT part 5) says a Summon performed by an
+  effect is not negatable by "negate the Summon" cards; Konami's 2026 Japanese Q&A (fids 24054, 16986) says a Summon an effect
+  performs can be answered by Solemn Judgment when that effect was Chain Link 1 and cannot from Chain Link 2. Pick one in step 8;
+  step 5 never opens the window for an effect's Summon. Also for step 8: a negated Summon is not "successful" (the monster
+  cannot be revived by a "must first be Special Summoned" clause: fid 21297), and a negated Flip Summon is destroyed on the field
+  (fid 17662).
+- "Pay half your LP" rounds the amount paid up for an odd LP: unsourced (tests use even LP).
+- The Damage Step's limits are not modelled (Counter Traps there, Infinite Impermanence not).
+- Infinite Impermanence's targets exclude a Normal Monster and an already negated monster: that is Konami's Japanese note only; the
+  TCG text has no such sentence. Whether a negated monster's trigger effects trigger is YGOProJudge's answer only (yes).
+- Destroying is a move to the Graveyard (no destruction event): Solemn Strike's destroyed monster is an ordinary move.
+- A negated monster's Continuous effects, and any other source of negation (Skill Drain), are step 6's modifiers.

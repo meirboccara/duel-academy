@@ -33,6 +33,21 @@ describe("coverage: the definition of done, checked over cards and their tests",
 		const { pending } = coverage([pot], [file(`${fullTests.text} it(\`\${cites("pot", "qa-other")} x\`)`)]);
 		expect(pending).toHaveLength(1);
 	});
+	it("reports a printed part that waits for a later step as pending, never as covered, even when a test cites it", () => {
+		const partial: CardSources = { ...pot, sources: [...pot.sources, { id: "column", kind: "card-text", cid: 4844, url: db(4844), read, quote: "...in this column are negated." }], deferred: [{ source: "column", step: 7, reason: "columns" }] };
+		const withCitation = file(`${fullTests.text} it(\`\${cites("pot", "column")} x\`)`);
+		expect(coverage([partial], [fullTests]).gaps).toEqual([]);
+		expect(coverage([partial], [withCitation]).pending).toEqual([
+			{ card: "pot", source: "column", reason: "step 7: columns" },
+			{ card: "pot", source: "qa-other", reason: "needs a card Academy doesn't have yet" },
+		]);
+	});
+	it("reports a deferred part that is also listed as an effect, or that names no source", () => {
+		const both: CardSources = { ...pot, deferred: [{ source: "draw", step: 6, reason: "x" }] };
+		expect(coverage([both], [fullTests]).gaps).toEqual([{ card: "pot", problem: "deferred-and-covered", source: "draw" }]);
+		const unknown: CardSources = { ...pot, deferred: [{ source: "ghost", step: 6, reason: "x" }] };
+		expect(coverage([unknown], [fullTests]).gaps).toEqual([{ card: "pot", problem: "unknown-source", source: "ghost" }]);
+	});
 	it("reports missing French text", () => {
 		const { french: _french, ...noFrench } = pot;
 		expect(coverage([noFrench], [fullTests]).gaps).toEqual([{ card: "pot", problem: "french-missing" }]);

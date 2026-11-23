@@ -1,3 +1,4 @@
+import { NEGATION_SOURCES } from "./negation-sources";
 import { konamiCardUrl, type SourceRecord } from "./sources";
 
 /**
@@ -281,4 +282,5 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 	// "once per Duel" (Destiny HERO - Disk Commander, Japanese name D-HERO ディスクガイ, cid 7095; the card text there is "once
 	// per Duel"): that I used a copy's effect does not stop the other player from activating it in that Duel.
 	qa("duel-per-player-effect-used", 7095, 8114, "相手プレイヤーがそのデュエル中に「 D-HERO ディスクガイ 」のモンスター効果が発動できなくなる事はありません。"),
+	...NEGATION_SOURCES,
 ];

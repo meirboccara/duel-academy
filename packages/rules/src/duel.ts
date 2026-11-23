@@ -110,12 +110,43 @@ export interface Duel {
 	readonly building: Building | null;
 	/** The once-per-turn (Duel, chain) uses so far (step 4). */
 	readonly used: Used;
+	/** Life Points: 8000 each (step 5, for the costs of cards such as Solemn Judgment; no damage yet). */
+	readonly lp: Readonly<Record<Side, number>>;
+	/** The Summon being attempted, which a "would be Summoned" effect can answer: it succeeds when both players pass in a row with no chain. */
+	readonly summoning: Summoning | null;
+	/** The turn player has used their Normal Summon this turn (a Normal Set of a monster is not in step 5, and `set` does not touch this). */
+	readonly normalSummoned: boolean;
+	/** The cards whose effects are negated until the end of a turn (step 5). */
+	readonly negations: readonly Negation[];
 	/** While a link resolves and its effect waits for a choice that is not a target: the whole chain, and the choice. */
 	readonly asking: Asking | null;
 	/** How many groups of simultaneous moves (`moveCards`) have happened: the last one's number tags its events. */
 	readonly batches: number;
 	/** What each card code does, as effect records (src/effects.ts): shared by reference, never copied, never changed. */
 	readonly defs: Readonly<Record<string, CardDef>>;
+}
+
+/**
+ * A card whose effects are negated until the end of the turn it names (Infinite Impermanence, Effect Veiler). It is the
+ * card as it was when negated (`moves`): a card that was turned face-down, left the field or changed control is a new card
+ * and is no longer negated (Konami: Effect Veiler's notes). `stamp` is the place in the order of negations; step 6 folds
+ * this list into the one list of timestamped modifiers.
+ */
+export interface Negation {
+	readonly card: number;
+	readonly moves: number;
+	/** The number of the turn in which it ends: it lasts until the end of that turn. */
+	readonly until: number;
+	readonly stamp: number;
+}
+
+/** The Summon in progress: it has been attempted and has not succeeded yet (step 5). The monster stays where it was, not on the field. */
+export interface Summoning {
+	readonly player: Side;
+	readonly cards: readonly number[];
+	readonly how: "normal" | "special";
+	/** A negator took: the Summon will not succeed. */
+	readonly negated: boolean;
 }
 
 /** A chain resolving, paused on a choice of its effect's player (`legalActions` lists the candidates as `choose`). */
@@ -141,6 +172,12 @@ export interface DuelSetup {
 	defs?: Readonly<Record<string, CardDef>>;
 	options?: Partial<TeachingOptions>;
 }
+
+/** Each player starts a Duel with 8000 LP (RB10, "Life Points"). */
+export const STARTING_LP = 8000;
+
+/** Priority in a closed game state with nobody having passed: after an action or a chain, `holder` may use a fast effect first. */
+export const closedPriority = (holder: Side): Priority => ({ holder, passed: [], open: false });
 
 export const other = (side: Side): Side => (side === "you" ? "rival" : "you");
 
@@ -190,6 +227,10 @@ export function createDuel(setup: DuelSetup): Duel {
 		waiting: [],
 		building: null,
 		used: NOTHING_USED,
+		lp: { you: STARTING_LP, rival: STARTING_LP },
+		summoning: null,
+		normalSummoned: false,
+		negations: [],
 		asking: null,
 		batches: 0,
 		defs: setup.defs ?? {},
@@ -226,7 +267,8 @@ export function moveCard(duel: Duel, id: number, to: MoveTo): Duel {
 	return move(duel, id, to, undefined);
 }
 
-type MoveTo = { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side };
+/** `negated`: the move of a Spell or Trap Card whose activation was negated, or of a monster whose Summon was negated (`GameEvent`). */
+type MoveTo = { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true };
 
 /**
  * Moves several cards at the same time, as one effect does ("send all monsters ... to the Graveyard"). Each moves like
@@ -248,7 +290,7 @@ function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Du
 	const renewed = zone !== before.zone || controller !== before.controller || flippedDown;
 	const after = { ...before, zone, face, controller, moves: before.moves + (renewed ? 1 : 0) };
 	const moved = place(duel, before, after, to.at ?? "top");
-	return renewed ? raiseEvent(moved, { type: "moved", before, after, batch }) : moved;
+	return renewed ? raiseEvent(moved, to.negated ? { type: "moved", before, after, batch, negated: true } : { type: "moved", before, after, batch }) : moved;
 }
 
 /** Gives control of a card on the field to a player: it becomes a new card for them. Its owner never changes. */

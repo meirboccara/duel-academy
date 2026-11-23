@@ -14,6 +14,11 @@ export interface CardSources {
 	sources: SourceRecord[];
 	/** One source per printed effect (costs and conditions included). */
 	effects: string[];
+	/**
+	 * Printed parts of the card the core does not apply yet, each a source of this card and the step that adds it. They are
+	 * reported as pending, never as covered (a test citing one does not make it done), and must not also be in `effects`.
+	 */
+	deferred?: { source: string; step: number; reason: string }[];
 	/** Rulings; a pending one involves a card Academy doesn't have yet. */
 	rulings: { source: string; pending?: string }[];
 }
@@ -24,7 +29,7 @@ export interface TestFile {
 }
 
 export type CoverageGap =
-	| { card: string; problem: "effect-untested" | "ruling-untested" | "rule-untested" | "unknown-source" | "source-other-card" | "duplicate-source"; source: string }
+	| { card: string; problem: "effect-untested" | "deferred-and-covered" | "ruling-untested" | "rule-untested" | "unknown-source" | "source-other-card" | "duplicate-source"; source: string }
 	| { card: string; problem: "source-invalid"; source: string; details: SourceProblem[] }
 	| { card: string; problem: "french-missing" | "reserved-code" }
 	| { card: string; problem: "french-invalid"; details: SourceProblem[] }
@@ -85,6 +90,11 @@ export function coverage(cards: readonly CardSources[], tests: readonly TestFile
 			const details = validateSource(source);
 			if (details.length > 0) gaps.push({ card: card.code, problem: "source-invalid", source: source.id, details });
 			if (source.kind !== "tcg-rule" && source.cid !== undefined && source.cid !== card.cid) gaps.push({ card: card.code, problem: "source-other-card", source: source.id });
+		}
+		for (const part of card.deferred ?? []) {
+			if (!known.has(part.source)) gaps.push({ card: card.code, problem: "unknown-source", source: part.source });
+			else if (card.effects.includes(part.source)) gaps.push({ card: card.code, problem: "deferred-and-covered", source: part.source });
+			else pending.push({ card: card.code, source: part.source, reason: `step ${part.step}: ${part.reason}` });
 		}
 		const listed = [...card.effects, ...card.rulings.map((ruling) => ruling.source)];
 		for (const source of listed) if (!known.has(source)) gaps.push({ card: card.code, problem: "unknown-source", source });

@@ -1,6 +1,6 @@
 import { type Action, PASS, sameAction } from "./action";
 import { activateAction, activateEffect, activationWays } from "./activation";
-import { type Duel, other, type Priority, type Side } from "./duel";
+import { closedPriority, type Duel, other, type Priority, type Side } from "./duel";
 import { effectOf } from "./effects";
 import type { Waiting } from "./events";
 
@@ -95,14 +95,14 @@ function advanceToChoice(duel: Duel): Duel {
 			current = add(current, all[0]!);
 			continue;
 		}
-		return { ...current, priority: { holder: sideOfStage(current, building.stage), passed: [], open: false } };
+		return { ...current, priority: closedPriority(sideOfStage(current, building.stage)) };
 	}
 }
 
 function finish(duel: Duel): Duel {
 	const building = duel.building!;
 	const top = duel.chain[duel.chain.length - 1];
-	const priority: Priority = building.anyActivated && top ? { holder: other(top.player), passed: [], open: false } : building.after;
+	const priority: Priority = building.anyActivated && top ? closedPriority(other(top.player)) : building.after;
 	return { ...duel, building: null, priority };
 }
 

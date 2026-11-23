@@ -1,9 +1,11 @@
 import { activateAction, activateEffect, activationWays } from "./activation";
 import { type Action, PASS, sameAction } from "./action";
-import { type CardInstance, type Duel, type Link, moveCard, other, PHASES, type Side } from "./duel";
+import { type CardInstance, closedPriority, type Duel, type Link, moveCard, other, PHASES, type Side } from "./duel";
 import { breakEffect, raiseEvent } from "./events";
 import { type CardDef, type EffectRecord, effectOf, rangeOf, speedOf } from "./effects";
+import { cardNegated, immune, withoutEnded } from "./negation";
 import { endChain, newTurn, refund } from "./once";
+import { beginSummon, finishSummon } from "./summon";
 import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./triggers";
 
 /**
@@ -29,13 +31,24 @@ import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./
  *   may ask its player for a card that is not a target: the chain then waits (`duel.asking`) and `legalActions` lists
  *   `choose`; with one candidate, nothing is asked.
  *
- * Not here yet: "cannot be negated" (step 5), the Damage Step's limits, Summons, attacks, the normal draw, and
+ * - Negation (step 5, src/negation.ts, src/summon.ts, src/life.ts): four different things. An activation negated and an effect
+ *   negated are flags of the link (`negateActivation`, `negateEffect`; a link whose card has its effects negated until the end
+ *   of the turn is skipped too, `Duel.negations`); "cannot be negated" is a condition read when the negation takes effect
+ *   (`EffectRecord.activationCannotBeNegated`, `effectCannotBeNegated`). A Summon (`summon` action: a Normal Summon with no
+ *   Tribute, or a built-in Special Summon from the hand) is not an activation and starts no chain: it is a moment of its own
+ *   (`Duel.summoning`) that only effects worded "would be Summoned" (`answersSummon`) can answer; the Summon succeeds when both
+ *   players pass, or once a chain started in the window has resolved, unless a negator took, in which case the monster is
+ *   destroyed without ever reaching the field. A Spell or Trap Card whose activation was negated goes to the Graveyard without
+ *   being sent from the field (`moved.negated`).
+ *
+ * Not here yet: the Damage Step's limits, Tributes, Flip Summons and Summons by effect (step 8), attacks, the normal draw, and
  * Continuous, Equip and Field cards that stay on the field (a Field Spell is placed and swept like any Spell; the
  * Field Zone comes with step 7). Known limit: a Spell or Trap whose control changed while on the chain is not swept
  * to the Graveyard (the sweep matches the card as activated, move count included).
  */
 /** Step 7 gives the exact zones; until then a side holds at most five cards in its Spell & Trap Zones. */
 const SPELL_ZONES = 5;
+const MONSTER_ZONES = 5;
 
 /**
  * Every action open to the player who holds priority, "pass" first. A player who does not hold priority has none.
@@ -63,6 +76,8 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 	let found = false;
 
 	const offer = (card: CardInstance, def: CardDef, index: number, effect: EffectRecord): boolean => {
+		// In the window of a Summon (nothing on the chain), only effects that answer the Summon can be activated.
+		if (duel.summoning && chain.length === 0 && !effect.answersSummon) return false;
 		const speed = speedOf(def, effect);
 		if (speed === 1 ? !slow : speed < topSpeed) return false;
 		const ctx = { player, card };
@@ -89,12 +104,23 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 		if (effects) {
 			for (let index = 0; index < effects.length; index++) {
 				const effect = effects[index]!;
-				if (!listedHere(effect, card, "hand", fromHand)) continue;
+				if (!listedHere(effect, card, "hand", fromHand || (room && effect.handIf?.(duel, { player, card }) === true))) continue;
 				if (offer(card, def, index, effect)) {
 					if (!out) return true;
 					found = true;
 				}
 			}
+		}
+		// A Normal Summon with no Tribute: a Level 4 or lower monster, once a turn, in an open game state, into a free Monster Zone.
+		if (!isSpellOrTrap && slow && !duel.normalSummoned && piles.monster.length < MONSTER_ZONES && (def.facts?.level ?? Infinity) <= 4) {
+			if (!out) return true;
+			out.push({ type: "summon", card: id, how: "normal" });
+			found = true;
+		}
+		if (def.builtInSummon && slow && piles.monster.length < MONSTER_ZONES && (def.builtInSummon.condition?.(duel, { player, card }) ?? true)) {
+			if (!out) return true;
+			out.push({ type: "summon", card: id, how: "special" });
+			found = true;
 		}
 		if (isSpellOrTrap && slow && room) {
 			if (!out) return true;
@@ -150,6 +176,7 @@ function apply(duel: Duel, action: Action): Duel {
 	if (duel.asking) return answer(duel, (action as Extract<Action, { type: "choose" }>).card);
 	if (duel.building) return action.type === "pass" ? declineTriggers(duel) : chooseTrigger(duel, action as Extract<Action, { type: "activate" }>);
 	if (action.type === "pass") return pass(duel);
+	if (action.type === "summon") return beginSummon(duel, duel.priority.holder, action.card, action.how);
 	return action.type === "set" ? set(duel, action.card) : activate(duel, action as Extract<Action, { type: "activate" }>);
 }
 
@@ -159,13 +186,13 @@ const decides = (duel: Duel) => duel.chain.length === 0 && duel.priority.open &&
 function set(duel: Duel, id: number): Duel {
 	const next = moveCard(breakEffect(duel), id, { zone: "spell", face: "down" });
 	// An action that starts no chain: trigger effects go first; then the turn player may use a fast effect, then the opponent (boxes B and C).
-	return triggerPoint({ ...next, setThisTurn: [...next.setThisTurn, id] }, { holder: duel.turn.player, passed: [], open: false });
+	return triggerPoint({ ...next, setThisTurn: [...next.setThisTurn, id] }, closedPriority(duel.turn.player));
 }
 
 function activate(duel: Duel, action: Extract<Action, { type: "activate" }>): Duel {
 	const player = duel.priority.holder;
 	const next = activateEffect(duel, player, duel.cards[action.card]!, action.effect, { paid: action.paid ?? [], targets: action.targets });
-	return { ...next, priority: { holder: other(player), passed: [], open: false } };
+	return { ...next, priority: closedPriority(other(player)) };
 }
 
 function pass(duel: Duel): Duel {
@@ -174,6 +201,8 @@ function pass(duel: Duel): Duel {
 	// Both players have passed in a row.
 	const turnPlayer = duel.turn.player;
 	if (duel.chain.length > 0) return resolveChain(duel, duel.chain, null);
+	// A Summon that nobody answered (or whose answers have resolved) succeeds.
+	if (duel.summoning) return finishSummon(duel);
 	// Nothing happened and both passed: the game state is open again, and the events before are no longer the last thing.
 	if (!open) return { ...breakEffect(duel), priority: { holder: turnPlayer, passed: [], open: true } };
 	return nextPhase(duel);
@@ -188,7 +217,9 @@ function pass(duel: Duel): Duel {
  * (When: after the whole chain, not after its own link. Konami's Japanese Q&A says so for Quick-Play Spells and Traps
  * chained to an effect: rule record `chained-card-after-chain`; the core applies it to every Spell and Trap Card.)
  */
-function resolveChain(duel: Duel, all: readonly Link[], pending: Duel | null): Duel {
+function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | null): Duel {
+	// The links as they stand once each has come up for resolution: a lower link carries the negation a higher one gave it.
+	const all = [...activated];
 	let next = duel;
 	let result = pending;
 	for (;;) {
@@ -197,7 +228,8 @@ function resolveChain(duel: Duel, all: readonly Link[], pending: Duel | null): D
 			next = breakEffect(next);
 			const index = next.chain.length - 1;
 			const link = next.chain[index]!;
-			result = link.activationNegated || link.effectNegated ? next : effectOf(next, link).operation(next, link, index);
+			all[index] = link;
+			result = link.activationNegated || link.effectNegated || cardNegated(next, link) ? next : effectOf(next, link).operation(next, link, index);
 		}
 		const asking = result.asking;
 		if (asking) {
@@ -212,9 +244,14 @@ function resolveChain(duel: Duel, all: readonly Link[], pending: Duel | null): D
 	for (const link of all) {
 		if (effectOf(next, link).type !== "activation") continue;
 		const now = next.cards[link.card.id]!;
-		if (now.zone === "spell" && now.face === "up" && now.moves === link.card.moves) next = moveCard(next, now.id, { zone: "graveyard" });
+		if (now.zone === "spell" && now.face === "up" && now.moves === link.card.moves) next = moveCard(next, now.id, link.activationNegated ? { zone: "graveyard", negated: true } : { zone: "graveyard" });
 	}
-	return triggerPoint(endChain(next), { holder: next.turn.player, passed: [], open: false });
+	next = endChain(next);
+	// The window of a Summon ends with the first chain started in it (lead from YGOProJudge, no Konami page found): the Summon succeeds,
+	// unless it was negated, in which case the monster was destroyed by the negator and nothing was Summoned.
+	if (next.summoning && !next.summoning.negated) return finishSummon(next);
+	if (next.summoning) next = { ...next, summoning: null };
+	return triggerPoint(next, closedPriority(next.turn.player));
 }
 
 /** The player picked a card for the effect that was asking: it goes on, and the rest of the chain resolves. */
@@ -236,7 +273,7 @@ function nextPhase(duel: Duel): Duel {
 	}
 	const player: Side = other(duel.turn.player);
 	const turn = { player, number: duel.turn.number + 1, phase: PHASES[0]! };
-	return triggerPoint(raiseEvent(newTurn({ ...moved, turn, setThisTurn: [] }), { type: "phase", phase: turn.phase, player }), { holder: player, passed: [], open: true });
+	return triggerPoint(raiseEvent(newTurn(withoutEnded({ ...moved, turn, setThisTurn: [], normalSummoned: false }, duel.turn.number)), { type: "phase", phase: turn.phase, player }), { holder: player, passed: [], open: true });
 }
 
 const flag = (duel: Duel, index: number, change: Partial<Link>): Duel => (duel.chain[index] ? { ...duel, chain: duel.chain.map((link, i) => (i === index ? { ...link, ...change } : link)) } : duel);
@@ -244,9 +281,35 @@ const flag = (duel: Duel, index: number, change: Partial<Link>): Duel => (duel.c
 /** Negates the activation of the link at `index`: it will apply nothing, and its card was never activated. */
 export function negateActivation(duel: Duel, index: number): Duel {
 	const link = duel.chain[index];
+	// "Cannot be negated" is read now, when the negating effect resolves (record `cannot-be-negated-checked-at-resolution`).
+	if (link && immune(duel, link, "activation")) return duel;
 	const flagged = flag(duel, index, { activationNegated: true });
 	return link ? refund(flagged, link, effectOf(duel, link)) : flagged;
 }
 
 /** Negates the effect of the link at `index`: the activation stands, the effect is not applied. */
-export const negateEffect = (duel: Duel, index: number): Duel => flag(duel, index, { effectNegated: true });
+export const negateEffect = (duel: Duel, index: number): Duel => {
+	const link = duel.chain[index];
+	return link && immune(duel, link, "effect") ? duel : flag(duel, index, { effectNegated: true });
+};
+
+/** Did the activation of the link at `index` get negated? An operation that says "and if you do" reads this after negating. */
+export const activationNegated = (duel: Duel, index: number): boolean => duel.chain[index]?.activationNegated ?? false;
+
+/**
+ * "Negate the activation, and if you do, destroy that card." Nothing more happens when the negation did not take (an
+ * activation that cannot be negated). It destroys only what is on the field: a monster whose effect was activated from the
+ * hand is normally already in the Graveyard as the cost (Konami's Q&A, record `hand-effect-negated-card-already-in-graveyard`);
+ * a hand monster that stays in the hand is not destroyed, and no Konami page found says whether it should be. A Spell or Trap Card whose activation was negated goes to the Graveyard without
+ * being sent from the field (`moved.negated`: record `negated-card-not-from-field`); a monster whose effect was negated is
+ * destroyed where it is, if it is still there.
+ */
+export function negateActivationAndDestroy(duel: Duel, index: number): Duel {
+	const link = duel.chain[index];
+	const negated = negateActivation(duel, index);
+	if (!link || link.activationNegated || !activationNegated(negated, index)) return negated;
+	const now = negated.cards[link.card.id]!;
+	const onField = (now.zone === "monster" || now.zone === "spell" || now.zone === "field") && now.moves === link.card.moves;
+	if (!onField) return negated;
+	return moveCard(negated, now.id, effectOf(duel, link).type === "activation" ? { zone: "graveyard", negated: true } : { zone: "graveyard" });
+}

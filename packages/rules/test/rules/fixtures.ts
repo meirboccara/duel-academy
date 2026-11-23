@@ -76,6 +76,10 @@ export interface SideSpec {
 	setThisTurn?: string[];
 	/** Face-up monsters. */
 	monsters?: string[];
+	/** Face-up Spell and Trap Cards in the Spell & Trap Zone (Continuous cards whose effects are activated). */
+	faceupSpells?: string[];
+	/** Face-down monsters. */
+	facedown?: string[];
 	graveyard?: string[];
 	deck?: string[];
 }
@@ -87,6 +91,8 @@ export function position(spec: { defs: Record<string, CardDef>; you?: SideSpec; 
 		["set", "spell", "down"],
 		["setThisTurn", "spell", "down"],
 		["monsters", "monster", "up"],
+		["facedown", "monster", "down"],
+		["faceupSpells", "spell", "up"],
 		["graveyard", "graveyard", undefined],
 		["deck", "deck", undefined],
 	];
@@ -116,6 +122,7 @@ export function label(duel: Duel, action: Action): string {
 	if (action.type === "pass") return "pass";
 	const code = duel.cards[action.card]!.code;
 	if (action.type === "set") return `set ${code}`;
+	if (action.type === "summon") return `${action.how === "special" ? "special-summon" : "summon"} ${code}`;
 	if (action.type === "choose") return `choose ${code}`;
 	return `activate ${code}${(action.paid ?? []).map((card) => ` ~ ${duel.cards[card]!.code}`).join("")}${action.targets.map((target) => ` > ${duel.cards[target]!.code}`).join("")}`;
 }

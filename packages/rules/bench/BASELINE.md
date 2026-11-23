@@ -126,3 +126,31 @@ What changed, and how to read it:
   engine, with a median of 0.051 ms): the ratio to quote is 14× with the noise in mind, and the floor seen was 10.7×.
 - New benchmark rows (`bench/records.bench.ts`) are unchanged within noise (0.0016 to 0.0019 ms listing, 0.0028 ms for the
   rival's window with Ash Blossom and D.D. Crow).
+
+# Rules core, step 5 (negation)
+
+Same machine and day (macOS, Node 20+, 2026-11-23), one run of `pnpm bench` (today's engine measured in the same run). Mean
+time per call:
+
+| Position | `legalActions` | list + `act` | today's engine | ratio |
+|---|---:|---:|---:|---:|
+| opening | 0.0006 ms | 0.0188 ms | 0.359 ms | 19× |
+| midgame | 0.0017 ms | 0.0268 ms | 1.546 ms | 58× |
+| crowdedHand | 0.0021 ms | 0.0523 ms | 0.765 ms | 14.6× |
+
+crowdedHand stays at or above 10× today's engine (the step 4 follow-up recorded 14.3×, floor seen 10.7×; same noise applies).
+What step 5 adds to the listing: one `duel.summoning` read per offered effect (a field read), the `handIf` check for a hand
+Trap that has one, and the Normal Summon / built-in Summon check per hand monster. `isNegated` scans `duel.negations`, empty
+except while a card is negated; none of the reference boards has a negation, so it does not show here.
+
+New in step 5 (`bench/negation.bench.ts`, real Solemn Judgment / Solemn Strike / Infinite Impermanence), mean per call:
+
+| Case | Mean |
+|---|---:|
+| `legalActions`: the rival's window against a Summon (3 Set Counter Traps, Impermanence in the hand, one monster) | 0.0021 ms |
+| `legalActions`: your turn with a negated monster and a Normal Summon available | 0.0007 ms |
+| A Normal Summon negated by Solemn Judgment, the whole sequence (list, activate, resolve) | 0.0060 ms |
+
+Re-measured after the step 5 review fixes (same machine, one run of `legal-moves.bench.ts`, today's engine in the same run):
+crowdedHand 0.0556 ms list + `act` against 0.746 ms: **13.4×** (opening 0.0211 ms vs 0.365 ms, 17×; midgame 0.0277 ms vs 1.691 ms, 61×).
+A full `pnpm bench` run earlier the same minute was noisy (today's engine ±35 % on crowdedHand) and is not quoted.
