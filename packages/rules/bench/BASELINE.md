@@ -275,3 +275,35 @@ Ritual Spell's activation condition (0.025 ms: every Main Monster Zone is taken,
 the field). It is still 14× to 40× under today's engine on its own boards, but it is what step 9 should cache per position if the
 bot lists at every node. Choosing materials costs more than listing: each question looks for a legal set once per candidate, and
 once more to tell whether a candidate is in every set.
+
+# Rules core, step 9 (bot support)
+
+Same Windows machine, 2026-11-24, Node 22. `bench/legal-moves.bench.ts` (one run), mean per call:
+
+| Position | `legalActions` | vs today's engine | list + `act` | today's engine | ratio |
+|---|---:|---:|---:|---:|---:|
+| opening | 0.0006 ms | ~1,300× | 0.0193 ms | 0.767 ms | 40× |
+| midgame | 0.0025 ms | ~1,300× | 0.0359 ms | 3.308 ms | 92× |
+| crowdedHand | 0.0022 ms | ~490× | 0.0498 ms | 1.070 ms | **21.5×** |
+
+Step 9 does not touch the listing or `act`: the listing stays far past the spec's 30× and list + `act` on crowdedHand above the 10×
+floor (within the noise of step 8's runs). No per-position cache of the procedure listing was added: the decision times below do not
+need it.
+
+`bench/bot.bench.ts`: one `chooseAction` per level for `you` in Main Phase 1 (seed 1), with a budget far above its cost (60 s) so the
+expert row is the full sampling (4 candidates × 8 worlds, playouts to the end of the next turn, at most 60 decisions each). Mean (and
+max) per decision, 20 runs (expert 5):
+
+| Position | basic | medium | strong | expert |
+|---|---:|---:|---:|---:|
+| opening (reference) | 0.053 ms | 0.055 ms | 0.047 ms | 2.6 ms (max 3.2) |
+| midgame (reference) | 0.083 ms | 0.070 ms | 0.115 ms | 48 ms (max 56) |
+| crowdedHand (reference) | 0.049 ms | 0.058 ms | 0.089 ms | 7.8 ms (max 10) |
+| handTrapMidgame (`bot-boards.ts`: real cards, hand traps in both hands, Set cards both sides) | 0.82 ms | 0.73 ms | 1.06 ms | **308 ms (max 378)** |
+
+After the review fixes (playouts check the clock; a line's step comes on top of the 4 greedy candidates) one more run gave expert
+2.0 / 34 / 6.8 / **241 ms (max 278)** on the same four boards.
+
+The expert decision is under the spec's 1.5 s by about 4× on the heaviest board; its default budget (1,200 ms) is a cap, not the
+expected cost. The boards have no plan, so medium and strong play as basic here (the differences are noise). Node, not a browser or
+a tablet: a Worker on a slow tablet should be measured in step 10.

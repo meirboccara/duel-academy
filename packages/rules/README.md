@@ -426,3 +426,54 @@ Known limits of step 8 (what the tests do not prove):
 - The listing looks for one legal material set per Extra Deck monster on every call: 0.08 ms with fifteen of them over five
   monsters and a Ritual Spell in hand (BASELINE.md). A bot that lists per node should cache "can Summon" per position; material choices cost more (a Ritual
   Summon with ten cards to Tribute among: 0.44 ms from the activation to the monster on the field).
+
+Step 9 (bot support; design in `docs/rules-core/step9/design.md`; code in `src/bot/`, tests in `test/bot/`):
+- `viewFor(duel, side)` (`src/bot/view.ts`): the Duel as `side` sees it. Cards it cannot see have the code `HIDDEN`: the opponent's
+  hand, both Decks (contents and order), the opponent's face-down cards on the field, face-down Extra Deck (face-up Pendulums stay
+  public) and face-down banished cards; event snapshots in `live`, `lingering`, `waiting` and the triggers being chained are masked
+  too, and so is the RNG. `unknown` holds, per owner, the sorted pools those cards come from (`main`, `extra`).
+- `redeal(view, seed)`: a full legal Duel consistent with the view. Each hidden card keeps its id, place and history and gets a code
+  dealt from its owner's pool (seeded `createRng`); a face-down Field Zone card gets a Field Spell, a Set card a Spell or Trap, a
+  face-down monster a monster. The world's RNG is reseeded.
+- `actionName(duel, action)` / `findNamed(duel, step)` / `followLine(duel, steps)` (`src/bot/names.ts`): names in the fixtures' style
+  ("activate terraforming", "attack big > small", "choose umi", "place 2"; "#n" for a card with several effect records; a step may add
+  " @z" and " as defense"); a line is followed with `act` and stops at the first step that is not legal (`failed: { index, step, offered }`).
+- `evaluate(duel, side)` / `interruptions(duel, owner, viewer)` (`src/bot/evaluate.ts`): LP, board, hand, Extra Deck and GY counts,
+  and interruptions (hand traps, Set Quick-Plays and Traps, untapped Quick Effects on the field; an opponent's unknown Set card counts
+  half), reading only what `viewFor` keeps.
+- `chooseAction(duel, side, { level, seed, budgetMs, plan, progress, now })` / `decide(...)` (`src/bot/bot.ts`): levels `basic`
+  (greedy: each action played on a re-dealt world and settled as if nobody answered), `medium` (+ the main line of the `DeckPlan`),
+  `strong` (+ switching to another line sharing the steps played), `expert` (+ determinized sampling: the top 4 candidates, the line
+  step with a bonus, over 8 re-dealt worlds, both players playing greedily to the end of the next turn). Never the real Duel: always
+  worlds re-dealt from the view. Line `Progress` is returned and handed back (no state in the bot). A quick choice first, then the
+  search within `budgetMs` (default 1,000 ms, expert 1,200 ms) with an injected clock.
+- `answerRequest(request, defs)` / `rebuildDuel` / `serveBot(scope, defs)` (`src/bot/protocol.ts`) and the worker entry
+  `src/bot-worker.ts` (not exported): the request carries the Duel as its setup and the actions played (plain data).
+- `bench/bot.bench.ts` and `bench/bot-boards.ts`; the step 9 table in BASELINE.md (expert 308 ms on the heaviest board).
+
+Known limits of step 9 (what the tests do not prove):
+- The opponent's pool is the true multiset of its hidden cards: the bot "knows" the opponent's decklist (Forge's choice; design D1).
+  A model of plausible meta lists would replace it without changing the seams.
+- What a player saw and remembers is not tracked: a card searched or returned to the hand in view of both players is hidden again
+  once in the hand and re-dealt like any other (event snapshots of it are masked too, so a world stays consistent). A hidden card
+  whose trigger is waiting stays hidden; a world drops a waiting trigger whose card was dealt a code without it. Face-down banished
+  cards of the opponent are pooled with its Main Deck cards.
+- The re-deal is greedy (most restricted zones first); a pool that cannot fit every face-down zone gives a card that does not fit
+  rather than failing (only an inconsistent view can lead there).
+- The evaluation's weights are first guesses. A hand trap is worth its card plus an interruption, so the playout policy spends it only
+  when it stops more than 5 points: it negates a monster Summoned from the Deck, not a plain search (card for card). Per-deck end
+  boards are not scored. A Set card counts as an interruption even in the turn it was Set (it is there for the opponent's turn; not
+  counting it would make Setting a Trap a loss), but not once its once-per-turn activation is spent.
+- `basic`, `medium` and `strong` settle a move as if the opponent passed; only `expert`'s playouts let the opponent answer, and only
+  with what it holds in each sampled world. Playouts are greedy (no randomness), so worlds differ only by the cards dealt. No
+  mistakes or personas: today's knobs (`skill`, `answers`, `aggression`) are the app's (step 10).
+- Lines: a line starts only in an open state of the side's own turn, at most one line a turn; a step that is not legal elsewhere (a
+  chain to answer) waits. A step is played without checking that the board after it is not worse. When expert's sampling prefers
+  another move, the line does not move on and its step is offered again.
+- Determinism holds while the budget is not reached; once the budget cuts the search, the answer can depend on the machine's speed.
+  A budget cut during sampling keeps only the worlds every candidate was played on (checked by reading, no test isolates it); a
+  playout checks the clock before each decision and is abandoned when the time is up. A world that refuses a move (a throw from `act`)
+  leaves that candidate unscored in it (defensive: no such world was found).
+- Times are Node on a desktop, not a browser Worker on a tablet. The worker entry is not run in a real Worker by any test (its
+  `serveBot` is, on a fake scope); the app wiring is step 10. The request replays the Duel from its setup: step 10's opening draw has
+  to be part of that setup or of the actions.

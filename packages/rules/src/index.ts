@@ -16,3 +16,4 @@ export * from "./summon";
 export * from "./battle";
 export * from "./zones";
 export * from "./procedures";
+export * from "./bot";
