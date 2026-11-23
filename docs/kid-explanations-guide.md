@@ -35,7 +35,29 @@ changes it on every card at once (the text is stored with its tokens).
 | `{set-trap}` | a Trap: set first, not usable the turn it is set, usable from the next turn on (either player's) | Place this Trap face-down first: you can use it from the next turn on, even your friend's. |
 | `{quick-play}` | a Quick-Play Spell: when it can be played | You can play it on your turn, or place it face-down and surprise your friend on a later turn, even theirs. |
 
-`explanations:save` refuses an unknown token, and a shared idea written by hand (for example "Ton adversaire peut
+**How an effect works**
+
+| Token | Use it when the card says | English |
+| --- | --- | --- |
+| `{mandatory}` | no "You can" ("Add…", "Destroy…") | This always happens, even if you don't want it to. |
+| `{optional}` | "You can" | You choose if you want to use it. |
+| `{when}` | **optional** "When … : You can" (it can miss its moment; a mandatory "When" never does) | It only works if that was the very last thing that happened. If something else happened just after, the moment is lost. |
+| `{if}` | optional "If … : You can" | It still works even if other things happened just after. |
+| `{once-per-turn}` | "Once per turn:" (this copy; resets if it leaves the field or is turned face-down) | You can use this once each turn. If this card leaves the field or is turned face-down and comes back, it is like a new card and can use it again this turn. |
+| `{once-per-turn-name}` | "You can only use this effect of [name] once per turn" (all copies together) | You can use this only once each turn, even with several copies of this card, and even if it leaves the field and comes back. |
+| `{quick-effect}` | "(Quick Effect)" | This monster can use its power even on your friend's turn, even right after they play a card. |
+| `{then}` | "…, then …" | First the first part happens, then the second. If the first part doesn't happen, the second doesn't either. |
+| `{also}` | "…, also …" | Both parts happen at the same time, and each one happens even if the other can't. |
+| `{if-you-do}` | "…, and if you do, …" | Both parts happen at the same time, but the second part only happens if the first one did. |
+
+**What happens to a card** (add it after the card's own sentence that uses the word): `{destroy}`,
+`{cannot-be-destroyed}`, `{send-to-gy}`, `{banish}`, `{discard}`, `{tribute}`, `{special-summon}`, `{return-to-hand}`,
+`{negate}`, `{set}`, `{equip}`. Their exact words in each language are in `phrases.ts`.
+
+Sources: then/also/and if you do from Konami's PSCT Part 7; Quick Effects from Konami's Fast Effect Timing page;
+When/If and the two once-per-turn rules from YGOProJudge only (2026-11-23), since Konami's PSCT pages don't cover them.
+
+`explanations:save` refuses an unknown token, and a shared idea written by hand when it has tell-tale wording (answer, cost, if-gone, set-trap, quick-play, mandatory, when, once per turn, quick effect; a card's own words may still say "destroyed", "banished" or "then") (for example "Ton adversaire peut
 encore répondre avec une carte avant" instead of `{answer}`).
 
 ## Rules (prompt version 2)
