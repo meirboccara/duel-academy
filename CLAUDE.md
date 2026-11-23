@@ -12,3 +12,13 @@ Moved out of `meirboccara/project-meir` into its own repo; the docs in `docs/` c
 - **Never commit unless asked.**
 - **Model split:** Opus 5.5 leads and decides when a task really needs Fable 5.2's deep rules work (chain/timing,
   summon procedures, board-state rules); Sonnet 5.5 for card scripting once the mechanic exists.
+- **TCG rules questions: ask YGOProJudge.** When a rules decision is unclear (timing, chains, triggers, a card's
+  ruling), ask the owner's rules site YGOProJudge through its partner API (`https://ygoprojudge.com/api/partner/v1`):
+  open a session with `POST /judge-sessions` (`externalDuelId`, `callerSeat: "A"`, `format: { game: "tcg" }`), ask with
+  `POST /judge-sessions/{id}/turns` (`seat: "A"`, `text` up to 1000 characters; an answer can take minutes), then
+  `POST /judge-sessions/{id}/close`. The key is `YGOJ_PARTNER_KEY` in
+  `~/Documents/personal/project-meir/apps/duel-nextjs/.env.development`: read it there, never print it or copy it into
+  this repo. Ask one question per session, in general terms, naming no person or project.
+  - Its answers often cite no source: treat them as a lead, not a record. Tests in `packages/rules` still cite Konami
+    sources; when YGOProJudge and a Konami page disagree, Konami wins. Where only YGOProJudge backs a choice, say so in
+    the code comment or README.
