@@ -306,9 +306,10 @@ export const activationNegated = (duel: Duel, index: number): boolean => duel.ch
 
 /**
  * "Negate the activation, and if you do, destroy that card." Nothing more happens when the negation did not take (an
- * activation that cannot be negated). It destroys only what is on the field: a monster whose effect was activated from the
- * hand is normally already in the Graveyard as the cost (Konami's Q&A, record `hand-effect-negated-card-already-in-graveyard`);
- * a hand monster that stays in the hand is not destroyed, and no Konami page found says whether it should be (README limits). A Spell or Trap Card whose activation was negated goes to the Graveyard without
+ * activation that cannot be negated). It destroys the card where it is, on the field or in the hand: a monster whose effect was
+ * activated from the hand is normally already in the Graveyard as the cost, and then there is nothing to destroy (Konami's Q&A,
+ * record `hand-effect-negated-card-already-in-graveyard`); one that stayed in the hand is destroyed there (YGOProJudge, asked
+ * 2026-11-23, no source cited; no Konami page found). A Spell or Trap Card whose activation was negated goes to the Graveyard without
  * being sent from the field (`moved.negated`: record `negated-card-not-from-field`); a monster whose effect was negated is
  * destroyed where it is, if it is still there.
  */
@@ -317,7 +318,7 @@ export function negateActivationAndDestroy(duel: Duel, index: number): Duel {
 	const negated = negateActivation(duel, index);
 	if (!link || link.activationNegated || !activationNegated(negated, index)) return negated;
 	const now = negated.cards[link.card.id]!;
-	const onField = (now.zone === "monster" || now.zone === "spell" || now.zone === "field") && now.moves === link.card.moves;
-	if (!onField) return negated;
+	const stillThere = (now.zone === "monster" || now.zone === "spell" || now.zone === "field" || now.zone === "hand") && now.moves === link.card.moves;
+	if (!stillThere) return negated;
 	return destroyCard(negated, now.id, effectOf(duel, link).type === "activation" ? { negated: true } : {});
 }

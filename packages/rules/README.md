@@ -212,10 +212,9 @@ Known limits of step 5 (what the tests do not prove):
   TCG text has no such sentence. Whether a negated monster's trigger effects trigger is YGOProJudge's answer only (yes).
 - Destruction is a `moved` event with `reason: "destroyed"` (`destroyCard`): MST, and the card or monster a negator destroys
   (even a negated Summon or activation, which is destroyed but "not sent from the field"). A move that is not a destruction
-  (discard, send, Tribute, a cost) has no reason. Destroying the monster of a negated effect when it stayed in the hand (an
-  effect whose cost is not the card itself): not settled. Konami's Q&A for Solemn Strike (cid 12187, 27 entries, all titles
-  read) has no entry on it, and Solemn Judgment's 105 were not read; the core destroys only a card on the field. A YGOProJudge
-  question was not asked (the key lives in another project's env file and the sandbox refused the read).
+  (discard, send, Tribute, a cost) has no reason. The monster of a negated hand effect that stayed in the hand (an effect whose
+  cost is not the card itself) is destroyed in the hand: YGOProJudge's answer only (asked 2026-11-23, no source cited). Konami's
+  Q&A for Solemn Strike (cid 12187, 27 entries, all titles read) has no entry on it, and Solemn Judgment's 105 were not read.
 - A negated monster's Continuous effects, and any other source of negation (Skill Drain), are step 6's modifiers.
 
 Step 6 (continuous effects, as one list of timestamped modifiers; design in `docs/rules-core/step6/design.md`, sources in

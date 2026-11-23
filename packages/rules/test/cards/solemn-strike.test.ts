@@ -57,4 +57,16 @@ describe("Solemn Strike, written as an effect record", () => {
 		expect(codes(done, "you", "graveyard")).toEqual(["hand-monster"]);
 		expect(done.lp.rival).toBe(6500);
 	});
+	// YGOProJudge only (asked 2026-11-23, no source cited): a card in the hand can be destroyed; no Konami page was found.
+	it("a monster whose hand effect is negated and that stayed in the hand is destroyed there (YGOProJudge lead)", () => {
+		const log: string[] = [];
+		const defs = { ...CARD_DEFS, ...negationCards(log) };
+		const start = position({ defs, you: { hand: ["hand-keeper"] }, rival: { set: [card] } });
+		const done = play(start, "activate hand-keeper", `activate ${card}`);
+		expect(log).toEqual([]);
+		expect(codes(done, "you", "hand")).toEqual([]);
+		expect(codes(done, "you", "graveyard")).toEqual(["hand-keeper"]);
+		const destroyed = done.cards[Object.values(done.cards).find((c) => c.code === "hand-keeper")!.id]!;
+		expect(destroyed.zone).toBe("graveyard");
+	});
 });

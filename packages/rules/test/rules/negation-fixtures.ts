@@ -87,6 +87,8 @@ export function negationCards(log: string[] = []): Record<string, CardDef> {
 		{ code: "immune-monster", kind: "monster", effects: [{ type: "ignition", effectCannotBeNegated: (duel, link) => duel.piles[link.player].monster.length > 1, operation: logs("immune-monster") }] },
 		// A monster whose hand Quick Effect discards itself as the cost.
 		{ code: "hand-monster", kind: "monster", effects: [{ type: "quick", range: "hand", cost: (duel, { card }) => moveCard(duel, card.id, { zone: "graveyard" }), operation: logs("hand-monster") }] },
+		// A monster whose hand Quick Effect has no cost: the card stays in the hand while its effect is on the chain.
+		{ code: "hand-keeper", kind: "monster", effects: [{ type: "quick", range: "hand", operation: logs("hand-keeper") }] },
 		// A Continuous Spell on the field with an Ignition Effect.
 		{ code: "lamp", kind: "spell", effects: [{ type: "ignition", operation: logs("lamp") }] },
 		// "You can banish this card; ... You can only use this effect of [name] once per turn.": the cost is banishing itself.
