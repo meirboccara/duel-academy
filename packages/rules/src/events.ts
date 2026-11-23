@@ -1,4 +1,4 @@
-import type { CardInstance, DamageStep, Duel, Phase, Side, Zone } from "./duel";
+import type { CardInstance, DamageStep, Duel, MoveReason, Phase, Position, Side, SummonKind, Zone } from "./duel";
 import { type CardDef, effectOf, inFieldRange, rangeOf } from "./effects";
 
 /**
@@ -11,10 +11,16 @@ export type GameEvent =
 	 * negated, or a monster whose Summon was negated, going to the Graveyard: Konami does not treat it as sent from the
 	 * field (rule records `negated-card-not-from-field`, `negated-summon-not-from-field`). `reason: "destroyed"`: the card was
 	 * destroyed (`destroyCard`); a card sent to the Graveyard otherwise (discarded, sent by an effect, Tributed) has none. */
-	| { readonly type: "moved"; readonly before: CardInstance; readonly after: CardInstance; readonly batch?: number; readonly negated?: true; readonly reason?: "destroyed"; readonly by?: "battle" }
+	| { readonly type: "moved"; readonly before: CardInstance; readonly after: CardInstance; readonly batch?: number; readonly negated?: true; readonly reason?: MoveReason; readonly usedFor?: SummonKind; readonly by?: "battle" }
 	/** A card went to a hand from another zone (a draw, a search, a recovery): `card` is the card in the hand, `from` where it was. Raised after its `moved`. */
 	| { readonly type: "added-to-hand"; readonly card: CardInstance; readonly from: Zone; readonly batch?: number }
-	| { readonly type: "summoned"; readonly card: CardInstance; readonly how: "normal" | "flip" | "special" }
+	/**
+	 * A Summon succeeded. Step 8: `kind` is the procedure (a Tribute, Fusion, Synchro, Xyz, Link, Ritual or Pendulum Summon); `by:
+	 * "effect"`: a card effect put the monster on the field (Monster Reborn, Polymerization), not an action of the player.
+	 */
+	| { readonly type: "summoned"; readonly card: CardInstance; readonly how: "normal" | "flip" | "special"; readonly kind?: SummonKind; readonly by?: "effect" }
+	/** Step 8: a face-up monster's battle position was changed, by its controller or by an effect; `from` is the position it had. */
+	| { readonly type: "position-changed"; readonly card: CardInstance; readonly from: Position }
 	/** Step 6b: an attack was declared (`target` `null`: a direct attack). */
 	| { readonly type: "attack-declared"; readonly attacker: CardInstance; readonly target: CardInstance | null }
 	/** Step 6b: a timing of the Damage Step begins. */
@@ -22,7 +28,7 @@ export type GameEvent =
 	/** Step 6b: the attack reached damage calculation: the monsters "battled" (RB10). */
 	| { readonly type: "battled"; readonly attacker: CardInstance; readonly target: CardInstance | null }
 	| { readonly type: "battle-damage"; readonly player: Side; readonly amount: number }
-	/** Step 6b: a monster was flipped face-up (the attack target, before damage calculation; the event is raised after it). */
+	/** A monster was flipped face-up: the attack target (step 6b: before damage calculation; the event is raised after it), a Flip Summon or a card effect (step 8). */
 	| { readonly type: "flipped"; readonly card: CardInstance }
 	/** A phase starts; `player` is the turn player. */
 	| { readonly type: "phase"; readonly phase: Phase; readonly player: Side };

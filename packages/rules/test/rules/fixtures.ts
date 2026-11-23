@@ -86,6 +86,9 @@ export interface SideSpec {
 	extraZone?: string[];
 	graveyard?: string[];
 	deck?: string[];
+	/** Step 8: the Extra Deck (face-down), and Pendulum Monsters face-up on it. */
+	extra?: string[];
+	extraFaceUp?: string[];
 }
 
 /** Builds a position: your turn, Main Phase 1, the game state open, unless told otherwise. */
@@ -104,7 +107,8 @@ export function position(spec: { defs: Record<string, CardDef>; you?: SideSpec; 
 	];
 	const all = (side: SideSpec) => places.flatMap(([key]) => side[key] ?? []);
 	const sides = { you: spec.you ?? {}, rival: spec.rival ?? {} };
-	let duel = createDuel({ seed: 7, you: { deck: all(sides.you) }, rival: { deck: all(sides.rival) }, defs: spec.defs, options: spec.options });
+	const extraOf = (side: SideSpec) => [...(side.extra ?? []), ...(side.extraFaceUp ?? [])];
+	let duel = createDuel({ seed: 7, you: { deck: all(sides.you), extra: extraOf(sides.you) }, rival: { deck: all(sides.rival), extra: extraOf(sides.rival) }, defs: spec.defs, options: spec.options });
 	const setThisTurn: number[] = [];
 	let id = 1;
 	for (const side of ["you", "rival"] as const) {
@@ -117,6 +121,9 @@ export function position(spec: { defs: Record<string, CardDef>; you?: SideSpec; 
 				id++;
 			}
 		}
+		// The Extra Deck's cards come after the side's other cards: those face-up on it (Pendulum Monsters) are turned now.
+		id += sides[side].extra?.length ?? 0;
+		for (const _code of sides[side].extraFaceUp ?? []) duel = moveCard(duel, id++, { zone: "extra", face: "up" });
 	}
 	const turn = spec.turn ?? "you";
 	// Placing the cards for the position is not something that happened in the duel.
@@ -129,10 +136,12 @@ export const codes = (duel: Duel, side: Side, zone: Zone) => cardsIn(duel, side,
 export function label(duel: Duel, action: Action): string {
 	if (action.type === "pass") return "pass";
 	if (action.type === "place") return `place ${action.zone}`;
+	if (action.type === "pendulum-summon") return "pendulum-summon";
 	const code = duel.cards[action.card]!.code;
 	if (action.type === "set") return `set ${code}`;
 	if (action.type === "summon") return `${action.how === "special" ? "special-summon" : "summon"} ${code}`;
 	if (action.type === "choose") return `choose ${code}`;
+	if (action.type === "flip-summon" || action.type === "change-position") return `${action.type} ${code}`;
 	if (action.type === "attack") return `attack ${code} ${action.target === null ? "directly" : `> ${duel.cards[action.target]!.code}`}`;
 	return `activate ${code}${(action.paid ?? []).map((card) => ` ~ ${duel.cards[card]!.code}`).join("")}${action.targets.map((target) => ` > ${duel.cards[target]!.code}`).join("")}`;
 }

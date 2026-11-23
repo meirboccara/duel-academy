@@ -12,7 +12,9 @@ import { createRng } from "./rng";
  * turn). Zones are coarse here; step 7 adds the exact layout.
  */
 export type Side = "you" | "rival";
-export type Zone = "deck" | "hand" | "extra" | "monster" | "spell" | "field" | "graveyard" | "banished";
+export type Zone = "deck" | "hand" | "extra" | "monster" | "spell" | "field" | "graveyard" | "banished" | "material";
+/** Step 8: the way a monster was Summoned beyond Normal / Flip / Special: by which procedure. */
+export type SummonKind = "tribute" | "fusion" | "synchro" | "xyz" | "link" | "ritual" | "pendulum";
 export type Face = "up" | "down";
 
 export interface CardInstance {
@@ -42,6 +44,22 @@ export interface CardInstance {
 	readonly slot: number | null;
 	/** Step 7: the monster this Equip Card is equipped to (its id), `null` when it equips nothing. */
 	readonly equippedTo: number | null;
+	/**
+	 * Step 8: the Xyz Monster this card is attached to as an Xyz Material (its id); `null` otherwise. An Xyz Material is in the zone
+	 * `material`: it is not a card on the field (RB10).
+	 */
+	readonly attachedTo: number | null;
+	/** Step 8: the number of the turn in which it was played onto the field (Summoned, Set, placed); 0 off the field. A change of control or a flip keeps it. */
+	readonly arrived: number;
+	/**
+	 * Step 8: it was Summoned by its own procedure and the Summon succeeded ("properly Special Summoned", RB10): only then can a
+	 * Fusion, Synchro, Xyz, Link or Ritual Monster be Special Summoned from the Graveyard or from banishment. Kept on the field
+	 * (face-down too), in the Graveyard, while banished and face-up on the Extra Deck (a Pendulum Monster); lost in the hand, the Deck
+	 * and face-down in the Extra Deck.
+	 */
+	readonly proper: boolean;
+	/** Step 8: how it was last Summoned by a procedure ("if this card was Synchro Summoned"); kept and lost as `proper`. */
+	readonly summonedBy: SummonKind | null;
 }
 
 export type Position = "attack" | "defense";
@@ -136,7 +154,7 @@ export interface Duel {
 	readonly lp: Readonly<Record<Side, number>>;
 	/** The Summon being attempted, which a "would be Summoned" effect can answer: it succeeds when both players pass in a row with no chain. */
 	readonly summoning: Summoning | null;
-	/** The turn player has used their Normal Summon this turn (a Normal Set of a monster is not in step 5, and `set` does not touch this). */
+	/** The turn player has used their Normal Summon or Set this turn (RB10: one Normal Summon or Normal Set a turn, Tribute Summons and Sets included). */
 	readonly normalSummoned: boolean;
 	/**
 	 * Step 6: what resolved effects leave behind for a while (negation of a card's effects, Shrink, Droll & Lock Bird's lock, a
@@ -146,6 +164,10 @@ export interface Duel {
 	readonly modifiers: readonly Modifier[];
 	/** The last stamp given: modifiers and cards that came face-up on the field take the next one. */
 	readonly clock: number;
+	/** Step 8: the monsters whose battle position their controller has changed by hand this turn (ids); a Flip Summon counts. */
+	readonly repositioned: readonly number[];
+	/** Step 8: the turn player has Pendulum Summoned this turn. */
+	readonly pendulumSummoned: boolean;
 	/** While a link resolves and its effect waits for a choice that is not a target: the whole chain, and the choice. */
 	readonly asking: Asking | null;
 	/** Step 6b: the attack in progress, from its declaration to the end of its Damage Step (src/battle.ts). */
@@ -189,13 +211,24 @@ export interface Battle {
 	readonly flipped: CardRef | null;
 }
 
-/** The Summon in progress: it has been attempted and has not succeeded yet (step 5). The monster stays where it was, not on the field. */
+/** The Summon in progress: it has been attempted and has not succeeded yet (step 5). The monster stays where it was, not on the field (a monster being Flip Summoned is on the field, face-down). */
 export interface Summoning {
 	readonly player: Side;
 	readonly cards: readonly number[];
-	readonly how: "normal" | "special";
+	readonly how: "normal" | "special" | "flip";
 	/** Step 7: the zone each monster was Summoned to (from the player's left), chosen when the Summon was attempted. */
 	readonly slots?: readonly number[];
+	/** Step 8: the battle position of each monster (default Attack Position). */
+	readonly positions?: readonly Position[];
+	/** Step 8: the procedure, if any: a Tribute, Synchro, Xyz, Link or Pendulum Summon. */
+	readonly kind?: SummonKind;
+	/** Step 8: the monster's own procedure: a success makes it properly Summoned. */
+	readonly proper?: boolean;
+	/**
+	 * Step 8: the Summon is performed by an effect that was Chain Link 1 ("Synchro Summon using..."): its window opens once the chain has
+	 * finished resolving (Konami's Japanese Q&A 24054, record `summon-by-effect-chain-link-1`).
+	 */
+	readonly pending?: boolean;
 	/** A negator took: the Summon will not succeed. */
 	readonly negated: boolean;
 }
@@ -206,7 +239,14 @@ export interface Asking {
 	readonly links: readonly Link[];
 	readonly player: Side;
 	readonly from: readonly number[];
-	readonly then: (duel: Duel, picked: number) => Duel;
+	readonly then: (duel: Duel, picked: number, position?: Position) => Duel;
+	/**
+	 * Step 8: the player may stop choosing here ("these are all the materials"): `legalActions` then also lists `pass`, which runs
+	 * `done`. With no candidate left, `done` runs by itself.
+	 */
+	readonly done?: (duel: Duel) => Duel;
+	/** Step 8: with `zones`, the battle positions the monster may be placed in; the `place` action names one (default: the first). */
+	readonly positions?: readonly Position[];
 	/** The events the links resolved before it raised (step 6, `Duel.lingering`): kept across the pause. */
 	readonly carried?: readonly GameEvent[];
 	/** Step 7: `from` holds zones (from the player's left), not cards: the choice is a `place` action. */
@@ -262,7 +302,9 @@ const slotsOf = (zone: Zone): number => (zone === "monster" ? MONSTER_ZONES + EX
 
 export const other = (side: Side): Side => (side === "you" ? "rival" : "you");
 
-const ZONES: readonly Zone[] = ["deck", "hand", "extra", "monster", "spell", "field", "graveyard", "banished"];
+const ZONES: readonly Zone[] = ["deck", "hand", "extra", "monster", "spell", "field", "graveyard", "banished", "material"];
+/** Where a monster is no longer "properly Summoned": it starts again from the hand, the Deck, or face-down in the Extra Deck. */
+const forgetsSummon = (zone: Zone, face: Face): boolean => zone === "deck" || zone === "hand" || (zone === "extra" && face === "down");
 const ON_FIELD: ReadonlySet<Zone> = new Set(["monster", "spell", "field"]);
 const FACE_DOWN_BY_DEFAULT: ReadonlySet<Zone> = new Set(["deck", "hand", "extra"]);
 
@@ -280,7 +322,7 @@ export function createDuel(setup: DuelSetup): Duel {
 		for (const zone of ["deck", "extra"] as const) {
 			for (const code of setup[side][zone] ?? []) {
 				const id = nextId++;
-				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0, position: "attack", slot: null, equippedTo: null };
+				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0, position: "attack", slot: null, equippedTo: null, attachedTo: null, arrived: 0, proper: false, summonedBy: null };
 				piles[side][zone].push(id);
 			}
 		}
@@ -314,6 +356,8 @@ export function createDuel(setup: DuelSetup): Duel {
 		normalSummoned: false,
 		modifiers: [],
 		clock: 0,
+		repositioned: [],
+		pendulumSummoned: false,
 		asking: null,
 		battle: null,
 		attacked: [],
@@ -357,7 +401,9 @@ export function moveCard(duel: Duel, id: number, to: MoveTo): Duel {
 /** `negated`: the move of a Spell or Trap Card whose activation was negated, or of a monster whose Summon was negated (`GameEvent`). */
 /** `position`: in the Monster Zone (default: Defense Position face-down, else the position it had there, else Attack Position). `by`: a destruction by battle. */
 /** `slot`: the exact zone on the field (step 7); by default the zone it is in when it stays in the same zone, else the first free one. */
-type MoveTo = { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: "destroyed"; by?: "battle"; position?: Position; slot?: number };
+/** `reason`: `tributed` (a Tribute) and `material` (a Synchro, Link or Fusion Material sent away, `usedFor` saying for which Summon) are step 8's. `attachedTo`: with zone `material`, the Xyz Monster it is attached to. */
+export type MoveReason = "destroyed" | "tributed" | "material";
+type MoveTo = { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: MoveReason; usedFor?: SummonKind; by?: "battle"; position?: Position; slot?: number; attachedTo?: number };
 
 /**
  * Destroys a card: it goes to the Graveyard and the move says it was destroyed (`moved.reason`), which "when destroyed" triggers
@@ -397,15 +443,57 @@ function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Du
 	// RB10: to use another Field Spell, the previous one is sent to the Graveyard (the core does it when the new one is placed).
 	const previousField = zone === "field" ? occupant(duel, controller, "field", 0) : null;
 	if (previousField && previousField.id !== before.id) duel = move(duel, previousField.id, { zone: "graveyard" }, batch);
-	const after = { ...before, zone, face, controller, position, slot, equippedTo: renewed && !(before.zone === "spell" && zone === "spell" && face === "up" && !flippedDown) ? null : before.equippedTo, moves: before.moves + (renewed ? 1 : 0), since: cameUp ? duel.clock + 1 : before.since };
+	if ((zone === "material") !== (to.attachedTo !== undefined)) throw new Error("an Xyz Material is attached to its Xyz Monster, and nothing else is");
+	const forgets = forgetsSummon(zone, face);
+	const after: CardInstance = {
+		...before,
+		zone,
+		face,
+		controller,
+		position,
+		slot,
+		equippedTo: renewed && !(before.zone === "spell" && zone === "spell" && face === "up" && !flippedDown) ? null : before.equippedTo,
+		attachedTo: zone === "material" ? to.attachedTo! : null,
+		// Played onto the field now, also as a monster that was there as a Spell (a Pendulum Monster leaving its Pendulum Zone).
+		arrived: !isOnField(zone) ? 0 : isOnField(before.zone) && !(zone === "monster" && before.zone !== "monster") ? before.arrived : duel.turn.number,
+		proper: forgets ? false : before.proper,
+		summonedBy: forgets ? null : before.summonedBy,
+		moves: before.moves + (renewed ? 1 : 0),
+		since: cameUp ? duel.clock + 1 : before.since,
+	};
 	const placed = place(duel, before, after, to.at ?? "top");
-	const moved = cameUp ? { ...placed, clock: placed.clock + 1 } : placed;
-	if (!renewed) return moved;
-	const raised = raiseEvent(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}), ...(to.by ? { by: to.by } : {}) });
+	const stamped = cameUp ? { ...placed, clock: placed.clock + 1 } : placed;
+	if (!renewed) return stamped;
+	const moved = flippedDown && zone === before.zone && controller === before.controller ? keptThroughFlip(stamped, before.id, before.moves, after.moves) : stamped;
+	const raised = raiseEvent(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}), ...(to.usedFor ? { usedFor: to.usedFor } : {}), ...(to.by ? { by: to.by } : {}) });
 	const added = zone === "hand" && before.zone !== "hand" ? raiseEvent(raised, { type: "added-to-hand", card: after, from: before.zone, ...(batch === undefined ? {} : { batch }) }) : raised;
 	// RB10: if the equipped monster is destroyed, flipped face-down or removed from the field, its Equip Cards are destroyed.
 	const unequipped = before.zone === "monster" && before.face === "up" && (zone !== "monster" || face === "down");
-	return unequipped ? equipsOf(added, before.id).reduce((next, equipId) => move(next, equipId, { zone: "graveyard", reason: "destroyed" }, undefined), added) : added;
+	const bare = unequipped ? equipsOf(added, before.id).reduce((next, equipId) => move(next, equipId, { zone: "graveyard", reason: "destroyed" }, undefined), added) : added;
+	// RB10: when an Xyz Monster leaves the field, all of its Xyz Materials are sent to the Graveyard (also when its Summon was negated).
+	if (zone === "monster" || bare.piles.you.material.length + bare.piles.rival.material.length === 0) return bare;
+	return materialsOf(bare, before.id).reduce((next, materialId) => move(next, materialId, { zone: "graveyard" }, undefined), bare);
+}
+
+/**
+ * Step 8: a monster turned face-down where it stands is a new card for what was applied to it (step 5: a negation ends), but it is
+ * still the monster a control change "until the End Phase" must give back, and still the monster an attack in progress is about
+ * (RB10: a replay needs the target removed or a new monster, record `replay-causes`). The control change following the flip is the
+ * core's reading: no Konami page read, and YGOProJudge could not be asked (step 6's sources list the Konami Q&A on it as not read).
+ */
+function keptThroughFlip(duel: Duel, id: number, was: number, now: number): Duel {
+	const same = (ref: CardRef): CardRef => (ref.id === id && ref.moves === was ? { id, moves: now } : ref);
+	const taken = (modifier: Modifier): boolean => modifier.layer.kind === "control" && typeof modifier.affects !== "function" && modifier.affects.card === id && modifier.affects.moves === was;
+	const modifiers = duel.modifiers.some(taken) ? duel.modifiers.map((modifier) => (taken(modifier) ? { ...modifier, affects: { card: id, moves: now } } : modifier)) : duel.modifiers;
+	const battle = duel.battle ? { ...duel.battle, attacker: same(duel.battle.attacker), target: duel.battle.target && same(duel.battle.target), defenders: duel.battle.defenders.map(same) } : null;
+	return modifiers === duel.modifiers && battle === null ? duel : { ...duel, modifiers, battle };
+}
+
+/** Step 8: the Xyz Materials attached to the monster `id`, in the order they were attached. */
+export function materialsOf(duel: Duel, id: number): number[] {
+	const found: number[] = [];
+	for (const side of ["you", "rival"] as const) for (const other of duel.piles[side].material) if (duel.cards[other]!.attachedTo === id) found.push(other);
+	return found;
 }
 
 /** The Equip Cards on the field equipped to the monster `id`. */

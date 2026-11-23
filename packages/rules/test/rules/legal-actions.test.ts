@@ -9,11 +9,11 @@ const options = { everyWindow: true };
 describe("legalActions in an open game state", () => {
 	it(`${cites("rules", "open-state")} ${cites("rules", "open-state-only")} offers the turn player, in their Main Phase, every card they can activate or Set, and to pass`, () => {
 		const duel = position({ defs, you: { hand: ["monster", "spell", "quick-play", "trap", "hand-quick"], monsters: ["ignition"] }, rival: { hand: ["hand-quick"], set: ["trap"] } });
-		expect(offered(duel)).toEqual(["activate hand-quick", "activate ignition", "activate quick-play", "activate spell", "pass", "set quick-play", "set spell", "set trap"]);
+		expect(offered(duel)).toEqual(["activate hand-quick", "activate ignition", "activate quick-play", "activate spell", "change-position ignition", "pass", "set quick-play", "set spell", "set trap"]);
 	});
 	it(`${cites("rules", "turn-player-priority")} offers only the cards of the player who holds priority`, () => {
 		const duel = position({ defs, you: { hand: ["spell"], set: ["quick-play"] }, rival: { hand: ["hand-quick"], set: ["trap"], monsters: ["field-quick"] } });
-		const controllers = legalActions(duel).flatMap((action) => (action.type === "pass" || action.type === "place" ? [] : [duel.cards[action.card]!.controller]));
+		const controllers = legalActions(duel).flatMap((action) => (action.type === "pass" || action.type === "place" || action.type === "pendulum-summon" ? [] : [duel.cards[action.card]!.controller]));
 		expect(controllers).toEqual(["you", "you", "you"]);
 	});
 	it(`${cites("rules", "spell-main-phase")} ${cites("rules", "quick-play")} outside the Main Phase, offers no Spell Speed 1 card and no Set, but still a Quick-Play Spell from the hand`, () => {

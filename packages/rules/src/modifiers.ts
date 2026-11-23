@@ -16,8 +16,14 @@ import { cardColumn } from "./zones";
 
 export type Stat = "atk" | "def" | "level";
 
-/** What a lock stops. `add-to-hand`: adding a card from the Main Deck to the hand (a draw, a search). */
-export type LockKind = "add-to-hand";
+/**
+ * What a lock stops. `add-to-hand`: adding a card from the Main Deck to the hand (a draw, a search). `summon` (step 8): Summoning
+ * a monster, in the `ways` the layer names (default: every way) and for the monsters its `only` accepts (default: every monster).
+ */
+export type LockKind = "add-to-hand" | "summon";
+
+/** The ways of Summoning a lock can stop: a Normal Summon (Tribute Summons included), a Flip Summon, a Special Summon of any kind. A Set is not a Summon. */
+export type SummonWay = "normal" | "flip" | "special";
 
 export type Layer =
 	/** "Its original ATK becomes halved": replaces the original value (and so any earlier "becomes"). */
@@ -29,7 +35,7 @@ export type Layer =
 	/** The card's effects are negated: its continuous effects and the effects it activates in the Monster Zone. */
 	| { readonly kind: "negate" }
 	/** "Neither player can ...": a lock on the players it names. */
-	| { readonly kind: "lock"; readonly what: LockKind; readonly who: Side | "both" }
+	| { readonly kind: "lock"; readonly what: LockKind; readonly who: Side | "both"; readonly ways?: readonly SummonWay[]; readonly only?: (duel: Duel, card: CardInstance) => boolean }
 	/** Bookkeeping for a control change that lasts: the card goes back to its owner when it ends. */
 	| { readonly kind: "control"; readonly to: Side };
 
@@ -277,9 +283,9 @@ export function level(duel: Duel, id: number): number {
  * Does a lock of this kind apply now: a lasting lock, or a continuous one of a card that is face-up on the field and not negated?
  * `who` is the player whose card or effect is stopped (a lock "for both players" stops anyone).
  */
-export function locked(duel: Duel, what: LockKind, who?: Side): boolean {
+export function locked(duel: Duel, what: LockKind, who?: Side, also?: (layer: Extract<Layer, { kind: "lock" }>) => boolean): boolean {
 	if (quiet(duel)) return false;
-	const stops = (layer: Layer) => layer.kind === "lock" && layer.what === what && (layer.who === "both" || who === undefined || layer.who === who);
+	const stops = (layer: Layer) => layer.kind === "lock" && layer.what === what && (layer.who === "both" || who === undefined || layer.who === who) && (!also || also(layer));
 	if (duel.modifiers.some((modifier) => stops(modifier.layer))) return true;
 	const codes = codesWithContinuous(duel.defs);
 	if (codes.size === 0) return false;
@@ -289,10 +295,22 @@ export function locked(duel: Duel, what: LockKind, who?: Side): boolean {
 				const source = duel.cards[id]!;
 				if (source.face !== "up" || !codes.has(source.code)) continue;
 				for (const record of duel.defs[source.code]!.effects!) {
-					if (record.type === "continuous" && appliesNow(duel, source, record, NOBODY) && record.modifies!(duel, source).some(stops)) return true;
+					// The layers are read first: whether the source applies (is it negated?) is the costly question, asked only of a record that locks.
+					if (record.type === "continuous" && record.modifies!(duel, source).some(stops) && appliesNow(duel, source, record, NOBODY)) return true;
 				}
 			}
 		}
 	}
 	return false;
+}
+
+/**
+ * Step 8: is `who` stopped from Summoning `card` this way ("you cannot Special Summon monsters, except DARK monsters")? A lock stops
+ * the Summon, whoever would perform it: the player's action is not offered and an effect does not Summon the monster (Konami's
+ * card FAQ on Rivalry of Warlords and Gozen Match, record `summon-lock-stops`). A Set is not a Summon and is never stopped by it
+ * (`summon-lock-set-allowed`).
+ */
+export function summonLocked(duel: Duel, who: Side, card: CardInstance, way: SummonWay): boolean {
+	if (quiet(duel)) return false;
+	return locked(duel, "summon", who, (layer) => (layer.ways === undefined || layer.ways.includes(way)) && (layer.only === undefined || layer.only(duel, card)));
 }

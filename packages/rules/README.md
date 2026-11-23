@@ -340,3 +340,84 @@ Known limits of step 7 (what the tests do not prove):
 - Equip Cards: only Equip Spells, with the relation set by the card's own operation; equip limits ("equip only to a monster you
   control") and monsters as Equip Cards (step 11) are not modelled; when the monster leaves, its Equip Cards are destroyed one by one
   after its move, not in the same batch.
+
+Step 8 (Summon procedures as data; plan in `docs/rules-core/step8/design.md`, sources in `docs/rules-core/step8/sources.md`, records in
+`src/summon-sources.ts`):
+- `src/procedures.ts`. A procedure is data on the card (`CardDef.procedure`; `facts` gains `tuner`, `rank`, `link`, frame `ritual`):
+  `synchro` (1 Tuner + 1 or more non-Tuners, or the card's own filters; the Levels add up), `xyz` (2 monsters whose Level is the
+  Rank, or the card's count and filter; `alternatives` for "you can also Xyz Summon this card by using...", with `transfer`), `link`
+  (the card's count and filter; the materials count for the Link Rating, a Link Monster for 1 or its Rating), `fusion` (the listed
+  materials; `contact` for a Fusion Monster Summoned by sending its materials away with no card effect), `ritual`. One search serves
+  every kind, Tributes included: `legalActions` only asks whether one legal set of materials exists (it never builds them all) and
+  lists the Summon **once per card**; after `act`, the materials are asked one at a time (`choose`, among cards that can still be
+  part of a legal set; `pass` as soon as the cards chosen are enough; a card every legal set needs is taken without asking), then
+  the zone (`place`). A set is legal only if it leaves the monster a zone (materials free theirs; a Link material takes its arrows
+  with it).
+- Actions (`legalActions` / `act`): `summon` (`normal`: also a Tribute Summon, 1 Tribute for Level 5-6, 2 for Level 7+; `special`:
+  also the own procedure of an Extra Deck monster, with `positions` when the player chooses Attack or Defense Position), `set` of a
+  monster (Normal Set and Tribute Set: face-down Defense Position, not a Summon, shares the turn's Normal Summon), `flip-summon`,
+  `change-position` (once per monster per turn, not the turn it came to the field, not after it attacked, never a Link Monster),
+  `pendulum-summon` (once a turn: the monsters one at a time, each with its zone and position, then all at once in one window).
+  Every Summon a player performs is a moment of its own (step 5) that "would be Summoned" cards can answer; Tributes and materials
+  are paid before it and stay paid when it is negated.
+- For card effects: `specialSummon` / `askSpecialSummon` / `canSpecialSummon` (an effect puts the monster on the field: `summoned` is
+  raised with `by: "effect"`, there is no window), `fusionSummon` / `canFusionSummon` (the effect says where the materials come from:
+  hand, field, Deck, Graveyard, banished, the opponent's field, and where they go), `ritualSummon` / `canRitualSummon` (`equal` or
+  `at-least`, a banish from the Graveyard as Tribute, a card that is the whole Tribute), `summonByEffect` / `canSummonByEffect` (the
+  effect performs a Synchro, Xyz or Link Summon, or a Normal or Tribute Summon, in either player's turn), `askMaterials`, `tribute`,
+  `flipFaceUp`, `flipFaceDown`, `changePosition`, `attach`, `detach`, `materialsOf`.
+- Decided (design D1): "negate the Summon" cards never answer a monster an effect Special Summons (TCG PSCT part 5); they answer a
+  Summon an effect *performs* when that effect was Chain Link 1, its window opening once the chain has resolved, and not from Chain
+  Link 2 (Konami's Japanese Q&A 24054 and 16986, OCG only; YGOProJudge says the same for the TCG, no page cited).
+- Xyz Materials are cards in the new zone `material` (`CardInstance.attachedTo`): not on the field; sent to the Graveyard when their
+  monster leaves the field (or its Summon is negated), kept across a flip or a control change.
+- `CardInstance.proper` / `summonedBy`: the monster was Summoned by its own procedure and the Summon succeeded. A Fusion, Synchro,
+  Xyz, Link or Ritual Monster can be Special Summoned by anything else only then (`canBeRevived`: from the hand, the Deck, the
+  Graveyard, banished, or face-up on the Extra Deck); a negated Summon never sets it; a face-down monster keeps it. `CardInstance.arrived`: the turn it was played onto the field.
+- Events: `summoned` gains `kind` (tribute, fusion, synchro, xyz, link, ritual, pendulum) and `by: "effect"`; `moved.reason` gains
+  `tributed` and `material` (`usedFor`); `position-changed`; `flipped` is also raised by a Flip Summon and by `flipFaceUp` (FLIP
+  effects are trigger records on it). A negated Flip Summon destroys the monster on the field (no `negated` mark).
+- Locks: `Layer` `lock` with `what: "summon"`, `ways` (`normal`, `flip`, `special`) and `only` (which monsters); `summonLocked`. It
+  stops the action being offered and `specialSummon` from Summoning; a Set is never stopped.
+- Link Spider now has its Link Material ("1 Normal Monster"), raises `summoned` for the monster it Summons, and asks for the position.
+- `Asking` gains `done` (the player may stop choosing: `pass`) and `positions` (a `place` names the battle position);
+  `askPlace` in `src/effects.ts`. `bench/procedures.bench.ts` and the step 8 table in BASELINE.md.
+
+Known limits of step 8 (what the tests do not prove):
+- Every card in the step 8 tests is made up (shaped like the blockers of the coverage notes: generic Synchro and one with a non-Tuner
+  filter, Xyz with a detach cost and an alternative Summon, Link, Fusion by effect from the Deck, the Graveyard and the opponent's
+  field, contact Fusion, Ritual "equal" and "equal or exceed" with a Graveyard banish and a whole-Tribute card). No real meta card
+  was written; Link Spider is the only real card touched.
+- YGOProJudge only (asked 2026-11-23, four sessions, no Konami page cited): "equal or exceed" refuses a Tribute that is not needed;
+  materials are not given back when the Summon is negated, and the monsters stacked for a negated Xyz Summon go to the Graveyard; a
+  negated Pendulum Summon sends every monster of it to the Graveyard; a Flip Summon is the monster's change of position of the turn
+  and an effect's change is not. Each test that rests on one says so.
+- Konami's Japanese Q&A only (OCG, no TCG page): the window of a Summon performed by an effect (24054, 16986), "one successful proper
+  Summon" for revival (21297; RB10 says "properly Special Summoned first" for the TCG), a negated Flip Summon destroyed in the Monster
+  Zone and a face-down monster still "Xyz Summoned" (17662).
+- Not expressible yet: Tokens as materials or Tributes (step 11); effects that change how a card counts as material ("can be treated
+  as a Tuner", "as 2 Tributes", Fusion substitutes, "treated as Level X for an Xyz Summon"); a Synchro Monster that needs 2 Tuners or
+  none; an Xyz alternative with a cost; "Tribute 3 monsters", Summons with fewer Tributes, a second Normal Summon as an action
+  (`summonByEffect` gives one by effect); Gemini, Spirit and Union monsters; a Pendulum Summon performed by an effect; Special Summons
+  and Sets in face-down Defense Position by an effect; zone locks. Materials "shuffled into the Deck" are placed on it (no shuffle).
+- "Properly Summoned" is asked of a Fusion, Synchro, Xyz, Link or Ritual Monster in the hand, the Deck, the Graveyard, banished or
+  face-up on the Extra Deck; a card worded "ignoring its Summoning conditions" has no way to say so yet. A monster keeps `proper`
+  when it is banished face-down. A Ritual Monster, an Extra Deck monster and a card marked `summon.cannotBeNormalSummoned` are
+  never offered a Normal Summon or Set.
+- A monster turned face-down where it stands is a new card for what was applied to it (step 5), but it still goes back to its owner
+  when a control change "until the End Phase" ends, and an attack on it goes on with no replay (RB10's replay causes): the control
+  part is the core's reading, with no Konami page read and YGOProJudge not asked (its Q&A is listed as not read in step 6's
+  sources). A monster that attacked and was turned face-down and face-up again may attack again (`Duel.attacked` is by card as it
+  was): not read either.
+- A change of control keeps `arrived`, so a monster taken this turn may change position by hand (no page read). Any declared attack
+  stops the change of position for the rest of the turn, in Main Phase 2 as RB10 says (the attack being negated is not looked at).
+- The monster of a Summon whose zone was taken during its window goes to the first zone it may still use; with none left the Summon
+  fails and the monster is sent to the Graveyard without reaching the field, its stacked Xyz Materials with it (the core's reading). All monsters of a Pendulum Summon are negated together.
+- A card that every legal set of materials needs is taken without asking, and the player is asked for a zone only when there are
+  two or more: a choice of the core for fewer questions, not a rule. A `place` lists `positions` even when there is one (a Link
+  Monster), and a monster in a Spell & Trap Zone (a Pendulum Monster in its Pendulum Zone) can be Special Summoned by an effect.
+- Event matchers are also run by the listing's dry runs (costs and placements on the immutable duel), as before step 8: a matcher
+  must stay a pure function.
+- The listing looks for one legal material set per Extra Deck monster on every call: 0.08 ms with fifteen of them over five
+  monsters and a Ritual Spell in hand (BASELINE.md). A bot that lists per node should cache "can Summon" per position; material choices cost more (a Ritual
+  Summon with ten cards to Tribute among: 0.44 ms from the activation to the monster on the field).

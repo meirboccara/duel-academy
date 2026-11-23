@@ -8,7 +8,7 @@ describe("a Normal Summon", () => {
 	it(`${cites("rules", "normal-summon-is-an-action")} is offered in your Main Phase with the game state open and starts no chain`, () => {
 		const log: string[] = [];
 		const start = position({ defs: negationCards(log), you: { hand: ["normal-4", "normal-4"] }, rival: { monsters: ["summon-watcher"] } });
-		expect(offered(start)).toEqual(["pass", "summon normal-4", "summon normal-4"]);
+		expect(offered(start)).toEqual(["pass", "set normal-4", "set normal-4", "summon normal-4", "summon normal-4"]);
 		const done = play(start, "summon normal-4");
 		expect(codes(done, "you", "monster")).toEqual(["normal-4"]);
 		// The Summon raises `summoned`, so a "when Summoned" trigger goes on a chain: step 3's trigger rules, the core's reading here (no cite).

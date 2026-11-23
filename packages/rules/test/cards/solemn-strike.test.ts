@@ -41,7 +41,7 @@ describe("Solemn Strike, written as an effect record", () => {
 		expect(log).toEqual([]);
 		expect(codes(done, "you", "graveyard")).toEqual(["ignition-once"]);
 		// The other copy: the use stays spent (the core's reading, backed by YGOProJudge and not by a Konami record; no cite).
-		expect(offered(done)).toEqual(["pass"]);
+		expect(offered(done)).toEqual(["change-position ignition-once", "pass"]);
 	});
 	it(`${cites("solemn-strike", "text")} is not offered against the activation of a Spell Card`, () => {
 		const defs = { ...CARD_DEFS, ...negationCards() };

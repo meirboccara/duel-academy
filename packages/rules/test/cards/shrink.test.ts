@@ -10,7 +10,7 @@ const idOf = (duel: ReturnType<typeof position>, code: string) => Object.values(
 describe("Shrink, written as an effect record", () => {
 	it(`${cites("shrink", "text")} targets a face-up monster of either player, and not a face-down one`, () => {
 		const start = position({ defs, options, you: { hand: ["shrink"], monsters: ["big"], facedown: ["small"] }, rival: { monsters: ["huge"] } });
-		expect(offered(start)).toEqual(["activate shrink > big", "activate shrink > huge", "pass", "set shrink"]);
+		expect(offered(start)).toEqual(["activate shrink > big", "activate shrink > huge", "change-position big", "flip-summon small", "pass", "set shrink"]);
 	});
 	it(`${cites("shrink", "text")} halves the original ATK of the target until the end of this turn`, () => {
 		const start = position({ defs, options, you: { hand: ["shrink"], monsters: ["big"] }, rival: { monsters: ["huge"] } });

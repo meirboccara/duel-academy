@@ -71,6 +71,6 @@ describe("what a negated activation leaves", () => {
 		expect(log).toEqual(["destroyed", "jammer"]);
 		expect(codes(negated, "you", "banished")).toEqual(["blazer"]);
 		// The other copy is not offered: the use stays spent (the core's reading, backed by YGOProJudge and not by a Konami record; no cite).
-		expect(offered(negated)).toEqual(["pass"]);
+		expect(offered(negated)).toEqual(["change-position blazer", "pass"]);
 	});
 });

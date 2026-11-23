@@ -235,3 +235,43 @@ New in step 7 (`bench/zones.bench.ts`), mean per call (the query rows from a fir
 `bench/triggers.bench.ts`'s crowded board had ten monsters a side, which exact zones no longer allow: it now has five a side
 (10 monsters swept, the same 6 mandatory triggers), so its sweep row is not comparable with earlier rows (0.0206 ms now).
 
+# Rules core, step 8 (Summon procedures)
+
+Same Windows machine, 2026-11-23. One run of `bench/legal-moves.bench.ts` with `bench/procedures.bench.ts`, mean per call:
+
+| Position | `legalActions` | list + `act` | today's engine | ratio |
+|---|---:|---:|---:|---:|
+| opening | 0.0006 ms | 0.0188 ms | 0.741 ms | 39× |
+| midgame | 0.0024 ms | 0.0337 ms | 3.279 ms | 97× |
+| crowdedHand | 0.0022 ms | 0.0531 ms | 1.061 ms | **20.0×** |
+
+(A full run of every bench file just before gave crowdedHand 0.0532 ms against 1.095 ms: 20.6×.) After the review fixes the machine
+was busy with other work and the means moved a lot from run to run: over eight more runs of `bench/legal-moves.bench.ts` the
+crowdedHand ratio by means went from 12.0× (one run, list + `act` 0.1019 ms against 1.220 ms) to 27.1× (0.0500 ms against
+1.356 ms), six of the eight between 16× and 22×; the fastest samples stayed put in every run (0.039 to 0.041 ms against 0.93 to
+0.97 ms: 23× to 24×), as before the fixes (0.0394 ms against 0.9026 ms). Every run is above the 10× floor. The reference boards have no
+Extra Deck procedure; what they pay for is the new actions: each Level 4 or lower monster of the hand is now also listed as a `set`,
+each face-up monster on the field as a `change-position`, each face-down one as a `flip-summon`, and "list + `act`" does every one
+of them. The listing itself is within noise of step 7 (0.0020 ms then); a Summon that needs Tributes or materials is listed once,
+never once per set of materials.
+
+A lock on Summons is asked of every monster listed. Reading the layers before asking whether their source is negated keeps the
+step 6 board (Skill Drain and two Muka Mukas, `bench/continuous.bench.ts`) at 0.0032 ms; with the costly question first it was
+0.0254 ms.
+
+New in step 8 (`bench/procedures.bench.ts`), mean per call:
+
+| Case | Mean |
+|---|---:|
+| `legalActions`: 15 Extra Deck monsters over 5 monsters on the field, 6 cards in hand with a Fusion and a Ritual Spell (7 procedure Summons listed) | 0.0765 ms |
+| `legalActions`: the same Extra Deck with no legal set of materials (every search fails at once) | 0.0193 ms |
+| A Synchro Summon, from the action to the monster on the field (material and zone choices answered) | 0.0544 ms |
+| A Tribute Summon with 2 Tributes, from the action to the monster on the field | 0.0246 ms |
+| Polymerization: activation, Fusion Monster, materials and zone chosen, Fusion Summon | 0.0524 ms |
+| A Ritual Spell ("equal or exceed", 10 cards to Tribute among): activation, Tributes and zone chosen, Ritual Summon | 0.4433 ms |
+
+The first row is the slow listing of this step: one search per Extra Deck monster (about 0.003 ms each on this board) and the
+Ritual Spell's activation condition (0.025 ms: every Main Monster Zone is taken, so the search has to find a set with a Tribute from
+the field). It is still 14× to 40× under today's engine on its own boards, but it is what step 9 should cache per position if the
+bot lists at every node. Choosing materials costs more than listing: each question looks for a legal set once per candidate, and
+once more to tell whether a candidate is in every set.

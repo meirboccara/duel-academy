@@ -254,7 +254,7 @@ describe("Pendulum Zones", () => {
 		const start = position({ defs, you: { hand: ["scale", "spell"] } });
 		const placing = legalActions(start).find((action) => action.type === "activate" && start.cards[action.card]!.code === "scale")!;
 		expect(placing).toMatchObject({ zones: [0, 4] });
-		const spellFirst = act(start, { ...legalActions(start).find((action) => action.type === "set")!, zone: 0 } as Action);
+		const spellFirst = act(start, { ...legalActions(start).find((action) => action.type === "set" && start.cards[action.card]!.code === "spell")!, zone: 0 } as Action);
 		const left = legalActions(spellFirst).find((action) => action.type === "activate" && spellFirst.cards[action.card]!.code === "scale")!;
 		expect(left).toMatchObject({ zones: [4] });
 		const done = act(start, { ...placing, zone: 4 } as Action);

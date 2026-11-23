@@ -1,5 +1,5 @@
 import { activateAction, activateEffect, activationWays } from "./activation";
-import { type Action, PASS, sameAction, takes } from "./action";
+import { type Action, PASS, type Placing, sameAction, takes } from "./action";
 import { type CardInstance, closedPriority, destroyCard, type Duel, freeSlots, type Link, moveCard, other, PHASES, type Side } from "./duel";
 import { PENDULUM_SLOTS } from "./zones";
 
@@ -7,10 +7,11 @@ import { PENDULUM_SLOTS } from "./zones";
 const FIELD_ZONE: readonly number[] = Object.freeze([0]);
 import { breakEffect, type GameEvent, raiseEvent } from "./events";
 import { type CardDef, type EffectRecord, effectOf, inFieldRange, rangeOf, speedOf } from "./effects";
-import { returnControl, withoutEnded } from "./modifiers";
+import { returnControl, summonLocked, withoutEnded } from "./modifiers";
 import { cardNegated, immune } from "./negation";
 import { endChain, newTurn, refund } from "./once";
-import { beginSummon, finishSummon } from "./summon";
+import { beginSummon, finishSummon, openPendingSummon } from "./summon";
+import { beginFlipSummon, canBeNormalSummoned, canChangePosition, canFlipSummon, canPendulumSummon, canStartProcedure, canTribute, changePositionByHand, setMonster, startPendulumSummon, startProcedure, startTribute, summonPositions, tributesNeeded } from "./procedures";
 import { advanceBattle, attackActions, damageStepAllows, declareAttack } from "./battle";
 import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./triggers";
 
@@ -47,9 +48,13 @@ import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./
  *   destroyed without ever reaching the field. A Spell or Trap Card whose activation was negated goes to the Graveyard without
  *   being sent from the field (`moved.negated`).
  *
- * Not here yet: the Damage Step's limits, Tributes, Flip Summons and Summons by effect (step 8), attacks, the normal draw, and
- * Continuous, Equip and Field cards that stay on the field (a Field Spell is placed and swept like any Spell; the
- * Field Zone comes with step 7). Known limit: a Spell or Trap whose control changed while on the chain is not swept
+ * - Summon procedures (step 8, src/procedures.ts): Tribute Summons and Sets, the Normal Set of a monster, Flip Summons, changes of
+ *   battle position, Synchro / Xyz / Link Summons, contact Fusions and Pendulum Summons are actions listed here. One that needs
+ *   Tributes or materials is listed once; the cards are then asked one at a time (`Duel.asking`: `choose`, and `pass` when the
+ *   cards chosen are enough), then the zone (`place`). An effect that performs a Summon as Chain Link 1 opens the Summon's window
+ *   once the chain has resolved.
+ *
+ * Not here yet: the normal draw. Known limit: a Spell or Trap whose control changed while on the chain is not swept
  * to the Graveyard (the sweep matches the card as activated, move count included).
  */
 /**
@@ -59,7 +64,13 @@ import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./
 export function legalActions(duel: Duel): Action[] {
 	// The Duel is over: nothing more is offered.
 	if (duel.winner) return [];
-	if (duel.asking) return duel.asking.zones ? duel.asking.from.map((zone): Action => ({ type: "place", zone })) : duel.asking.from.map((card): Action => ({ type: "choose", card }));
+	if (duel.asking) {
+		const { from, zones, positions, done } = duel.asking;
+		if (zones) return from.map((zone): Action => (positions && positions.length > 0 ? { type: "place", zone, positions } : { type: "place", zone }));
+		const picks = from.map((card): Action => ({ type: "choose", card }));
+		// Step 8: the cards chosen so far are enough: the player may stop there.
+		return done ? [PASS, ...picks] : picks;
+	}
 	if (duel.building) return triggerActions(duel);
 	const actions: Action[] = [PASS];
 	collect(duel, actions);
@@ -129,19 +140,28 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 				}
 			}
 		}
-		// A Normal Summon with no Tribute: a Level 4 or lower monster, once a turn, in an open game state, into a free Main Monster Zone of the player's choice.
-		const summonable = !isSpellOrTrap && slow && ((!duel.normalSummoned && (def.facts?.level ?? Infinity) <= 4) || (def.builtInSummon !== undefined && (def.builtInSummon.condition?.(duel, { player, card }) ?? true)));
-		// A monster from the hand goes to a free Main Monster Zone (as `summonZones` says for it).
-		const zones = summonable ? (mainSlots ??= freeSlots(duel, player, "monster")) : null;
-		if (zones && zones.length > 0 && !duel.normalSummoned && (def.facts?.level ?? Infinity) <= 4) {
-			if (!out) return true;
-			out.push({ type: "summon", card: id, how: "normal", zones });
-			found = true;
+		// The turn's Normal Summon or Set (RB10), in an open game state: a Level 4 or lower monster into a free Main Monster Zone of the
+		// player's choice; a Level 5 or higher monster by Tributing 1 or 2 monsters (step 8), listed once: the Tributes and the zone are
+		// asked afterwards. A Set (face-down Defense Position) is not a Summon, so a lock on Summons does not stop it.
+		const level = isSpellOrTrap ? undefined : def.facts?.level;
+		if (level !== undefined && slow && !duel.normalSummoned && canBeNormalSummoned(def)) {
+			const count = tributesNeeded(level);
+			const zones = count === 0 ? (mainSlots ??= freeSlots(duel, player, "monster")) : null;
+			if (zones ? zones.length > 0 : canTribute(duel, player, card, count)) {
+				if (!out) return true;
+				if (!summonLocked(duel, player, card, "normal")) out.push(zones ? { type: "summon", card: id, how: "normal", zones } : { type: "summon", card: id, how: "normal" });
+				out.push(zones ? { type: "set", card: id, zones } : { type: "set", card: id });
+				found = true;
+			}
 		}
-		if (zones && zones.length > 0 && def.builtInSummon && (def.builtInSummon.condition?.(duel, { player, card }) ?? true)) {
-			if (!out) return true;
-			out.push({ type: "summon", card: id, how: "special", zones });
-			found = true;
+		// A built-in Special Summon from the hand, into a free Main Monster Zone, in face-up Attack or Defense Position (RB10).
+		if (!isSpellOrTrap && slow && def.builtInSummon && (def.builtInSummon.condition?.(duel, { player, card }) ?? true) && !summonLocked(duel, player, card, "special")) {
+			const zones = (mainSlots ??= freeSlots(duel, player, "monster"));
+			if (zones.length > 0) {
+				if (!out) return true;
+				out.push({ type: "summon", card: id, how: "special", zones, positions: summonPositions(duel, id) });
+				found = true;
+			}
 		}
 		if (isSpellOrTrap && slow && room) {
 			if (!out) return true;
@@ -153,6 +173,12 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 		for (const id of piles[zone]) {
 			if (only !== undefined && id !== only) continue;
 			const card = duel.cards[id]!;
+			// Step 8: a face-down monster may be Flip Summoned, a face-up one have its battle position changed, in the Main Phase with the game state open.
+			if (zone === "monster" && slow && (card.face === "down" ? canFlipSummon(duel, card) : canChangePosition(duel, card))) {
+				if (!out) return true;
+				out.push({ type: card.face === "down" ? "flip-summon" : "change-position", card: id });
+				found = true;
+			}
 			const effects = defs[card.code]?.effects;
 			if (!effects) continue;
 			const def = defs[card.code]!;
@@ -166,6 +192,24 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 					found = true;
 				}
 			}
+		}
+	}
+	// Step 8: the Summons of the Extra Deck's monsters by their own procedure (Synchro, Xyz, Link, contact Fusion), each listed once
+	// when one legal set of materials exists, and the Pendulum Summon.
+	if (slow) {
+		for (const id of piles.extra) {
+			if (only !== undefined && id !== only) continue;
+			const card = duel.cards[id]!;
+			if (!defs[card.code]?.procedure || !canStartProcedure(duel, player, card)) continue;
+			if (!out) return true;
+			const positions = summonPositions(duel, id);
+			out.push(positions.length > 1 ? { type: "summon", card: id, how: "special", positions } : { type: "summon", card: id, how: "special" });
+			found = true;
+		}
+		if (only === undefined && piles.spell.length >= 2 && canPendulumSummon(duel, player)) {
+			if (!out) return true;
+			out.push({ type: "pendulum-summon" });
+			found = true;
 		}
 	}
 	// Step 6b: the attacks the turn player can declare in the Battle Phase.
@@ -196,7 +240,8 @@ export function act(duel: Duel, action: Action): Duel {
 function legalMatch(duel: Duel, action: Action): Action | null {
 	// The Duel is over: nothing, not even a pass.
 	if (duel.winner) return null;
-	if (duel.asking || duel.building) return legalActions(duel).find((legal) => sameAction(legal, action)) ?? null;
+	if (duel.asking) return legalActions(duel).find((legal) => takes(legal, action)) ?? null;
+	if (duel.building) return legalActions(duel).find((legal) => sameAction(legal, action)) ?? null;
 	// Passing is always open to the player who holds priority.
 	if (action.type === "pass") return PASS;
 	if (action.type === "attack") {
@@ -206,26 +251,56 @@ function legalMatch(duel: Duel, action: Action): Action | null {
 	}
 	// A zone is placed only when a choice asks for it.
 	if (action.type === "place") return null;
+	if (action.type === "pendulum-summon") return legalActions(duel).some((legal) => legal.type === "pendulum-summon") ? action : null;
 	const listed: Action[] = [];
 	collect(duel, listed, action.card);
 	return listed.find((legal) => takes(legal, action)) ?? null;
 }
 
-/** A placing action as it will be done: with the zone it names, or else the first the listing gave (step 7). */
+/** A placing action as it will be done: with the zone and the battle position it names, or else the first the listing gave (steps 7 and 8). */
 function withZone(action: Action, listed: Action): Action {
 	if (action.type !== "summon" && action.type !== "set" && action.type !== "activate") return action;
-	const zone = action.zone ?? (listed as { zones?: readonly number[] }).zones?.[0];
-	return zone === undefined ? action : { ...action, zone };
+	const zone = action.zone ?? (listed as Placing).zones?.[0];
+	const position = action.position ?? (listed as Placing).positions?.[0];
+	return { ...action, ...(zone === undefined ? {} : { zone }), ...(position === undefined ? {} : { position }) };
 }
 
 function apply(duel: Duel, action: Action): Duel {
-	if (duel.asking) return answer(duel, action.type === "place" ? action.zone : (action as Extract<Action, { type: "choose" }>).card);
+	if (duel.asking) return answer(duel, action);
 	if (duel.building) return action.type === "pass" ? declineTriggers(duel) : chooseTrigger(duel, action as Extract<Action, { type: "activate" }>);
-	if (action.type === "pass") return pass(duel);
-	if (action.type === "summon") return beginSummon(duel, duel.priority.holder, action.card, action.how, action.zone);
-	if (action.type === "attack") return declareAttack(duel, action.card, action.target);
-	return action.type === "set" ? set(duel, action.card, action.zone) : activate(duel, action as Extract<Action, { type: "activate" }>);
+	const player = duel.priority.holder;
+	switch (action.type) {
+		case "pass":
+			return pass(duel);
+		case "summon": {
+			// Step 8: an Extra Deck monster's own procedure: the materials, then the zone, are asked before the Summon is attempted.
+			if (duel.cards[action.card]!.zone === "extra") return resumeAfter(startProcedure(duel, player, action.card, action.position ?? "attack"), unchanged);
+			const tributes = action.how === "normal" ? tributesNeeded(levelOf(duel, action.card)) : 0;
+			if (tributes > 0) return resumeAfter(startTribute(duel, player, action.card, tributes, false), unchanged);
+			return beginSummon(duel, player, action.card, action.how, action.zone, action.how === "special" && action.position ? { position: action.position } : {});
+		}
+		case "set": {
+			if (duel.defs[duel.cards[action.card]!.code]?.kind !== "monster") return set(duel, action.card, action.zone);
+			const tributes = tributesNeeded(levelOf(duel, action.card));
+			return tributes > 0 ? resumeAfter(startTribute(duel, player, action.card, tributes, true), unchanged) : setMonster(duel, action.card, action.zone);
+		}
+		case "flip-summon":
+			return beginFlipSummon(duel, action.card);
+		case "change-position":
+			return changePositionByHand(duel, action.card);
+		case "pendulum-summon":
+			return resumeAfter(startPendulumSummon(duel, player), unchanged);
+		case "attack":
+			return declareAttack(duel, action.card, action.target);
+		case "activate":
+			return activate(duel, action);
+		default:
+			throw new Error(`nothing asks for ${JSON.stringify(action)}`);
+	}
 }
+
+const unchanged = (duel: Duel): Duel => duel;
+const levelOf = (duel: Duel, id: number): number => duel.defs[duel.cards[id]!.code]?.facts?.level ?? 0;
 
 
 /** In an open game state the turn player always decides for themselves, even when all they can do is end the phase. */
@@ -287,9 +362,9 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 		}
 		const asking = result.asking;
 		if (asking) {
-			if (asking.from.length > 1) return { ...result, asking: { ...asking, links: all, carried } };
-			const board = { ...result, asking: null };
-			result = asking.from.length === 1 ? asking.then(board, asking.from[0]!) : board;
+			const settled = settle(result);
+			if (settled === null) return { ...result, asking: { ...asking, links: all, carried } };
+			result = settled;
 			continue;
 		}
 		// The cards this link added to a hand stop being the last thing that happened when the next one resolves; a `lingers` effect may still answer it after the chain.
@@ -309,6 +384,8 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 		if (sweepable && now.face === "up" && now.moves === link.card.moves) next = moveCard(next, now.id, link.activationNegated ? { zone: "graveyard", negated: true } : { zone: "graveyard" });
 	}
 	next = endChain(carried.length > 0 ? { ...next, lingering: carried } : next);
+	// Step 8: Chain Link 1 performed a Summon ("Synchro Summon using..."): it is attempted now that the chain has resolved, and can be answered.
+	if (next.summoning?.pending) return openPendingSummon(next);
 	// The window of a Summon ends with the first chain started in it (lead from YGOProJudge, no Konami page found): the Summon succeeds,
 	// unless it was negated, in which case the monster was destroyed by the negator and nothing was Summoned.
 	if (next.summoning && !next.summoning.negated) return finishSummon(next);
@@ -316,12 +393,28 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 	return triggerPoint(next, closedPriority(next.turn.player));
 }
 
-/** The player picked a card for the effect that was asking: it goes on, and the rest of the chain resolves. */
-function answer(duel: Duel, picked: number): Duel {
-	const { links, then, carried, resume } = duel.asking!;
+/**
+ * The player answered the effect that was asking (a card, a zone with its battle position, or "these are all"): it goes on, and the
+ * rest of the chain resolves.
+ */
+function answer(duel: Duel, action: Action): Duel {
+	const { links, then, done, carried, resume, positions } = duel.asking!;
 	const board = { ...duel, asking: null };
-	if (resume) return resumeAfter(then(board, picked), resume);
-	return resolveChain(board, links, then(board, picked), carried);
+	const result = action.type === "pass" ? done!(board) : action.type === "place" ? then(board, action.zone, action.position ?? positions?.[0]) : then(board, (action as Extract<Action, { type: "choose" }>).card);
+	return resume ? resumeAfter(result, resume) : resolveChain(board, links, result, carried);
+}
+
+/**
+ * A question nobody has to be asked: with nothing to choose from, the effect does nothing more (or, when the player may stop, it
+ * goes on with what was chosen); the only candidate is taken at once. `null`: the player must be asked.
+ */
+function settle(duel: Duel): Duel | null {
+	const asking = duel.asking!;
+	const board = { ...duel, asking: null };
+	if (asking.done) return asking.from.length === 0 ? asking.done(board) : null;
+	if (asking.from.length === 0) return board;
+	if (asking.from.length === 1 && !(asking.positions && asking.positions.length > 1)) return asking.then(board, asking.from[0]!, asking.positions?.[0]);
+	return null;
 }
 
 /**
@@ -330,10 +423,10 @@ function answer(duel: Duel, picked: number): Duel {
  */
 export function resumeAfter(duel: Duel, resume: (duel: Duel) => Duel): Duel {
 	let next = duel;
-	while (next.asking && next.asking.from.length <= 1) {
-		const { from, then } = next.asking;
-		const board = { ...next, asking: null };
-		next = from.length === 1 ? then(board, from[0]!) : board;
+	while (next.asking) {
+		const settled = settle(next);
+		if (settled === null) break;
+		next = settled;
 	}
 	return next.asking ? { ...next, asking: { ...next.asking, resume: next.asking.resume ?? resume } } : resume(next);
 }
@@ -352,7 +445,7 @@ function nextPhase(duel: Duel): Duel {
 	}
 	const player: Side = other(duel.turn.player);
 	const turn = { player, number: duel.turn.number + 1, phase: PHASES[0]! };
-	return triggerPoint(raiseEvent(newTurn(withoutEnded({ ...moved, turn, setThisTurn: [], normalSummoned: false, attacked: [], replay: null }, duel.turn.number)), { type: "phase", phase: turn.phase, player }), { holder: player, passed: [], open: true });
+	return triggerPoint(raiseEvent(newTurn(withoutEnded({ ...moved, turn, setThisTurn: [], normalSummoned: false, attacked: [], replay: null, repositioned: [], pendulumSummoned: false }, duel.turn.number)), { type: "phase", phase: turn.phase, player }), { holder: player, passed: [], open: true });
 }
 
 const flag = (duel: Duel, index: number, change: Partial<Link>): Duel => (duel.chain[index] ? { ...duel, chain: duel.chain.map((link, i) => (i === index ? { ...link, ...change } : link)) } : duel);

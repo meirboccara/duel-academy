@@ -1,4 +1,4 @@
-import type { CardInstance, Duel, Link, Side } from "./duel";
+import type { CardInstance, Duel, Link, Position, Side } from "./duel";
 import type { GameEvent } from "./events";
 import type { Layer } from "./modifiers";
 
@@ -67,6 +67,16 @@ export const ask = (duel: Duel, player: Side, from: readonly number[], then: (du
  * player's left) instead of cards; `legalActions` lists them as `place`. With one zone nothing is asked; with none, `then` is not run.
  */
 export const askZone = (duel: Duel, player: Side, zones: readonly number[], then: (duel: Duel, zone: number) => Duel): Duel => ({ ...duel, asking: { links: [], player, from: zones, then, zones: true } });
+
+/**
+ * Step 8: the zone and the battle position of a monster being Special Summoned by an effect (RB10: "your choice of face-up Attack
+ * Position or face-up Defense Position"): as `askZone`, each `place` listing the `positions` open; the player names one with
+ * `position` (default: the first). Nothing is asked with one zone and one position.
+ */
+export const askPlace = (duel: Duel, player: Side, zones: readonly number[], positions: readonly Position[], then: (duel: Duel, zone: number, position: Position) => Duel): Duel => ({
+	...duel,
+	asking: { links: [], player, from: zones, then: (board, zone, position) => then(board, zone, position ?? positions[0] ?? "attack"), zones: true, positions },
+});
 
 /**
  * A cost the player chooses how to pay: `pick` lists the ways (each a list of cards, e.g. one card of the hand for
@@ -200,7 +210,13 @@ export interface Facts {
 	/** The Spell icon: a Field Spell goes to the Field Zone (step 7), an Equip Spell is equipped to a monster. */
 	readonly icon?: "field" | "equip";
 	/** An Extra Deck monster's frame (step 7: where it may be Summoned from the Extra Deck). */
-	readonly frame?: "fusion" | "synchro" | "xyz" | "link";
+	readonly frame?: "fusion" | "synchro" | "xyz" | "link" | "ritual";
+	/** Step 8: a Tuner monster. */
+	readonly tuner?: true;
+	/** Step 8: an Xyz Monster's Rank (it has no Level). */
+	readonly rank?: number;
+	/** Step 8: a Link Monster's Link Rating (it has no Level and no DEF). */
+	readonly link?: number;
 	/** A Link Monster's arrows. */
 	readonly arrows?: readonly Arrow[];
 	/** A Pendulum Monster: it can be placed in a Pendulum Zone, and goes face-up to the Extra Deck instead of the Graveyard from the field. */
@@ -211,6 +227,54 @@ export interface Facts {
 	readonly def?: number;
 	readonly normal?: true;
 }
+
+/** Who is Summoning what: the player, and the monster to be Summoned as it is now (in the Extra Deck, the hand...). */
+export interface MaterialContext {
+	readonly player: Side;
+	readonly summoned: CardInstance;
+}
+
+export type MaterialFilter = (duel: Duel, card: CardInstance, ctx: MaterialContext) => boolean;
+
+/** One line of a material "recipe": "1 Tuner", "1+ non-Tuner Dragon monsters", "2 Level 4 monsters". A card fills one slot. */
+export interface MaterialSlot {
+	readonly filter?: MaterialFilter;
+	readonly min: number;
+	readonly max: number;
+}
+
+/** A rule over the whole set of materials ("with different names"). */
+export type MaterialCheck = (duel: Duel, cards: readonly CardInstance[], ctx: MaterialContext) => boolean;
+
+/** "2+ Effect Monsters", "2 Level 4 monsters": how many, and which. */
+export interface MaterialCount {
+	readonly min: number;
+	/** Default: `min` (for a Link Monster: its Link Rating). */
+	readonly max?: number;
+	readonly filter?: MaterialFilter;
+}
+
+/**
+ * Step 8 of docs/rules-core-spec.md: a monster's Summon procedure, as data (src/procedures.ts plays it). The card writes only what
+ * is printed on it; the kind adds its own rule:
+ * - `synchro`: 1 Tuner and 1 or more non-Tuner monsters (or what `tuner` / `nonTuner` / `nonTuners` say), face-up on your field,
+ *   whose Levels add up to the Synchro Monster's Level; sent to the Graveyard.
+ * - `xyz`: 2 face-up monsters you control whose Level is the Rank (or what `materials` says), which become its Xyz Materials.
+ *   `alternatives`: the other ways printed on the card ("you can also Xyz Summon this card by using a Rank 4 Xyz Monster you
+ *   control as material"), each with its `condition`; `transfer`: "(Transfer its materials to this card.)".
+ * - `link`: face-up monsters you control that count for the Link Rating, a Link Monster for 1 or for its own Rating; sent to the
+ *   Graveyard.
+ * - `fusion`: the Fusion Materials listed. Not an action: the effect that Fusion Summons says where the materials come from and
+ *   where they go (`fusionSummon`). `contact`: "Must first be Special Summoned (from your Extra Deck) by sending the above cards you
+ *   control to the GY": an action too, with no card effect, the materials going `to`.
+ * - `ritual`: a Ritual Monster, Summoned by a Ritual Spell (`ritualSummon`).
+ */
+export type Procedure =
+	| { readonly kind: "synchro"; readonly tuner?: MaterialFilter; readonly nonTuner?: MaterialFilter; readonly nonTuners?: { readonly min: number; readonly max?: number }; readonly check?: MaterialCheck }
+	| { readonly kind: "xyz"; readonly materials?: MaterialCount; readonly check?: MaterialCheck; readonly alternatives?: readonly { readonly materials: MaterialCount; readonly condition?: (duel: Duel, ctx: MaterialContext) => boolean; readonly transfer?: true }[] }
+	| { readonly kind: "link"; readonly materials: MaterialCount; readonly check?: MaterialCheck }
+	| { readonly kind: "fusion"; readonly materials: readonly MaterialSlot[]; readonly check?: MaterialCheck; readonly contact?: { readonly to: "graveyard" | "banished" | "deck" } }
+	| { readonly kind: "ritual" };
 
 export interface CardDef {
 	readonly code: string;
@@ -229,8 +293,11 @@ export interface CardDef {
 	 * state, into a free Monster Zone, when `condition` holds. Step 5 only; the Summon procedures as data are step 8.
 	 */
 	readonly builtInSummon?: { readonly how: "special"; readonly condition?: (duel: Duel, ctx: EffectContext) => boolean };
+	/** Step 8: the Summon procedure of an Extra Deck or Ritual Monster, as data. */
+	readonly procedure?: Procedure;
 	/** Obelisk: "This card's Normal Summon cannot be negated": the negating cards are not even offered against such a Summon. */
-	readonly summon?: { readonly cannotBeNegated?: readonly ("normal" | "special")[] };
+	/** Step 8: `cannotBeNormalSummoned`: "Cannot be Normal Summoned/Set" (a Ritual Monster or an Extra Deck monster never can be, with no need to say so). */
+	readonly summon?: { readonly cannotBeNegated?: readonly ("normal" | "special")[]; readonly cannotBeNormalSummoned?: true };
 	/**
 	 * Printed parts of the card the core does not apply yet (for Infinite Impermanence, `"column"`: step 7). The card is
 	 * playable but not done. This is the card as the game imports it (step 10's port refuses a card that has any); its
