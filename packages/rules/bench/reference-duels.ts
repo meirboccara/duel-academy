@@ -1,54 +1,48 @@
-import { type CardDef, type Duel, type Effect, moveCard, negateEffect, other } from "../src";
+import { ASH_BLOSSOM_ANSWERS, type CardDef, type Duel, type EffectRecord, moveCard, negateEffect, other } from "../src";
 import { position } from "../test/rules/fixtures";
 
 /**
  * The reference boards of reference-boards.ts, rebuilt on the new core: the same cards in the same places, your turn,
- * Main Phase 1, the game state open. The cards are written with the provisional effect shape (src/effects.ts), close
+ * Main Phase 1, the game state open. The cards are written as effect records (src/effects.ts), close
  * enough to their text for the listing to do the same kind of work: conditions over the Deck, the field and the chain,
  * targets, costs. They are benchmark fixtures, not cards of the rules core.
  *
  * What the new core does not list yet, and today's engine does: Normal Summons and Sets of monsters, battle position
  * changes, attacks, Fusion Summons. The ratio in BASELINE.md is to be read with that in mind until those steps land.
  */
-const nothing: Effect["resolve"] = (duel) => duel;
+const nothing: EffectRecord["operation"] = (duel) => duel;
 const never = () => false;
 const monstersOf = (duel: Duel, side: "you" | "rival") => duel.piles[side].monster;
-const discardItself: Effect["cost"] = { pay: (duel, { card }) => moveCard(duel, card.id, { zone: "graveyard" }) };
+const discardItself: EffectRecord["cost"] = (duel, { card }) => moveCard(duel, card.id, { zone: "graveyard" });
 const FIELD_SPELLS = new Set(["umi"]);
 const isMonster = (duel: Duel, id: number) => DEFS[duel.cards[id]!.code]?.kind === "monster";
 
-const monster = (code: string, effect?: Omit<Effect, "activates">): CardDef => ({ code, kind: "monster", effects: effect ? [{ activates: "effect", ...effect }] : undefined });
-const card = (code: string, kind: CardDef["kind"], effect: Partial<Effect> = {}): CardDef => ({ code, kind, effects: [{ activates: "card", resolve: nothing, ...effect }] });
+const monster = (code: string, effect?: Omit<EffectRecord, "type" | "range" | "operation"> & { operation?: EffectRecord["operation"] }): CardDef => ({ code, kind: "monster", effects: effect ? [{ type: "quick", range: "hand", operation: nothing, ...effect }] : undefined });
+const card = (code: string, kind: CardDef["kind"], effect: Partial<EffectRecord> = {}): CardDef => ({ code, kind, effects: [{ type: "activation", operation: nothing, ...effect }] });
 
 const LIST: CardDef[] = [
 	...["dark-magician", "celtic-guardian", "summoned-skull", "blue-eyes-white-dragon", "giant-soldier-of-stone"].map((code) => monster(code)),
 	// Hand effects. Kuriboh and Droll & Lock Bird wait for an event the core does not raise yet.
-	monster("kuriboh", { speed: 2, from: "hand", condition: never, cost: discardItself, resolve: nothing }),
-	monster("droll-lock-bird", { speed: 2, from: "hand", condition: never, cost: discardItself, resolve: nothing }),
+	monster("kuriboh", { condition: never, cost: discardItself, operation: nothing }),
+	monster("droll-lock-bird", { condition: never, cost: discardItself, operation: nothing }),
 	monster("ash-blossom-joyous-spring", {
-		speed: 2,
-		from: "hand",
-		condition: (duel) => duel.chain[duel.chain.length - 1]?.categories.some((category) => category === "search" || category === "send-from-deck" || category === "summon-from-deck") ?? false,
+		condition: (duel) => duel.chain[duel.chain.length - 1]?.categories.some((category) => ASH_BLOSSOM_ANSWERS.includes(category)) ?? false,
 		cost: discardItself,
-		resolve: (duel, _link, index) => negateEffect(duel, index - 1),
+		operation: (duel, _link, index) => negateEffect(duel, index - 1),
 	}),
 	monster("effect-veiler", {
-		speed: 2,
-		from: "hand",
 		condition: (duel, { player }) => duel.turn.player !== player && (duel.turn.phase === "main1" || duel.turn.phase === "main2"),
-		targets: (duel, { player }) => monstersOf(duel, other(player)).filter((id) => duel.cards[id]!.face === "up"),
+		target: (duel, { player }) => monstersOf(duel, other(player)).filter((id) => duel.cards[id]!.face === "up"),
 		cost: discardItself,
-		resolve: nothing,
+		operation: nothing,
 	}),
 	monster("ghost-ogre-snow-rabbit", {
-		speed: 2,
-		from: "hand",
 		condition: (duel) => {
 			const top = duel.chain[duel.chain.length - 1];
 			return top !== undefined && duel.cards[top.card.id]!.zone === "monster";
 		},
 		cost: discardItself,
-		resolve: nothing,
+		operation: nothing,
 	}),
 	// Spells.
 	card("pot-of-greed", "spell", { categories: ["draw"], condition: (duel, { player }) => duel.piles[player].deck.length >= 2 }),
@@ -56,14 +50,14 @@ const LIST: CardDef[] = [
 	card("raigeki", "spell", { condition: (duel, { player }) => monstersOf(duel, other(player)).length > 0 }),
 	card("harpies-feather-duster", "spell", { condition: (duel, { player }) => duel.piles[other(player)].spell.length > 0 }),
 	card("foolish-burial", "spell", { categories: ["send-from-deck"], condition: (duel, { player }) => duel.piles[player].deck.some((id) => isMonster(duel, id)) }),
-	card("monster-reborn", "spell", { categories: ["summon"], targets: (duel) => [...duel.piles.you.graveyard, ...duel.piles.rival.graveyard].filter((id) => isMonster(duel, id)) }),
+	card("monster-reborn", "spell", { categories: ["summon"], target: (duel) => [...duel.piles.you.graveyard, ...duel.piles.rival.graveyard].filter((id) => isMonster(duel, id)) }),
 	// Polymerization needs Fusion Summons (step 8).
 	card("polymerization", "spell", { condition: never }),
 	// Traps. The Mirror Forces wait for an attack; Solemn Strike answers a monster effect.
 	card("mirror-force", "trap", { condition: never }),
 	card("storming-mirror-force", "trap", { condition: never }),
 	card("solemn-strike", "counter-trap", { condition: (duel) => duel.chain.length > 0 && isMonster(duel, duel.chain[duel.chain.length - 1]!.card.id) }),
-	card("infinite-impermanence", "trap", { targets: (duel, { player }) => monstersOf(duel, other(player)).filter((id) => duel.cards[id]!.face === "up") }),
+	card("infinite-impermanence", "trap", { target: (duel, { player }) => monstersOf(duel, other(player)).filter((id) => duel.cards[id]!.face === "up") }),
 ];
 const DEFS: Record<string, CardDef> = Object.fromEntries(LIST.map((def) => [def.code, def]));
 

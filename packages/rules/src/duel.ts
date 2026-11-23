@@ -1,5 +1,6 @@
 import type { CardDef, SpellSpeed } from "./effects";
 import { type GameEvent, raiseEvent, type Waiting } from "./events";
+import { NOTHING_USED, type Used } from "./once";
 import type { Building } from "./triggers";
 import { createRng } from "./rng";
 
@@ -48,6 +49,10 @@ export interface Link {
 	readonly speed: SpellSpeed;
 	/** The cards chosen as targets at activation. */
 	readonly targets: readonly number[];
+	/** Each target's `moves` at activation: a target that has moved since is a new card and is no longer the target (`targetsOf`). */
+	readonly targetMoves: readonly number[];
+	/** The once-per-turn use this activation spent (its key in `duel.used`), if its effect has a limit. */
+	readonly spent: string | null;
 	/** What the effect declared it would do ("search", "draw"...), so another card can respond to "an effect that would...". */
 	readonly categories: readonly string[];
 	/** The activation itself was negated: the link does nothing, as if the card had not been activated. */
@@ -96,13 +101,23 @@ export interface Duel {
 	readonly waiting: readonly Waiting[];
 	/** While trigger effects are being put on a chain: whose choice it is is in `priority.holder`. */
 	readonly building: Building | null;
+	/** The once-per-turn (Duel, chain) uses so far (step 4). */
+	readonly used: Used;
+	/** While a link resolves and its effect waits for a choice that is not a target: the whole chain, and the choice. */
+	readonly asking: Asking | null;
 	/** How many groups of simultaneous moves (`moveCards`) have happened: the last one's number tags its events. */
 	readonly batches: number;
-	/**
-	 * What each card code does. Provisional (see effects.ts): shared by reference, never copied, never changed. Step 4
-	 * decides where effect records live.
-	 */
+	/** What each card code does, as effect records (src/effects.ts): shared by reference, never copied, never changed. */
 	readonly defs: Readonly<Record<string, CardDef>>;
+}
+
+/** A chain resolving, paused on a choice of its effect's player (`legalActions` lists the candidates as `choose`). */
+export interface Asking {
+	/** The whole chain as activated, for what happens to its cards once it has resolved (filled in when the chain pauses). */
+	readonly links: readonly Link[];
+	readonly player: Side;
+	readonly from: readonly number[];
+	readonly then: (duel: Duel, picked: number) => Duel;
 }
 
 export interface DeckSetup {
@@ -167,6 +182,8 @@ export function createDuel(setup: DuelSetup): Duel {
 		live: [],
 		waiting: [],
 		building: null,
+		used: NOTHING_USED,
+		asking: null,
 		batches: 0,
 		defs: setup.defs ?? {},
 	};

@@ -66,3 +66,38 @@ Trigger-heavy benchmark (`bench/triggers.bench.ts`), same machine and day, mean 
 | A Spell with 4 trigger cards on the field that never trigger | 0.0036 ms |
 
 The scan is linear in the cards of the duel for every move; this is the cost to watch when real trigger cards arrive.
+
+# Rules core, step 4 (effect records + once per turn)
+
+Same positions, same benchmarks, same machine as step 3 (macOS, Darwin 24.2, Node 20+), 2026-11-23. Step 3's column is
+the figure recorded above (measured earlier the same day, not re-run beside step 4: no stash or worktree was allowed
+for this step), so a few percent of it is noise. Mean time per call:
+
+| Position | `legalActions` step 3 | `legalActions` step 4 | list + `act` step 3 | list + `act` step 4 | today's engine (same run) | step 4 vs today's engine |
+|---|---:|---:|---:|---:|---:|---:|
+| opening | 0.0005 ms | 0.0006 ms | 0.0143 ms | 0.0195 ms | 0.367 ms | 19× |
+| midgame | 0.0008 ms | 0.0014 ms | 0.0190 ms | 0.0314 ms | 1.604 ms | 51× |
+| crowdedHand | 0.0010 ms | 0.0019 ms | 0.0466 ms | 0.0712 ms | 0.761 ms | 10.7× |
+
+How to read it:
+- The listing now dry-runs every cost (and places a Spell or Trap Card for the run when it has a cost or a target) before it
+  offers an effect, so that targets are read on the board the cost leaves. That is the whole slowdown: about 1.5 to 2× on
+  `legalActions`, 35 to 65 % on list + `act`. The cost is an immutable-value dry run (no undo, nothing copied but the
+  cards it moves). Effects whose condition fails never reach the dry run.
+- The step 2 target (≥ 10× today's engine, like for like) is at the edge on crowdedHand: 10.7× in the first run, 10.4×
+  after the review fixes (0.0701 ms against 0.731 ms), and 9.8× in a later run the same day (0.0706 ms against
+  0.690 ms; from about 16× at step 3). Treat it as not met with margin. The next lever is a cheap pre-check beside the
+  dry run (the old `cost.can`), which step 4 dropped to keep one source of truth for a cost.
+- `used` (once-per-turn keys) is three short arrays on the duel; `isSpent` is an `includes` on one of them and only runs
+  for effects that have a `once`. It does not show in these positions.
+
+Trigger-heavy benchmark (`bench/triggers.bench.ts`), mean per call: sweep 0.048 ms in the first run, 0.062 ms after the review fixes (step 3: 0.044), `legalActions`
+while the optional triggers are chosen 0.0015 ms (0.0011), a Spell with 4 idle trigger cards 0.0045 ms (0.0036).
+
+New in step 4 (`bench/records.bench.ts`, real cards as effect records), mean per call:
+
+| Case | Mean |
+|---|---:|
+| `legalActions`: 3 hand cards, a Link Spider, 3 rival hand traps with costs and targets | 0.0015 ms |
+| `legalActions`: the rival's window with Ash Blossom (twice) and D.D. Crow in hand | 0.0032 ms |
+| Terraforming with 2 Field Spells: activate, both pass, the player chooses | 0.019 ms |

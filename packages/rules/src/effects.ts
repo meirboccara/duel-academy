@@ -2,10 +2,16 @@ import type { CardInstance, Duel, Link, Side } from "./duel";
 import type { GameEvent } from "./events";
 
 /**
- * PROVISIONAL effect shape, just enough for step 2 (one chain + the priority loop). Step 4 of docs/rules-core-spec.md
- * replaces it with real effect records ({ type, range, event, timing, condition, cost, target, operation, once }),
- * with dry runs for costs and targets, choices made at resolution, and once-per-turn limits. Nothing here is meant to
- * be kept: no card of `CARD_SOURCES` is written with it, only test and benchmark fixtures.
+ * Step 4 of docs/rules-core-spec.md: effect records. A card is data: a `CardDef` with one `EffectRecord` per printed
+ * effect, `{ type, range, event, timing, condition, cost, target, operation, once }` (plus what the core needs to tell
+ * apart: `mandatory`, `each`, `categories`). The records are plain values shared by every duel and never changed.
+ *
+ * How a record is played (src/activation.ts, src/chain.ts, src/triggers.ts):
+ * - Listing: `condition`, then the `once` limit, then a dry run of the `cost` (it is run on the immutable duel and the
+ *   result thrown away), then the `target` candidates read on the board the cost would leave.
+ * - Activating: the card is placed (for `type: "activation"`), the cost is paid for real, the target is checked again
+ *   on the paid board, the link freezes `categories`, and the `once` limit is spent.
+ * - Resolving: `operation` runs; it may ask its player for a choice that is not a target (`ask`).
  */
 export type SpellSpeed = 1 | 2 | 3;
 
@@ -18,51 +24,97 @@ export interface EffectContext {
 /** A card's own reaction to something that happened: a typed event (src/events.ts). */
 export type EventMatcher = (duel: Duel, event: GameEvent, ctx: EffectContext) => boolean;
 
-export interface Effect {
+/** Where the card must be for the effect: `field` means face-up on its controller's field. */
+export type Range = "hand" | "field" | "graveyard" | "banished";
+
+/**
+ * How often an effect may be used, as the printed wording says it (each wording has a card-text record in
+ * src/rule-sources.ts; those prove the wording, not what the core does with it). What the core does is mostly
+ * YGOProJudge's answer (the owner's rules site, no source cited); no Konami page was found for the starred parts:
+ * - `instance`: "Once per turn:". Each copy has its own use, and a card that has become a new card (it moved) has not
+ *   used it (*). A negated activation does not give it back (*).
+ * - `name`: "You can only use this effect of [name] once per turn." Per player, by name, spent at activation (*); a
+ *   negated activation does not give it back (*).
+ * - `activation`: "You can only activate 1 [name] per turn." As `name`, but a negated activation gives the use back (*);
+ *   a negated effect does not (the activation was made: Konami's Q&A fid 14075 says that of a negated effect).
+ * - `duel`: "once per Duel": as `name`, for the whole Duel, per player (*).
+ * - `chain`: "once per Chain": as `name`, until the chain it was put on has resolved (*).
+ * `key` lets several effects share one limit ("You can only use 1 [name] effect per turn"); the default is the card
+ * code and the effect's place in the card.
+ */
+export type OnceScope = "instance" | "name" | "activation" | "duel" | "chain";
+export interface Once {
+	readonly scope: OnceScope;
+	readonly key?: string;
+}
+
+/**
+ * A choice made while an effect resolves that is not a target: "add 1 Field Spell from your Deck" (the player picks the
+ * card). `ask` returns the duel as it stands with the question in `duel.asking`; the chain waits for the answer, and
+ * `then` continues from the duel with the card picked and may ask again. With one candidate there is nothing to choose
+ * and `then` runs at once; with none the effect does nothing more.
+ */
+export const ask = (duel: Duel, player: Side, from: readonly number[], then: (duel: Duel, picked: number) => Duel): Duel => ({ ...duel, asking: { links: [], player, from, then } });
+
+export interface EffectRecord {
 	/**
-	 * `card`: activating the Spell or Trap Card itself. Its Spell Speed and where it can be activated from follow from
-	 * the kind of card (see `CardDef.kind`), as the rulebook gives them.
-	 * `effect`: activating an effect of a card that stays where it is: a monster in the hand (a "hand trap") or a
-	 * face-up card on the field. It states its own `speed` and `from`.
-	 * `trigger`: a Trigger Effect (Spell Speed 1), put on a chain at a trigger point after `on` matched an event; see
-	 * `mandatory`, `timing` and `from`. It is never listed as an ordinary action.
+	 * `activation`: activating the Spell or Trap Card itself (Spell Speed from the kind of card, see `CardDef.kind`; where
+	 * it can be activated from follows the rulebook). `ignition`: an Ignition Effect of a card that stays where it is
+	 * (Spell Speed 1, the owner's Main Phase, nothing else going on). `quick`: a Quick Effect (Spell Speed 2).
+	 * `trigger`: a Trigger Effect (Spell Speed 1), put on a chain at a trigger point after `event` matched; never
+	 * listed as an ordinary action.
 	 */
-	readonly activates: "card" | "effect" | "trigger";
-	/** For `activates: "effect"`: 1 (Ignition) or 2 (Quick Effect). */
-	readonly speed?: SpellSpeed;
-	/**
-	 * Where the card must be. `field` means face-up on its controller's field. For `activates: "effect"`, only `hand`
-	 * and `field` are offered; a trigger can come from any of the four (default `field`).
-	 */
-	readonly from?: "hand" | "field" | "graveyard" | "banished";
-	/** Trigger: the event it triggers on; or, for a fast effect, the event it can answer while that is the last thing that happened. */
-	readonly on?: EventMatcher;
-	/** Trigger: a mandatory ("you must") effect, or optional ("you can"). Default optional. */
-	readonly mandatory?: boolean;
+	readonly type: "activation" | "ignition" | "quick" | "trigger";
+	/** For `ignition`, `quick` and `trigger`; default `field`. Ignored for `activation`. */
+	readonly range?: Range;
+	/** Trigger: the event it triggers on; for a card activation or Quick Effect, the event it can answer while that is the last thing that happened. */
+	readonly event?: EventMatcher;
 	/**
 	 * Trigger: "when ... you can" misses the timing unless the event is the last thing that happened; "if ... you can"
 	 * does not (default "when"). A mandatory trigger never misses it.
 	 */
 	readonly timing?: "when" | "if";
+	/** Trigger: a mandatory ("you must") effect, or optional ("you can"). Default optional. */
+	readonly mandatory?: boolean;
 	/**
 	 * Trigger worded "each time ...": it activates once for every time its condition was met at the trigger point, not
-	 * once (Konami's Japanese Q&A, rule records `each-time-counts-events` and `each-time-across-chain`). Without it, the
-	 * core puts the effect on the chain once per point: no Konami page we found settles the other case.
+	 * once (Konami's Japanese Q&A, rule records `each-time-counts-events` and `each-time-across-chain`).
 	 */
 	readonly each?: boolean;
-	/** What the effect would do, frozen on the link ("search", "draw"...). */
-	readonly categories?: readonly string[];
+	/**
+	 * What the effect would do ("search", "draw"...), so another card can respond to "an effect that would...". Frozen
+	 * on the link when the effect is activated: a function is read once then, on the board the cost left and with the
+	 * targets chosen, and never again.
+	 */
+	readonly categories?: readonly string[] | ((duel: Duel, ctx: EffectContext, targets: readonly number[]) => readonly string[]);
 	/** The activation condition, over the duel and its chain. Absent: always met. */
 	readonly condition?: (duel: Duel, ctx: EffectContext) => boolean;
-	/** The cards that may be targeted. When present, exactly one is chosen at activation, and one is needed. */
-	readonly targets?: (duel: Duel, ctx: EffectContext) => readonly number[];
-	/** Paid at activation, after the card is placed and before the link is added; never refunded. */
-	readonly cost?: { readonly can?: (duel: Duel, ctx: EffectContext) => boolean; readonly pay: (duel: Duel, ctx: EffectContext) => Duel };
+	/**
+	 * The cost, paid at activation after the card is placed and before the link is added; never refunded. It returns the
+	 * duel with the cost paid, or `null` when it cannot be paid. The listing runs it as a dry run: the duel is a value,
+	 * so nothing is spent. One way to pay only: a choice among cost cards is not offered yet.
+	 */
+	readonly cost?: (duel: Duel, ctx: EffectContext) => Duel | null;
+	/**
+	 * The cards that may be targeted, read on the duel with the cost paid (a cost can remove a target or make one).
+	 * When present, exactly one is chosen at activation, and one is needed.
+	 */
+	readonly target?: (duel: Duel, ctx: EffectContext) => readonly number[];
 	/**
 	 * Applies the effect when its link resolves. `index` is the link's place in `duel.chain`, which still holds this
-	 * link and those below it. To negate, it calls `negateActivation` or `negateEffect` on a lower link.
+	 * link and those below it. To negate, it calls `negateActivation` or `negateEffect` on a lower link; to make the
+	 * player choose a card that is not a target, it returns `ask(...)`.
 	 */
-	readonly resolve: (duel: Duel, link: Link, index: number) => Duel;
+	readonly operation: (duel: Duel, link: Link, index: number) => Duel;
+	/** The once-per-turn (or Duel, or chain) limit, as printed. */
+	readonly once?: Once;
+}
+
+/** What a card says about itself that the core reads: its Spell or Trap icon, a monster's Level, a Normal Monster. */
+export interface Facts {
+	readonly icon?: "field";
+	readonly level?: number;
+	readonly normal?: true;
 }
 
 export interface CardDef {
@@ -75,24 +127,27 @@ export interface CardDef {
 	 * Continuous, Equip, Field and Ritual cards are not told apart yet.
 	 */
 	readonly kind: "monster" | "spell" | "quick-play" | "trap" | "counter-trap";
-	readonly effects?: readonly Effect[];
+	readonly facts?: Facts;
+	readonly effects?: readonly EffectRecord[];
 }
 
-/** The Spell Speed of an effect of a card: fixed by the kind of card for a card activation, stated otherwise. */
-export function speedOf(def: CardDef, effect: Effect): SpellSpeed {
-	if (effect.activates === "effect") return effect.speed ?? 1;
+/** The Spell Speed of an effect of a card: fixed by the kind of card for a card activation, by the type otherwise. */
+export function speedOf(def: CardDef, effect: EffectRecord): SpellSpeed {
+	if (effect.type === "quick") return 2;
+	if (effect.type !== "activation") return 1;
 	if (def.kind === "counter-trap") return 3;
 	return def.kind === "spell" ? 1 : 2;
 }
 
 /** The effect a link or a waiting trigger points at: the card's code and the effect's index in its card. */
-export const effectOf = (duel: Duel, from: { readonly card: CardInstance; readonly effect: number }): Effect => duel.defs[from.card.code]!.effects![from.effect]!;
+export const effectOf = (duel: Duel, from: { readonly card: CardInstance; readonly effect: number }): EffectRecord => duel.defs[from.card.code]!.effects![from.effect]!;
 
 /**
- * A link for an activation, holding the card as it is when activated (placed, before the cost): used for card and effect
- * activations in chain.ts and for triggers in triggers.ts.
+ * The cards a link targeted that are still the cards it targeted: a target that left where it was and came back (it
+ * moved, so it is a new card) is no longer "that target". An operation reads its targets through this. (UCT4: "that
+ * target" has to still meet the targeting requirements; a card that became a new card is not the same one: R2021 and step 1.)
  */
-export function newLink(duel: Duel, player: Side, card: CardInstance, index: number, targets: readonly number[]): Link {
-	const effect = effectOf(duel, { card, effect: index });
-	return { player, card, effect: index, speed: speedOf(duel.defs[card.code]!, effect), targets, categories: effect.categories ?? [], activationNegated: false, effectNegated: false };
-}
+export const targetsOf = (duel: Duel, link: Link): CardInstance[] => link.targets.flatMap((id, i) => (duel.cards[id]!.moves === link.targetMoves[i] ? [duel.cards[id]!] : []));
+
+/** Where the card must be for the effect: the field unless the record says otherwise. */
+export const rangeOf = (effect: EffectRecord): Range => effect.range ?? "field";

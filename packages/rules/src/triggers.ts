@@ -1,7 +1,8 @@
-import type { Action } from "./chain";
+import { type Action, PASS, sameAction } from "./action";
+import { activateEffect, activationWays } from "./activation";
 import { type Duel, other, type Priority, type Side } from "./duel";
-import { effectOf, newLink } from "./effects";
-import { dropWhen, type Waiting } from "./events";
+import { effectOf } from "./effects";
+import type { Waiting } from "./events";
 
 /**
  * Step 3 of docs/rules-core-spec.md: trigger points. After a chain resolves, or after an action that starts no chain,
@@ -36,25 +37,20 @@ export interface Building {
 	readonly anyActivated: boolean;
 }
 
-const NO_TARGETS: readonly number[] = Object.freeze([]);
 type Activate = Extract<Action, { type: "activate" }>;
 
-/** Every way this trigger effect can be activated now: none if its card has moved since, or a condition, cost or target fails. */
+/** Every way this trigger effect can be activated now: none if its card has moved since, or a condition, limit, cost or target fails. */
 function options(duel: Duel, waiting: Waiting): Activate[] {
 	const effect = effectOf(duel, waiting);
 	const card = duel.cards[waiting.card.id]!;
 	if (card.moves !== waiting.card.moves) return [];
 	// The teaching chain limit stops us asking for optional effects; a mandatory one still goes on, or the card would resolve differently.
 	if (!effect.mandatory && duel.options.chainLimit !== null && duel.chain.length >= duel.options.chainLimit) return [];
-	const ctx = { player: waiting.card.controller, card };
-	if (effect.condition && !effect.condition(duel, ctx)) return [];
-	if (effect.cost?.can && !effect.cost.can(duel, ctx)) return [];
-	if (!effect.targets) return [{ type: "activate", card: card.id, effect: waiting.effect, targets: NO_TARGETS }];
-	return effect.targets(duel, ctx).map((target) => ({ type: "activate", card: card.id, effect: waiting.effect, targets: [target] }));
+	return activationWays(duel, { player: card.controller, card }, waiting.effect, effect).map((targets): Activate => ({ type: "activate", card: card.id, effect: waiting.effect, targets }));
 }
 
 /** An "each time" effect waiting twice offers the same action twice: show it once, it will be offered again. */
-const distinct = (actions: Activate[]) => actions.filter((action, index) => actions.findIndex((candidate) => candidate.card === action.card && candidate.effect === action.effect && candidate.targets.join() === action.targets.join()) === index);
+const distinct = (actions: Activate[]) => actions.filter((action, index) => actions.findIndex((candidate) => sameAction(candidate, action)) === index);
 
 const sideOfStage = (duel: Duel, stage: StageIndex): Side => (STAGES[stage].side === "turn player" ? duel.turn.player : other(duel.turn.player));
 
@@ -113,15 +109,9 @@ function finish(duel: Duel): Duel {
 function add(duel: Duel, action: Activate): Duel {
 	const building = duel.building!;
 	const waiting = building.remaining.find((entry) => entry.card.id === action.card && entry.effect === action.effect)!;
-	const effect = effectOf(duel, waiting);
-	const player = waiting.card.controller;
-	let next = duel;
-	// The link holds the card as it was when activated, before the cost.
-	const card = duel.cards[action.card]!;
-	if (effect.cost) next = dropWhen(effect.cost.pay(next, { player, card }));
-	const link = newLink(duel, player, card, action.effect, action.targets);
+	const next = activateEffect(duel, waiting.card.controller, duel.cards[action.card]!, action.effect, action.targets);
 	const remaining = building.remaining.filter((entry) => entry !== waiting);
-	return { ...next, chain: [...next.chain, link], building: { ...building, remaining, anyActivated: true } };
+	return { ...next, building: { ...building, remaining, anyActivated: true } };
 }
 
 /** The actions open while the trigger effects are put on a chain. */
@@ -131,8 +121,6 @@ export function triggerActions(duel: Duel): Action[] {
 	// A mandatory effect must be chosen; an optional one may be declined, which declines the player's other optional effects too.
 	return STAGES[building.stage].mandatory ? choices : [PASS, ...choices];
 }
-
-const PASS: Action = Object.freeze({ type: "pass" });
 
 /** An optional stage is over for the player: they decline what is left. */
 export function declineTriggers(duel: Duel): Duel {

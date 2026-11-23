@@ -1,4 +1,8 @@
+import type { CardDef } from "../effects";
 import type { CardSources } from "../coverage";
+
+/** A Normal Monster: no effect records. */
+export const CELTIC_GUARDIAN_DEF: CardDef = { code: "celtic-guardian", kind: "monster", facts: { level: 4, normal: true } };
 
 /**
  * Celtic Guardian: a Normal Monster, the first card through the definition of done. It has no effect, so it owes no

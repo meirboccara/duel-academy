@@ -1,4 +1,4 @@
-import type { SourceRecord } from "./sources";
+import { konamiCardUrl, type SourceRecord } from "./sources";
 
 /**
  * The rules the core is built on, each with Konami's own words. A rule test cites one with cites("rules", "<id>") in
@@ -7,11 +7,16 @@ import type { SourceRecord } from "./sources";
  * Every quote was checked against the page on the date read:
  * - RB10: the Official Rulebook v10 (PDF text; printed page numbers in the comments).
  * - FET: Konami's "Fast Effect Timing" page and its chart.
- * - One Japanese Q&A, where the TCG pages have no sentence for the rule (noted on the record).
+ * - UCT3, UCT4, UCT6, UCT7: Konami's "Understanding Card Text" articles, parts 3, 4, 6 and 7.
+ * - Card text: the printed wording of a card on Konami's card database, where it is the only Konami source for a rule
+ *   (the once-per-turn wordings): it proves the wording, not what the core does with it (each record says which).
+ * - Japanese Q&A, where the TCG pages have no sentence for the rule (noted on the record).
  */
 const RB10 = "https://www.yugioh-card.com/en/downloads/rulebook/SD_RuleBook_EN_10.pdf";
 const FET = "https://www.yugioh-card.com/en/play/fast-effect-timing/";
 const UCT6 = "https://www.yugioh-card.com/eu/play/understanding-card-text/part-6-finding-clues-in-turbo-pack-6-and-generation-force/";
+const UCT3 = "https://www.yugioh-card.com/eu/play/understanding-card-text/part-3-conditions-activations-and-effects/";
+const UCT4 = "https://www.yugioh-card.com/eu/play/understanding-card-text/part-4-the-clues-on-your-cards/";
 const UCT7 = "https://www.yugioh-card.com/eu/play/understanding-card-text/part-7-conjunction-functions/";
 const R2021 = "https://www.yugioh-card.com/en/play/2021_rules_update/";
 const read = "2026-11-23";
@@ -19,6 +24,18 @@ const rb10 = (id: string, quote: string): SourceRecord => ({ id, kind: "tcg-rule
 const fet = (id: string, quote: string): SourceRecord => ({ id, kind: "tcg-rule", url: FET, read, quote });
 
 const konamiPage = (id: string, url: string, quote: string): SourceRecord => ({ id, kind: "tcg-rule", url, read, quote });
+
+/** Konami's Japanese Q&A fid 14075, filed under Ash Blossom & Joyous Spring (cid 12950): see the rule record and the card's sources. */
+export const ICE_BELL_QA: Omit<SourceRecord, "id"> = {
+	kind: "jp-qa",
+	cid: 12950,
+	fid: 14075,
+	url: "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=14075&request_locale=ja",
+	read,
+	quote: "その場合でも、手札の「 WW－アイス・ベル 」のモンスター効果の発動は行われていますので、このターンに自分は、レベル５以上の風属性モンスターしかエクストラデッキから特殊召喚する事はできなくなります。",
+};
+
+const cardText = (id: string, cid: number, quote: string): SourceRecord => ({ id, kind: "card-text", cid, url: konamiCardUrl(cid, "en"), read, quote });
 
 export const RULE_SOURCES: readonly SourceRecord[] = [
 	// RB10 p. 45, "Spell Speeds".
@@ -210,4 +227,37 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 		read,
 		quote: "この場合、「エクシーズ・リボーン」の『そのモンスターを特殊召喚し』の処理は適用され、対象の「ジェムナイト・パール」は特殊召喚されますが、『このカードを下に重ねてX素材とする』処理は適用されません。",
 	},
+	// UCT4, "Costs": a cost is paid when the effect is activated.
+	konamiPage("costs-at-activation", UCT4, "Costs are always paid at activation."),
+	// UCT4, New Zombie Master: the cost comes first and the target is picked after it. Konami says nothing about an effect
+	// whose cost cannot be paid or whose cost removes its only target: that such an effect is not offered follows from this.
+	konamiPage("cost-then-target", UCT4, "Clues: You send a card to the Graveyard first, ‘then’ pick a target after that."),
+	// UCT3, Creature Swap: what an effect does, and the choices it makes, happen when it resolves.
+	konamiPage("choice-at-resolution", UCT3, "In fact, its text is exactly the same as before because everything on Creature Swap happens when the effect resolves: Each player chooses 1 monster they control and switches control of those monsters with each other."),
+	/**
+	 * Ash Blossom & Joyous Spring (cid 12950) negates a card or effect "that includes any of these effects": what the
+	 * effect includes is what it says, read when it is activated. Konami says nothing of the board changing in between;
+	 * that the categories are frozen on the link is derived from the wording (it speaks of what is activated).
+	 */
+	cardText("frozen-categories", 12950, "When a card or effect is activated that includes any of these effects (Quick Effect): You can discard this card; negate that effect."),
+	// The five printed once-per-turn wordings (card text). What each does is the core's reading; see EffectRecord.once.
+	// "Once per turn:" (Link Spider, cid 13034). That each copy has its own use, and that a card that moved is a new card
+	// with a new use, is not worded on a Konami page we found; YGOProJudge (no source cited) says so.
+	cardText("once-instance-wording", 13034, "Once per turn: You can Special Summon 1 Level 4 or lower Normal Monster from your hand to your zone this card points to."),
+	// "You can only use this effect of [name] once per turn" (Ash Blossom & Joyous Spring, cid 12950). By name and per
+	// player, spent at activation even if negated: YGOProJudge (no source cited).
+	cardText("once-name-wording", 12950, 'You can only use this effect of "Ash Blossom & Joyous Spring" once per turn.'),
+	// "You can only activate 1 [name] per turn" (Pot of Desires, cid 12465). That a negated activation gives the use back
+	// and a negated effect does not: YGOProJudge (no source cited); no Konami page found.
+	cardText("once-activation-wording", 12465, 'You can only activate 1 "Pot of Desires" per turn.'),
+	// "once per Duel" (Revolution Synchron, cid 18789). Tracked per player: YGOProJudge (no source cited).
+	cardText("once-duel-wording", 18789, 'You can only use this effect of "Revolution Synchron" once per Duel.'),
+	// "Once per Chain" (Argostars - Home Stadium, cid 20795). Lifted when the chain has resolved, per player: YGOProJudge (no source cited).
+	cardText("once-chain-wording", 20795, 'Once per Chain, if a Continuous Trap activates its effect in your Monster Zone'),
+	/**
+	 * Konami's Japanese Q&A under Ash Blossom & Joyous Spring (cid 12950): the effect of WW-Ice Bell is negated by Ash, but
+	 * the activation of its effect was made, so what applies at activation (its restriction on Extra Deck Summons) does.
+	 * Used for: a negated effect is still an activation that happened, so no "activate 1 per turn" use is given back.
+	 */
+	{ id: "effect-negated-still-activated", ...ICE_BELL_QA },
 ];

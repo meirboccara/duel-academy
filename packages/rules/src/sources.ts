@@ -50,3 +50,6 @@ export function validateSource(record: SourceRecord): SourceProblem[] {
 	if (!isKonamiUrl(record.url)) problems.push("url-not-konami");
 	return problems;
 }
+
+/** The Konami card database page of a card (`cid`), in English or French. */
+export const konamiCardUrl = (cid: number, locale: "en" | "fr"): string => `https://www.db.yugioh-card.com/yugiohdb/card_search.action?ope=2&cid=${cid}&request_locale=${locale}`;

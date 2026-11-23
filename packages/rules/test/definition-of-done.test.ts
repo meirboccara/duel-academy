@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CARD_SOURCES, coverage, RULE_SOURCES, type TestFile } from "../src";
+import { CARD_DEFS, CARD_SOURCES, coverage, RULE_SOURCES, type TestFile } from "../src";
 
 /**
  * Card tests live in test/cards and rule tests in test/rules. Each cites its sources in its title: cites(card, source)
@@ -29,5 +29,8 @@ describe("the definition of done, over every card the rules core plays and every
 	it("gives each card its own code and Konami card id", () => {
 		expect(new Set(CARD_SOURCES.map((card) => card.code)).size).toBe(CARD_SOURCES.length);
 		expect(new Set(CARD_SOURCES.map((card) => card.cid)).size).toBe(CARD_SOURCES.length);
+	});
+	it("writes each card of the sources as records, and owes sources to each card written as records", () => {
+		expect(Object.keys(CARD_DEFS).sort()).toEqual(CARD_SOURCES.map((card) => card.code).sort());
 	});
 });

@@ -18,7 +18,7 @@ Step 2 (one chain + priority loop):
   the duel after one of them. Konami's Fast Effect Timing chart; the chain resolves when both players pass in a row.
 - `Duel` now carries the turn, the chain (`Link[]`), the priority state and the teaching options (`chainLimit`,
   `everyWindow`).
-- `src/effects.ts`: a provisional effect shape, replaced by effect records in step 4.
+- `src/effects.ts`: the effect shape of steps 2 and 3, replaced by effect records in step 4 (below).
 - `src/rule-sources.ts`: the rules cited by the tests in `test/rules` with `cites("rules", id)`.
 
 Step 3 (triggers + missing the timing):
@@ -35,7 +35,7 @@ Step 3 (triggers + missing the timing):
   "if", whole-chain deferral, cost events, moved cards, and the Heraldry Change / Torrential Tribute example.
 
 Known limits of step 3 (to be honest about what the tests do not prove):
-- The trigger fixtures are test cards in the provisional effect shape; step 4 replaces the shape.
+- The trigger fixtures are made-up test cards (written as effect records since step 4).
 - Nothing raises `summoned` yet but a card effect: Summons come with step 8. No attack, destruction or "leaves the field"
   events beyond `moved` (a destruction is a move to the Graveyard; its cause is not recorded).
 - Trigger occurrences are first filtered to those whose card has not moved since. An effect worded "each time" (`each:
@@ -68,5 +68,68 @@ Known limits of step 3 (to be honest about what the tests do not prove):
   OCG Q&A orders simultaneous effects by "priority 1/2/3" with different grouping (face-up optional effects before
   hidden ones); this core follows the TCG rulebook (RB10 p. 50), as the spec says.
 - No same-timing check between trigger effects that respond to the activation of an effect (a trigger "when a card or
-  effect is activated" is a Quick Effect, step 4's records).
+  effect is activated" is a Quick Effect, which step 4's records can say; no card needs the same-timing check yet).
 - Spell/Trap Cards that stay on the field and the Damage Step's limits are still out of scope.
+
+Step 4 (effect records + once per turn):
+- `src/effects.ts`: `EffectRecord` = `{ type, range, event, timing, condition, cost, target, operation, once }`, plus
+  `mandatory`, `each` and `categories`. `type` is `activation` (the Spell/Trap Card itself), `ignition`, `quick` or
+  `trigger`; `range` is where the card is (`hand`, `field`, `graveyard`, `banished`). A `CardDef` is a code, a `kind`, a few
+  `facts` (Field icon, Level, Normal) and its records. The records are plain values shared by every duel.
+- `src/activation.ts`: what activating a record takes, shared by an effect the player activates (`chain.ts`) and a trigger
+  put on a chain (`triggers.ts`), so listing and activating cannot disagree. Listing: `condition`, the `once` limit, then
+  a **dry run of the cost** (`cost` returns the duel with the cost paid, or `null`; it is run on the immutable duel and
+  thrown away) and the `target` candidates **read on the board the cost leaves** (a cost can take the only target or make
+  one: records `cost-then-target`, `costs-at-activation`). Activating pays for real, checks the target again on the paid
+  board (the step 3 leftover) and freezes the link.
+- Categories are frozen on the link: `categories` is a list, or a function read once at activation (on the board the cost
+  left, with the targets), never again.
+- Choices at resolution (`ask` in `effects.ts` returns the duel with the question in `duel.asking`; the `choose` action): an operation can return `ask(duel,
+  player, candidates, then)` for a card that is not a target (Terraforming's Field Spell, Link Spider's monster). The chain
+  waits, `legalActions` lists `choose`, `act` resumes the remaining links; one candidate is taken at once and none ends the
+  effect (record `choice-at-resolution`). The continuation is a pure function, so a paused duel can be answered both
+  ways. A teaching option never changes it.
+- `src/once.ts` (internal, not exported): five once-per-turn scopes, as printed on the card: `instance` ("Once per turn:", per copy, lifted when the
+  card became a new card, i.e. its `moves` changed), `name` ("You can only use this effect of [name] once per turn": per
+  player, spent at activation, kept when the activation is negated), `activation` ("You can only activate 1 [name] per
+  turn": a negated activation gives the use back, a negated effect does not; `negateActivation` does the refund), `duel`
+  (never lifted) and `chain` (lifted once the chain has resolved). A `key` shares one limit between effects. Triggers use
+  the same check.
+- `src/cards/`: the cards Academy writes as data, as records, each with its `CardSources` and tests in `test/cards`: Ash
+  Blossom & Joyous Spring, Terraforming, Mystical Space Typhoon, D.D. Crow, Pot of Greed and Link Spider
+  (hard once per turn; draw; Quick Effects from the hand with cost and target; a search with a chosen card; a "once per
+  turn" monster). `CARD_DEFS` is what to hand to `createDuel`. Celtic Guardian is the effect-less one.
+- Tests: `test/rules/records.test.ts` (costs, targets, choices, categories), `test/rules/once-per-turn.test.ts` (the five
+  scopes), `test/cards/*` (each card through `legalActions`/`act`, citing its Konami text).
+
+Known limits of step 4 (what the tests do not prove):
+- Most of the once-per-turn semantics rest on YGOProJudge (the owner's rules site), which cites no source, and not on a
+  Konami record: per-copy reset when a card moves, the limit being per player, a negated activation keeping a "use" limit
+  and giving back an "activate" one, `duel` and `chain` being per player and `chain` lifting at the end of the chain.
+  What Konami's pages give is the printed wording of each scope (records `once-*-wording`, card text) and, for a negated
+  effect still counting as an activation, one Japanese Q&A (`effect-negated-still-activated`, fid 14075, about WW-Ice
+  Bell: the other consequences of the activation still apply). A "Once per turn:" effect whose activation is negated is
+  not refunded here; YGOProJudge says so too, but its own answer was not consistent on the point (it first described the
+  `activate` refund for the other wording). Treat it as unsettled.
+- A cost has one way to be paid: there is no choice among cost cards (discard 1 card, Tribute 1 monster are written with a
+  fixed pick), and offering one needs an `ask` at activation.
+- A target is exactly one card: no zero targets, no "up to N", no several.
+- A target counts as the same card only while it has not moved (`targetsOf` compares `moves` with the value frozen on the
+  link); that a card that left and came back is no longer "that target" is the core's reading, no Konami page found.
+- Ash Blossom & Joyous Spring negates the link right below it (`index - 1`): it assumes it sits directly above the link it
+  answers. Several negations, and "cannot be negated", come with step 5.
+- A resolved Field or Continuous Spell is swept to the Graveyard like a Normal Spell until step 7 (zones) and the later
+  steps keep it on the field.
+- A choice at resolution is one card from a list; "up to N", "you may choose none" and several cards in a row (chain `ask`s
+  by hand) are not modelled as such, and a player cannot decline a mandatory search.
+- Zones: Link Spider summons "to your zone this card points to" into the Monster Zone with no zone choice (step 7); a Field
+  Spell is a Spell in the S/T pile (`facts.icon: "field"` is only used for searching).
+- Droll & Lock Bird is not a card of the core yet: its lock "for the rest of this turn" is a continuous effect (step 6), so
+  it would not play as printed. It waits for step 6 (its event, Draw Phase exception and cost are easy to write as a record).
+- Ash Blossom & Joyous Spring answers `search`, `summon-from-deck` and `send-from-deck` only: the printed list. Drawing is
+  not on it. Academy's old engine also lets Ash answer a draw; that is a difference of data, not settled here.
+- Pot of Greed needs 2 cards in the Deck (kept from the old engine; no Konami page read). Link Spider needs a Normal Monster
+  of Level 4 or lower in the hand to be activated (an analogy with `search-needs-a-card`; no Konami page read).
+- Mystical Space Typhoon cannot target itself and "destroys" by moving to the Graveyard (no destruction event yet). The
+  rulings of its Q&A that need a card on the field after the cost (Xyz Reborn) are only in the step 2 rule records.
+- The cost dry run makes the listing 1.5 to 2× slower (BASELINE.md); a pre-check beside it is the lever if needed.

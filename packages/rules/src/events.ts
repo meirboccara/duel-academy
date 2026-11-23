@@ -1,5 +1,5 @@
 import type { CardInstance, Duel, Phase, Side } from "./duel";
-import { type Effect, effectOf } from "./effects";
+import { effectOf, rangeOf } from "./effects";
 
 /**
  * Step 3 of docs/rules-core-spec.md: typed events. Every move of a card raises `moved`; effects raise the others with
@@ -24,7 +24,7 @@ export interface Waiting {
 interface Listening {
 	/** The codes of the cards with a trigger effect. */
 	readonly triggers: readonly string[];
-	/** Does a card care about events: trigger effects, or effects that wait for one (`on`)? */
+	/** Does a card care about events: trigger effects, or effects that wait for one (`event`)? */
 	readonly listensToEvents: boolean;
 }
 
@@ -37,8 +37,8 @@ function listeners(defs: Duel["defs"]): Listening {
 		let listensToEvents = false;
 		for (const def of Object.values(defs)) {
 			for (const effect of def.effects ?? []) {
-				if (effect.activates === "trigger") triggers.push(def.code);
-				if (effect.activates === "trigger" || effect.on) listensToEvents = true;
+				if (effect.type === "trigger") triggers.push(def.code);
+				if (effect.type === "trigger" || effect.event) listensToEvents = true;
 			}
 		}
 		found = { triggers, listensToEvents };
@@ -48,8 +48,8 @@ function listeners(defs: Duel["defs"]): Listening {
 }
 
 /** Is the card where a trigger effect says it triggers from? Default: face-up on the field. */
-function placedFor(card: CardInstance, from: Effect["from"]): boolean {
-	switch (from ?? "field") {
+function placedFor(card: CardInstance, range: ReturnType<typeof rangeOf>): boolean {
+	switch (range) {
 		case "hand":
 			return card.zone === "hand";
 		case "graveyard":
@@ -64,7 +64,7 @@ function placedFor(card: CardInstance, from: Effect["from"]): boolean {
 /**
  * Notes that something happened. Each trigger effect whose card is in place and whose condition the event meets is
  * kept in `waiting` until the next trigger point, when it can be put on a chain. The event is also "live": the last
- * thing that happened, which effects that answer an event (`on`) can respond to.
+ * thing that happened, which effects that answer an event (`event`) can respond to.
  */
 export function raiseEvent(duel: Duel, event: GameEvent): Duel {
 	const { triggers, listensToEvents } = listeners(duel.defs);
@@ -76,7 +76,7 @@ export function raiseEvent(duel: Duel, event: GameEvent): Duel {
 			const effects = duel.defs[card.code]!.effects!;
 			for (let index = 0; index < effects.length; index++) {
 				const effect = effects[index]!;
-				if (effect.activates !== "trigger" || !placedFor(card, effect.from) || !effect.on?.(duel, event, { player: card.controller, card })) continue;
+				if (effect.type !== "trigger" || !placedFor(card, rangeOf(effect)) || !effect.event?.(duel, event, { player: card.controller, card })) continue;
 				waiting = [...waiting, { card, effect: index, event }];
 			}
 		}
