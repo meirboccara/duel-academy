@@ -17,6 +17,7 @@ import {
 	type GameEvent,
 	materialsOf,
 	negateSummonAndDestroy,
+	effectDestruction,
 	type RitualOptions,
 	ritualSummon,
 	type Side,
@@ -122,7 +123,7 @@ export function summonCards(log: string[] = []): Record<string, CardDef> {
 		// "When a monster is Summoned" (mandatory).
 		{ code: "summon-watcher", kind: "monster", facts: { level: 4 }, effects: [{ type: "trigger", mandatory: true, event: (_duel, event) => event.type === "summoned", operation: logs("summon-watcher") }] },
 		// "When a monster(s) would be Summoned: negate the Summon, and if you do, destroy it." (a Counter Trap)
-		{ code: "warning", kind: "counter-trap", effects: [{ type: "activation", answersSummon: true, condition: (duel) => duel.chain.length === 0 && summonNegatable(duel), operation: (duel) => (log.push("warning"), negateSummonAndDestroy(duel)) }] },
+		{ code: "warning", kind: "counter-trap", effects: [{ type: "activation", answersSummon: true, condition: (duel) => duel.chain.length === 0 && summonNegatable(duel), operation: (duel, link) => (log.push("warning"), negateSummonAndDestroy(duel, effectDestruction(link))) }] },
 		// A Quick-Play Spell with nothing to do with Summons, to make a chain with.
 		{ code: "filler", kind: "quick-play", effects: [{ type: "activation", operation: logs("filler") }] },
 		// "Target 1 face-up monster: change it to face-down Defense Position." / "Flip all your face-down monsters face-up." / "Change its battle position."

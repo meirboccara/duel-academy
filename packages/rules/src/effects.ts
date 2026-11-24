@@ -205,8 +205,22 @@ export interface EffectRecord {
 /** A Link Arrow as printed, read with the card upright for its controller. */
 export type Arrow = "top-left" | "top" | "top-right" | "left" | "right" | "bottom-left" | "bottom" | "bottom-right";
 
+export type Attribute = "DARK" | "DIVINE" | "EARTH" | "FIRE" | "LIGHT" | "WATER" | "WIND";
+export type MonsterType =
+	| "Aqua" | "Beast" | "Beast-Warrior" | "Creator God" | "Cyberse" | "Dinosaur" | "Divine-Beast" | "Dragon" | "Fairy" | "Fiend"
+	| "Fish" | "Illusion" | "Insect" | "Machine" | "Plant" | "Psychic" | "Pyro" | "Reptile" | "Rock" | "Sea Serpent" | "Spellcaster"
+	| "Thunder" | "Warrior" | "Winged Beast" | "Wyrm" | "Zombie";
+
 /** What a card says about itself that the core reads: its Spell or Trap icon, a monster's printed Level, ATK and DEF, a Normal Monster. */
 export interface Facts {
+	/** Printed identity, as data. A name or archetype is never derived from `code`; effects that change names are not modelled here. */
+	readonly name?: string;
+	readonly attribute?: Attribute;
+	readonly monsterType?: MonsterType;
+	/** Archetypes this card is explicitly a member of, including a printed "always treated as" archetype. */
+	readonly archetypes?: readonly string[];
+	/** Exact card names mentioned by the printed text, for "mentions" searches; no fragments. */
+	readonly mentions?: readonly string[];
 	/** The Spell icon: a Field Spell goes to the Field Zone (step 7), an Equip Spell is equipped to a monster. */
 	readonly icon?: "field" | "equip";
 	/** An Extra Deck monster's frame (step 7: where it may be Summoned from the Extra Deck). */

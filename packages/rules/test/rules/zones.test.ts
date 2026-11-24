@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { act, type Action, atk, beginSummon, changeControl, destroyCard, finishSummon, equip, equipsOf, freeSlots, takeControl, targetsOf, legalActions, pendulumZones, type Arrow, type CardDef, cardsIn, createDuel, type Duel, summonZones, cardsInColumn, cites, coLinked, columnOf, isLinked, linkedZones, moveCard, pointedZones, pointsTo, sameColumn } from "../../src";
+const MECHANIC = { destruction: { cause: "game-mechanic" as const } };
 import { codes, offered, plainCards, play, position } from "./fixtures";
 
 describe("exact board slots", () => {
@@ -287,7 +288,7 @@ describe("Pendulum Zones", () => {
 		const start = position({ defs, you: { monsters: ["scale"], faceupSpells: ["scale"] }, rival: { hand: ["monster"] } });
 		const [inMonsterZone] = start.piles.you.monster;
 		const [inPendulumZone] = start.piles.you.spell;
-		const destroyed = destroyCard(destroyCard(start, inMonsterZone!), inPendulumZone!);
+		const destroyed = destroyCard(destroyCard(start, inMonsterZone!, MECHANIC), inPendulumZone!, MECHANIC);
 		expect(destroyed.cards[inMonsterZone!]).toMatchObject({ zone: "extra", face: "up", controller: "you" });
 		expect(destroyed.cards[inPendulumZone!]).toMatchObject({ zone: "extra", face: "up" });
 		expect(destroyed.piles.you.extra).toEqual([inMonsterZone!, inPendulumZone!]);
@@ -342,7 +343,7 @@ describe("Equip Cards", () => {
 		}
 		const equips = monsters.map((monster) => equipsOf(duel, monster)[0]!);
 		expect(equips.every((id) => id !== undefined)).toBe(true);
-		const destroyed = destroyCard(duel, monsters[0]!);
+		const destroyed = destroyCard(duel, monsters[0]!, MECHANIC);
 		expect(destroyed.cards[equips[0]!]).toMatchObject({ zone: "graveyard", equippedTo: null });
 		const banished = moveCard(duel, monsters[1]!, { zone: "banished" });
 		expect(banished.cards[equips[1]!]!.zone).toBe("graveyard");
@@ -466,6 +467,6 @@ describe("review fixes (step 7)", () => {
 		duel = equip(duel, axe!, monster!);
 		duel = moveCard(duel, axe!, { zone: "spell", controller: "rival" });
 		expect(duel.cards[axe!]!.equippedTo).toBe(monster);
-		expect(destroyCard(duel, monster!).cards[axe!]!.zone).toBe("graveyard");
+		expect(destroyCard(duel, monster!, MECHANIC).cards[axe!]!.zone).toBe("graveyard");
 	});
 });

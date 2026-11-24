@@ -477,3 +477,25 @@ Known limits of step 9 (what the tests do not prove):
 - Times are Node on a desktop, not a browser Worker on a tablet. The worker entry is not run in a real Worker by any test (its
   `serveBot` is, on a fake scope); the app wiring is step 10. The request replays the Duel from its setup: step 10's opening draw has
   to be part of that setup or of the actions.
+
+Exact-list readiness foundation (2026-11-24; checklist in `docs/rules-core-spec.md`, card inventory in `docs/card-plan.md`):
+- `READINESS_DECKS` / `deckReadiness` (`src/deck-manifests.ts`): exact Blue-Eyes 746021 and Sky Striker 745443 inventories with
+  separate Side inventories. It reports registration only; `ready` is always `false`. Names without a code are unsupported, not
+  substituted. 56 of the 60 distinct Main/Extra names are absent.
+- `Facts` now has typed printed `name`, `attribute`, `monsterType`, `archetypes` and exact `mentions`. Use `printedFacts`,
+  `hasPrintedName`, `belongsTo` and `mentionsCard`; they never infer from `code` or text fragments. Effective Level/ATK/DEF stay
+  in `level`/`atk`/`def`; effective name, Attribute, Type and archetype changes are not modelled.
+- `moved.destruction` attributes every destroyed move: `effect` (activated source snapshot, activating player and effect index),
+  `cost` (source and player), `battle`, or `game-mechanic`. Scripts pass `effectDestruction(link)` or `costDestruction(ctx)` to
+  `destroyCard(..., { destruction })`. MST, Solemn Judgment/Strike and the core summon/activation negators retain the negator's
+  source after resolution. An `effect` or `cost` source was activated, so shown to both players: `viewFor` keeps it as it was, even
+  once the card is hidden again, and a re-dealt world never gives it another code. `hasPrintedName`, `belongsTo` and `mentionsCard`
+  read the definition whatever the face: a script checking a face-up card must check the face and zone itself.
+
+Known limits of the readiness foundation:
+- Registration is not completion: registered cards still need complete sourced printed identity for exact-list use.
+- Whether destruction paid as a cost satisfies a card's "destroyed by card effect" wording is unsettled; the event keeps `cost`
+  separate and provides no predicate. Raye, Roze and Radiant Typhoon Vision are not scripted.
+- Every destroyed move needs its attribution: `move` throws on `reason: "destroyed"` without `destruction`, and on a `destruction`
+  without that reason. The built-in Equip and battle moves pass `game-mechanic` and `battle`. `deckReadiness` counts a card as
+  registered only when its printed name matches the manifest, and the manifests are frozen at runtime. Ghost Ogre and Effect Veiler are still unscripted.

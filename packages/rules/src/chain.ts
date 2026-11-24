@@ -1,6 +1,6 @@
 import { activateAction, activateEffect, activationWays } from "./activation";
 import { type Action, PASS, type Placing, sameAction, takes } from "./action";
-import { type CardInstance, closedPriority, destroyCard, type Duel, freeSlots, type Link, moveCard, other, PHASES, type Side } from "./duel";
+import { type CardInstance, closedPriority, destroyCard, type Destruction, type Duel, freeSlots, type Link, moveCard, other, PHASES, type Side } from "./duel";
 import { PENDULUM_SLOTS } from "./zones";
 
 /** The Field Zone: one zone, always open to a Field Spell (the one there is sent to the Graveyard). */
@@ -477,12 +477,12 @@ export const activationNegated = (duel: Duel, index: number): boolean => duel.ch
  * being sent from the field (`moved.negated`: record `negated-card-not-from-field`); a monster whose effect was negated is
  * destroyed where it is, if it is still there.
  */
-export function negateActivationAndDestroy(duel: Duel, index: number): Duel {
+export function negateActivationAndDestroy(duel: Duel, index: number, destruction: Destruction): Duel {
 	const link = duel.chain[index];
 	const negated = negateActivation(duel, index);
 	if (!link || link.activationNegated || !activationNegated(negated, index)) return negated;
 	const now = negated.cards[link.card.id]!;
 	const stillThere = (now.zone === "monster" || now.zone === "spell" || now.zone === "field" || now.zone === "hand") && now.moves === link.card.moves;
 	if (!stillThere) return negated;
-	return destroyCard(negated, now.id, effectOf(duel, link).type === "activation" ? { negated: true } : {});
+	return destroyCard(negated, now.id, { destruction, ...(effectOf(duel, link).type === "activation" ? { negated: true as const } : {}) });
 }

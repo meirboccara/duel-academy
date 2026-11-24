@@ -88,7 +88,7 @@ function giveBack(duel: Duel, ending: readonly Modifier[], choose: boolean): Due
 	if (card.moves !== modifier.affects.moves || card.zone !== "monster") return giveBack(duel, rest, choose);
 	const to = modifier.layer.to;
 	const zones = freeSlots(duel, to, "monster");
-	if (zones.length === 0) return giveBack(destroyCard(duel, card.id), rest, choose);
+	if (zones.length === 0) return giveBack(destroyCard(duel, card.id, { destruction: { cause: "game-mechanic" } }), rest, choose);
 	const back = (board: Duel, slot: number) => giveBack(changeControl(board, card.id, to, slot), rest, choose);
 	return zones.length === 1 || !choose ? back(duel, zones[0]!) : askZone(duel, to, zones, back);
 }
@@ -105,7 +105,7 @@ export function takeControl(duel: Duel, id: number, side: Side, until: number): 
 	// With no free Main Monster Zone left when it resolves, the monster is destroyed by the game's rules and sent to its owner's
 	// Graveyard; a card that takes control needs a free zone to be activated at all (its condition). YGOProJudge's chat answer only
 	// (asked 2026-11-23, no source cited).
-	if (zones.length === 0) return destroyCard(duel, id);
+	if (zones.length === 0) return destroyCard(duel, id, { destruction: { cause: "game-mechanic" } });
 	// The player taking it chooses a free Main Monster Zone, also for a monster in an Extra Monster Zone (record `control-extra-zone-to-main`).
 	const take = (board: Duel, slot: number) => {
 		const taken = changeControl(board, id, side, slot);

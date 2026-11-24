@@ -17,6 +17,7 @@ import { konamiCardUrl } from "../sources";
 export const INFINITE_IMPERMANENCE: CardDef = {
 	code: "infinite-impermanence",
 	kind: "trap",
+	facts: { name: "Infinite Impermanence" },
 	effects: [
 		{
 			type: "activation",

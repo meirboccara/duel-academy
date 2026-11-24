@@ -64,6 +64,7 @@ function withSnapshots(duel: Duel, fix: (snapshot: CardInstance) => CardInstance
 	const event = (raised: GameEvent): GameEvent => {
 		switch (raised.type) {
 			case "moved":
+				// The source of an effect's or a cost's destruction was activated, so shown to both players: it is kept as it was.
 				return { ...raised, before: fix(raised.before), after: fix(raised.after) };
 			case "added-to-hand":
 			case "summoned":

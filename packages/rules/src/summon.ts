@@ -1,4 +1,4 @@
-import { type CardInstance, closedPriority, destroyCard, type Duel, moveCard, occupant, type Position, type Side, type Summoning, type SummonKind } from "./duel";
+import { type CardInstance, closedPriority, destroyCard, type Destruction, type Duel, moveCard, occupant, type Position, type Side, type Summoning, type SummonKind } from "./duel";
 import { breakEffect, dropWhen, raiseEvent } from "./events";
 import { triggerPoint } from "./triggers";
 import { summonZones } from "./zones";
@@ -122,9 +122,9 @@ export function negateSummon(duel: Duel): Duel {
  * being Flip Summoned is on the field, and is destroyed there (Konami's Japanese Q&A 17662, record
  * `negated-flip-summon-destroyed-on-field`).
  */
-export function negateSummonAndDestroy(duel: Duel): Duel {
+export function negateSummonAndDestroy(duel: Duel, destruction: Destruction): Duel {
 	if (!summonNegatable(duel)) return duel;
 	const negated = negateSummon(duel);
 	const flip = negated.summoning!.how === "flip";
-	return negated.summoning!.cards.reduce((next, id) => destroyCard(next, id, flip ? {} : { negated: true }), negated);
+	return negated.summoning!.cards.reduce((next, id) => destroyCard(next, id, { destruction, ...(flip ? {} : { negated: true as const }) }), negated);
 }

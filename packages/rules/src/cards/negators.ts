@@ -1,7 +1,7 @@
 import { negateActivationAndDestroy } from "../chain";
 import type { Cost, EffectRecord } from "../effects";
 import { effectOf } from "../effects";
-import type { Duel, Link } from "../duel";
+import { effectDestruction, type Duel, type Link } from "../duel";
 import { negateSummonAndDestroy, summonNegatable } from "../summon";
 
 /** Is the link the activation of a Spell or Trap Card (not of an effect of one that is on the field, and not a monster's)? */
@@ -21,6 +21,6 @@ export function summonOrActivationNegator(options: { cost: Cost; summon?: "speci
 		answersSummon: true,
 		condition: (duel) => (duel.chain.length === 0 ? summonNegatable(duel, options.summon) : options.activation(duel, duel.chain[duel.chain.length - 1]!)),
 		cost: options.cost,
-		operation: (duel, link) => (link.answers === null ? negateSummonAndDestroy(duel) : negateActivationAndDestroy(duel, link.answers)),
+		operation: (duel, link) => (link.answers === null ? negateSummonAndDestroy(duel, effectDestruction(link)) : negateActivationAndDestroy(duel, link.answers, effectDestruction(link))),
 	};
 }

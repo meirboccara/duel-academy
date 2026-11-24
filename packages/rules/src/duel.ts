@@ -402,15 +402,28 @@ export function moveCard(duel: Duel, id: number, to: MoveTo): Duel {
 /** `position`: in the Monster Zone (default: Defense Position face-down, else the position it had there, else Attack Position). `by`: a destruction by battle. */
 /** `slot`: the exact zone on the field (step 7); by default the zone it is in when it stays in the same zone, else the first free one. */
 /** `reason`: `tributed` (a Tribute) and `material` (a Synchro, Link or Fusion Material sent away, `usedFor` saying for which Summon) are step 8's. `attachedTo`: with zone `material`, the Xyz Monster it is attached to. */
+/** Why a destruction happened, independent of the destroyed card's destination. Sources are immutable snapshots, not live ids. */
+export type Destruction =
+	| { readonly cause: "effect"; readonly source: CardInstance; readonly player: Side; readonly effect: number }
+	| { readonly cause: "cost"; readonly source: CardInstance; readonly player: Side }
+	| { readonly cause: "battle" }
+	| { readonly cause: "game-mechanic" };
+
+/** Attribute an effect's destruction to the activated link, even if its source has since moved or changed controller. */
+export const effectDestruction = (link: Link): Destruction => ({ cause: "effect", source: link.card, player: link.player, effect: link.effect });
+
+/** Attribute a destruction paid at activation; this is not destruction by a card effect. */
+export const costDestruction = (ctx: { readonly card: CardInstance; readonly player: Side }): Destruction => ({ cause: "cost", source: ctx.card, player: ctx.player });
+
 export type MoveReason = "destroyed" | "tributed" | "material";
-type MoveTo = { zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: MoveReason; usedFor?: SummonKind; by?: "battle"; position?: Position; slot?: number; attachedTo?: number };
+type MoveTo = { destruction?: Destruction; zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: MoveReason; usedFor?: SummonKind; by?: "battle"; position?: Position; slot?: number; attachedTo?: number };
 
 /**
  * Destroys a card: it goes to the Graveyard and the move says it was destroyed (`moved.reason`), which "when destroyed" triggers
  * look at. `negated`: the card never reached the field (a negated activation or Summon). Konami: destroying is an action that
  * sends a card to the Graveyard (rule record `trigger-sent-to-graveyard`).
  */
-export function destroyCard(duel: Duel, id: number, options: { negated?: true } = {}): Duel {
+export function destroyCard(duel: Duel, id: number, options: { readonly destruction: Destruction; readonly negated?: true }): Duel {
 	return move(duel, id, { zone: "graveyard", reason: "destroyed", ...options }, undefined);
 }
 
@@ -425,6 +438,9 @@ export function moveCards(duel: Duel, ids: readonly number[], to: MoveTo): Duel 
 }
 
 function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Duel {
+	// Every destruction says what destroyed it (an effect, a cost, battle, the game's rules), and only a destruction carries that.
+	if (to.reason === "destroyed" && !to.destruction) throw new Error("a destruction needs its attribution (destruction)");
+	if (to.destruction && to.reason !== "destroyed") throw new Error("an attribution (destruction) is only for a move with reason \"destroyed\"");
 	const before = instance(duel, id);
 	if (before.zone === "deck" && to.zone === "hand" && locked(duel, "add-to-hand", before.owner)) return duel;
 	if (to.controller !== undefined && !isOnField(to.zone)) throw new Error("a controller can be chosen only on the field");
@@ -465,11 +481,11 @@ function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Du
 	const stamped = cameUp ? { ...placed, clock: placed.clock + 1 } : placed;
 	if (!renewed) return stamped;
 	const moved = flippedDown && zone === before.zone && controller === before.controller ? keptThroughFlip(stamped, before.id, before.moves, after.moves) : stamped;
-	const raised = raiseEvent(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}), ...(to.usedFor ? { usedFor: to.usedFor } : {}), ...(to.by ? { by: to.by } : {}) });
+	const raised = raiseEvent(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}), ...(to.usedFor ? { usedFor: to.usedFor } : {}), ...(to.by ? { by: to.by } : {}), ...(to.reason === "destroyed" ? { destruction: to.destruction! } : {}) });
 	const added = zone === "hand" && before.zone !== "hand" ? raiseEvent(raised, { type: "added-to-hand", card: after, from: before.zone, ...(batch === undefined ? {} : { batch }) }) : raised;
 	// RB10: if the equipped monster is destroyed, flipped face-down or removed from the field, its Equip Cards are destroyed.
 	const unequipped = before.zone === "monster" && before.face === "up" && (zone !== "monster" || face === "down");
-	const bare = unequipped ? equipsOf(added, before.id).reduce((next, equipId) => move(next, equipId, { zone: "graveyard", reason: "destroyed" }, undefined), added) : added;
+	const bare = unequipped ? equipsOf(added, before.id).reduce((next, equipId) => move(next, equipId, { zone: "graveyard", reason: "destroyed", destruction: { cause: "game-mechanic" } }, undefined), added) : added;
 	// RB10: when an Xyz Monster leaves the field, all of its Xyz Materials are sent to the Graveyard (also when its Summon was negated).
 	if (zone === "monster" || bare.piles.you.material.length + bare.piles.rival.material.length === 0) return bare;
 	return materialsOf(bare, before.id).reduce((next, materialId) => move(next, materialId, { zone: "graveyard" }, undefined), bare);

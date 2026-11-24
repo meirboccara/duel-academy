@@ -18,6 +18,7 @@ export const ASH_BLOSSOM_ANSWERS: readonly string[] = ["search", "summon-from-de
 export const ASH_BLOSSOM: CardDef = {
 	code: "ash-blossom-joyous-spring",
 	kind: "monster",
+	facts: { name: "Ash Blossom & Joyous Spring" },
 	effects: [
 		{
 			type: "quick",

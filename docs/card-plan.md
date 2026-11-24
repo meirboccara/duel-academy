@@ -47,7 +47,7 @@ decided in its ticket "Card plan: order of staples and masters' decks" (#21). Th
 | 14 | Branded Dracotail, Sky Striker, Radiant Typhoon, Artmage, Angelechy, Branded, Elfnote | Solomon Muto | Angelechy and Radiant Typhoon need step 11 |
 
 **Step 11, special board objects:** Tokens, counters, dice, monsters as Equip Cards, and monsters as Continuous Spells.
-It is a rules-core step after the switch, because Academy's current cards don't need it.
+Its monster-equip subset is brought forward when exact Blue-Eyes/Sky Striker consumers need it; the remaining work stays in the existing rules-core step.
 
 ## When a master switches
 
@@ -67,3 +67,74 @@ are done and before its master switches. Sonnet writes it and Opus reviews it. E
 | medium | the main line |
 | strong | the main line plus the alternatives |
 | expert | everything, plus determinized sampling |
+
+## Exact-list completion inventory
+
+See the [single rules-core checklist](./rules-core-spec.md#real-deck-completion-checklist-bounded-work-started-2026-11-24).
+The manifest in `packages/rules/src/deck-manifests.ts` is authoritative for counts and provenance, not a playable deck.
+Below, **registered** means only present in the new core; every unchecked row still owes complete printed identity,
+all effect/ruling tests, French text, independent review and integration. **Missing** means no new-core definition.
+Side inventories stay in the manifest separately and are not scripting targets. No old-engine coverage is credited.
+
+| Complete | Exact Main/Extra name | New-core state |
+|---|---|---|
+| [ ] | Ancient Fairy Life Dragon | Missing |
+| [ ] | Ash Blossom & Joyous Spring | Registered; completeness pending |
+| [ ] | Bingo Machine, Go!!! | Missing |
+| [ ] | Blue-Eyes Spirit Dragon | Missing |
+| [ ] | Blue-Eyes Tyrant Dragon | Missing |
+| [ ] | Blue-Eyes Ultimate Spirit Dragon | Missing |
+| [ ] | Blue-Eyes White Dragon | Missing |
+| [ ] | Blue-Eyes White Dragon, the White Phantom Beast | Missing |
+| [ ] | Bystial Magnamhut | Missing |
+| [ ] | Crimson Dragon | Missing |
+| [ ] | Deep-Eyes White Dragon, the Blue Abyss | Missing |
+| [ ] | Dominus Purge | Missing |
+| [ ] | Droll & Lock Bird | Registered; completeness pending |
+| [ ] | Ecclesia and the Dark Dragon | Missing |
+| [ ] | Effect Veiler | Missing |
+| [ ] | Ghost Ogre & Snow Rabbit | Missing |
+| [ ] | Hieratic Seal of the Heavenly Spheres | Missing |
+| [ ] | Infinite Impermanence | Registered; completeness pending |
+| [ ] | Lightning Storm | Missing |
+| [ ] | Lightstorm Dragon | Missing |
+| [ ] | Maiden of White | Missing |
+| [ ] | Majesty of the White Dragons | Missing |
+| [ ] | Mausoleum of White | Missing |
+| [ ] | Mulcharmy Fuwalos | Missing |
+| [ ] | Mulcharmy Purulia | Missing |
+| [ ] | Mystical Space Typhoon | Registered; completeness pending |
+| [ ] | Neo Blue-Eyes Ultimate Dragon | Missing |
+| [ ] | Pot of Prosperity | Missing |
+| [ ] | Pot of Sloth | Missing |
+| [ ] | Primite Dragon Ether Beryl | Missing |
+| [ ] | Primite Drillbeam | Missing |
+| [ ] | Primite Lordly Lode | Missing |
+| [ ] | Prototype Sky Striker Ace - Amatsu | Missing |
+| [ ] | Psychic End Punisher | Missing |
+| [ ] | Radiant Typhoon Vision | Missing |
+| [ ] | Raigeki | Missing |
+| [ ] | Roar of the Blue-Eyed Dragons | Missing |
+| [ ] | S:P Little Knight | Missing |
+| [ ] | Sage with Eyes of Blue | Missing |
+| [ ] | Sky Striker Ace - Azalea | Missing |
+| [ ] | Sky Striker Ace - Hayate | Missing |
+| [ ] | Sky Striker Ace - Kagari | Missing |
+| [ ] | Sky Striker Ace - Raye | Missing |
+| [ ] | Sky Striker Ace - Roze | Missing |
+| [ ] | Sky Striker Ace - Shizuku | Missing |
+| [ ] | Sky Striker Ace - Zeke | Missing |
+| [ ] | Sky Striker Ace = Zero | Missing |
+| [ ] | Sky Striker Mecha - Shark Cannon | Missing |
+| [ ] | Sky Striker Mecha - Widow Anchor | Missing |
+| [ ] | Sky Striker Mobilize - Engage! | Missing |
+| [ ] | Sky Striker Mobilize - Linkage! | Missing |
+| [ ] | Sky Striker Special Maneuver - Lemnisgate! | Missing |
+| [ ] | Spirit with Eyes of Blue | Missing |
+| [ ] | Stardust Sifr Divine Dragon | Missing |
+| [ ] | Super Starslayer TY-PHON - Sky Crisis | Missing |
+| [ ] | The Dragon that Devours the Dogma | Missing |
+| [ ] | The Fallen & The Virtuous | Missing |
+| [ ] | True Light | Missing |
+| [ ] | Upstart Goblin | Missing |
+| [ ] | Wishes for Eyes of Blue | Missing |

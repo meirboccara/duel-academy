@@ -182,7 +182,7 @@ function damageCalculation(duel: Duel): Duel {
 /** At the end of the Damage Step, the monsters destroyed by battle go to the Graveyard, at the same time, if they are still there. */
 function sendDestroyed(duel: Duel): Duel {
 	const ids = duel.battle!.destroyed.filter((ref) => isStill(duel, ref) && duel.cards[ref.id]!.zone === "monster").map((ref) => ref.id);
-	return moveCards(duel, ids, { zone: "graveyard", reason: "destroyed", by: "battle" });
+	return moveCards(duel, ids, { zone: "graveyard", reason: "destroyed", by: "battle", destruction: { cause: "battle" } });
 }
 
 /** The attack is over (or replayed): back to the Battle Step, the game state open for the turn player. */

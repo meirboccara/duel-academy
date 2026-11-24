@@ -1,4 +1,4 @@
-import { destroyCard } from "../duel";
+import { destroyCard, effectDestruction } from "../duel";
 import { type CardDef, targetsOf } from "../effects";
 import type { CardSources } from "../coverage";
 import { spellsAndTraps } from "./helpers";
@@ -11,6 +11,7 @@ import { konamiCardUrl } from "../sources";
 export const MYSTICAL_SPACE_TYPHOON: CardDef = {
 	code: "mystical-space-typhoon",
 	kind: "quick-play",
+	facts: { name: "Mystical Space Typhoon" },
 	effects: [
 		{
 			type: "activation",
@@ -18,7 +19,7 @@ export const MYSTICAL_SPACE_TYPHOON: CardDef = {
 			operation: (duel, link) => {
 				// "that target": it must still be on the field as a Spell or Trap when this resolves.
 				const target = targetsOf(duel, link)[0];
-				return target && (target.zone === "spell" || target.zone === "field") ? destroyCard(duel, target.id) : duel;
+				return target && (target.zone === "spell" || target.zone === "field") ? destroyCard(duel, target.id, { destruction: effectDestruction(link) }) : duel;
 			},
 		},
 	],

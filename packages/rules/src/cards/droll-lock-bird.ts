@@ -15,7 +15,7 @@ import { sendThisToGraveyard } from "./helpers";
 export const DROLL_LOCK_BIRD: CardDef = {
 	code: "droll-lock-bird",
 	kind: "monster",
-	facts: { level: 1, atk: 0, def: 0 },
+	facts: { name: "Droll & Lock Bird", level: 1, atk: 0, def: 0 },
 	effects: [
 		{
 			type: "quick",

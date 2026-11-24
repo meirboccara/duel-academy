@@ -15,5 +15,8 @@ export * from "./life";
 export * from "./summon";
 export * from "./battle";
 export * from "./zones";
+export * from "./identity";
 export * from "./procedures";
 export * from "./bot";
+
+export * from "./deck-manifests";

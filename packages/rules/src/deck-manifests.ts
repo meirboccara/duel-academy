@@ -1,0 +1,365 @@
+import type { CardDef } from "./effects";
+
+/** Exact inventory, not a playable deck. An absent code is deliberately unsupported, never substituted. */
+export interface DeckEntry { readonly name: string; readonly count: number; readonly code?: string }
+export interface DeckManifest {
+ readonly id: number; readonly name: string; readonly url: string; readonly inventory: string; readonly column: string;
+ readonly main: readonly DeckEntry[]; readonly extra: readonly DeckEntry[]; readonly side: readonly DeckEntry[];
+}
+/** Frozen from the local research inventories' L1 columns, 2026-11-24. Side is inventory only. */
+const DECKS: readonly DeckManifest[] = [
+  {
+    "id": 746021,
+    "name": "Blue-Eyes",
+    "url": "https://ygoprodeck.com/deck/primite-blue-eyes-746021",
+    "inventory": "docs/research/blue-eyes-dark-time-wizard-coverage-2026-11.md",
+    "column": "L1 M/E/S",
+    "main": [
+      {
+        "name": "Ash Blossom & Joyous Spring",
+        "count": 3,
+        "code": "ash-blossom-joyous-spring"
+      },
+      {
+        "name": "Bingo Machine, Go!!!",
+        "count": 1
+      },
+      {
+        "name": "Blue-Eyes White Dragon",
+        "count": 2
+      },
+      {
+        "name": "Blue-Eyes White Dragon, the White Phantom Beast",
+        "count": 1
+      },
+      {
+        "name": "Bystial Magnamhut",
+        "count": 1
+      },
+      {
+        "name": "Deep-Eyes White Dragon, the Blue Abyss",
+        "count": 3
+      },
+      {
+        "name": "Dominus Purge",
+        "count": 3
+      },
+      {
+        "name": "Droll & Lock Bird",
+        "count": 1,
+        "code": "droll-lock-bird"
+      },
+      {
+        "name": "Effect Veiler",
+        "count": 3
+      },
+      {
+        "name": "Ghost Ogre & Snow Rabbit",
+        "count": 3
+      },
+      {
+        "name": "Infinite Impermanence",
+        "count": 3,
+        "code": "infinite-impermanence"
+      },
+      {
+        "name": "Maiden of White",
+        "count": 3
+      },
+      {
+        "name": "Majesty of the White Dragons",
+        "count": 1
+      },
+      {
+        "name": "Mausoleum of White",
+        "count": 1
+      },
+      {
+        "name": "Pot of Prosperity",
+        "count": 1
+      },
+      {
+        "name": "Primite Dragon Ether Beryl",
+        "count": 1
+      },
+      {
+        "name": "Primite Drillbeam",
+        "count": 1
+      },
+      {
+        "name": "Primite Lordly Lode",
+        "count": 3
+      },
+      {
+        "name": "Roar of the Blue-Eyed Dragons",
+        "count": 1
+      },
+      {
+        "name": "Sage with Eyes of Blue",
+        "count": 3
+      },
+      {
+        "name": "True Light",
+        "count": 1
+      },
+      {
+        "name": "Wishes for Eyes of Blue",
+        "count": 3
+      }
+    ],
+    "extra": [
+      {
+        "name": "Ancient Fairy Life Dragon",
+        "count": 1
+      },
+      {
+        "name": "Blue-Eyes Spirit Dragon",
+        "count": 2
+      },
+      {
+        "name": "Blue-Eyes Tyrant Dragon",
+        "count": 1
+      },
+      {
+        "name": "Blue-Eyes Ultimate Spirit Dragon",
+        "count": 1
+      },
+      {
+        "name": "Crimson Dragon",
+        "count": 1
+      },
+      {
+        "name": "Hieratic Seal of the Heavenly Spheres",
+        "count": 2
+      },
+      {
+        "name": "Lightstorm Dragon",
+        "count": 1
+      },
+      {
+        "name": "Neo Blue-Eyes Ultimate Dragon",
+        "count": 1
+      },
+      {
+        "name": "Psychic End Punisher",
+        "count": 1
+      },
+      {
+        "name": "Spirit with Eyes of Blue",
+        "count": 2
+      },
+      {
+        "name": "Stardust Sifr Divine Dragon",
+        "count": 1
+      },
+      {
+        "name": "Super Starslayer TY-PHON - Sky Crisis",
+        "count": 1
+      }
+    ],
+    "side": [
+      {
+        "name": "Mulcharmy Fuwalos",
+        "count": 3
+      },
+      {
+        "name": "Mulcharmy Purulia",
+        "count": 3
+      },
+      {
+        "name": "PSY-Frame Driver",
+        "count": 1
+      },
+      {
+        "name": "PSY-Framegear Gamma",
+        "count": 1
+      },
+      {
+        "name": "Solemn Judgment",
+        "count": 1,
+        "code": "solemn-judgment"
+      },
+      {
+        "name": "Solemn Warning",
+        "count": 3
+      },
+      {
+        "name": "The Great Gallant Bandit",
+        "count": 3
+      }
+    ]
+  },
+  {
+    "id": 745443,
+    "name": "Sky Striker",
+    "url": "https://ygoprodeck.com/deck/sky-striker-745443",
+    "inventory": "docs/research/meta-decks-engine-coverage-2026-11.md",
+    "column": "L1 M/E/S",
+    "main": [
+      {
+        "name": "Ash Blossom & Joyous Spring",
+        "count": 3,
+        "code": "ash-blossom-joyous-spring"
+      },
+      {
+        "name": "Lightning Storm",
+        "count": 2
+      },
+      {
+        "name": "Mulcharmy Fuwalos",
+        "count": 3
+      },
+      {
+        "name": "Mulcharmy Purulia",
+        "count": 3
+      },
+      {
+        "name": "Mystical Space Typhoon",
+        "count": 1,
+        "code": "mystical-space-typhoon"
+      },
+      {
+        "name": "Pot of Sloth",
+        "count": 2
+      },
+      {
+        "name": "Radiant Typhoon Vision",
+        "count": 3
+      },
+      {
+        "name": "Raigeki",
+        "count": 3
+      },
+      {
+        "name": "Sky Striker Ace - Raye",
+        "count": 3
+      },
+      {
+        "name": "Sky Striker Ace - Roze",
+        "count": 2
+      },
+      {
+        "name": "Sky Striker Mecha - Shark Cannon",
+        "count": 1
+      },
+      {
+        "name": "Sky Striker Mecha - Widow Anchor",
+        "count": 1
+      },
+      {
+        "name": "Sky Striker Mobilize - Engage!",
+        "count": 2
+      },
+      {
+        "name": "Sky Striker Mobilize - Linkage!",
+        "count": 3
+      },
+      {
+        "name": "Sky Striker Special Maneuver - Lemnisgate!",
+        "count": 2
+      },
+      {
+        "name": "The Fallen & The Virtuous",
+        "count": 3
+      },
+      {
+        "name": "Upstart Goblin",
+        "count": 3
+      }
+    ],
+    "extra": [
+      {
+        "name": "Ecclesia and the Dark Dragon",
+        "count": 1
+      },
+      {
+        "name": "Prototype Sky Striker Ace - Amatsu",
+        "count": 1
+      },
+      {
+        "name": "S:P Little Knight",
+        "count": 1
+      },
+      {
+        "name": "Sky Striker Ace - Azalea",
+        "count": 1
+      },
+      {
+        "name": "Sky Striker Ace - Hayate",
+        "count": 2
+      },
+      {
+        "name": "Sky Striker Ace - Kagari",
+        "count": 3
+      },
+      {
+        "name": "Sky Striker Ace - Shizuku",
+        "count": 1
+      },
+      {
+        "name": "Sky Striker Ace - Zeke",
+        "count": 1
+      },
+      {
+        "name": "Sky Striker Ace = Zero",
+        "count": 3
+      },
+      {
+        "name": "The Dragon that Devours the Dogma",
+        "count": 1
+      }
+    ],
+    "side": [
+      {
+        "name": "Cosmic Cyclone",
+        "count": 3
+      },
+      {
+        "name": "Forbidden Crown",
+        "count": 2
+      },
+      {
+        "name": "Forbidden Droplet",
+        "count": 3
+      },
+      {
+        "name": "Ghost Ogre & Snow Rabbit",
+        "count": 3
+      },
+      {
+        "name": "Harpie's Feather Duster",
+        "count": 1
+      },
+      {
+        "name": "Solemn Accusation",
+        "count": 2
+      },
+      {
+        "name": "Surgical Striker - H.A.M.P.",
+        "count": 1
+      }
+    ]
+  }
+];
+
+/** Registration is only a first gate, NOT the per-effect/ruling/French/review coverage definition of done. */
+export function deckReadiness(deck: DeckManifest, defs: Readonly<Record<string, CardDef>>) {
+ const cards = [...deck.main, ...deck.extra].map((entry) => {
+  const def = entry.code === undefined ? undefined : defs[entry.code];
+  // A definition whose printed name is not the manifest's (missing, or a wrong code) is not counted as this card.
+  return { ...entry, status: !def ? "missing" as const : def.unmodelled?.length || def.facts?.name !== entry.name ? "partial" as const : "registered" as const };
+ });
+ // This inventory cannot certify source coverage, review, lifecycle or full-duel acceptance.
+ return { cards, ready: false as const };
+}
+
+const deepFreeze = <T>(value: T): T => {
+	if (value && typeof value === "object" && !Object.isFrozen(value)) {
+		Object.freeze(value);
+		for (const inner of Object.values(value as object)) deepFreeze(inner);
+	}
+	return value;
+};
+
+/** The two exact lists, frozen at runtime too: no caller can change the shared inventory. */
+export const READINESS_DECKS: readonly DeckManifest[] = deepFreeze(DECKS);

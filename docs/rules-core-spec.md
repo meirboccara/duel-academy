@@ -57,4 +57,37 @@ model than the one that wrote it.
 | 8 | Summon procedures as data | Material specs per Extra Deck card (filters, counts, Tuner/non-Tuner, Link rating, alternative Xyz); Ritual "equal / equal or greater"; Fusion by effect from hand, field, Deck, GY or the opponent's field; Summons by effect and on the opponent's turn | The Synchro, Fusion and Ritual blockers named in the coverage notes |
 | 9 | Bot support | Board seen from one player's side and re-dealing of hidden cards; moves as named sequential choices for combo data; evaluation that counts interruptions; bot in a Web Worker with a time budget and fallback | ≥ 30× speed; expert decision ≤ 1.5 s |
 | 10 | Teaching options, parity, switch | Junior's levels rebuilt as teaching options; every card Academy scripts today ported; today's card and engine tests passing on the new core; the app switches; the old package removed and renamed | All of today's tests green on `packages/rules` |
-| 11 | Special board objects | Tokens; counters; dice; monsters as Equip Cards; monsters treated as Continuous Spells (added by ticket #21; after the switch because today's cards don't need it) | Dark Time Wizard, Beetrooper, Angelechy and Radiant Typhoon cards expressible |
+| 11 | Special board objects | Tokens; counters; dice; monsters as Equip Cards; monsters treated as Continuous Spells (added by ticket #21; monster equips brought forward when required by the exact-list checklist below; the app switch still waits for parity) | Dark Time Wizard, Beetrooper, Angelechy and Radiant Typhoon cards expressible |
+
+## Real-deck completion checklist (bounded work started 2026-11-24)
+
+This is a checklist against the steps above, **not another roadmap**. The approved exact acceptance decks are
+Blue-Eyes **746021** (43 Main / 15 Extra) and Sky Striker **745443** (40 Main / 15 Extra). The immutable inventory is
+[`packages/rules/src/deck-manifests.ts`](../packages/rules/src/deck-manifests.ts), transcribed from the research notes'
+L1 M/E/S columns, with the original deck URLs and local provenance. Each includes a separate 15-card Side inventory;
+Side scripting is not part of this acceptance. No substitutions, including for unsupported new names.
+
+**Current new-core registration:** 60 distinct Main/Extra names, 4 registered (Ash Blossom, Droll, Infinite Impermanence,
+MST), 56 absent. Registration is not completion: printed identity, all effects/rulings, French text, independent review
+and exact-deck integration still gate it. Historical research coverage describes the old engine, not readiness here.
+`deckReadiness` reports missing/partial/registered only and cannot certify a ready deck.
+
+| Existing step / card-plan work | Current state and completion gate |
+|---|---|
+| 1: printed identity | **Partial:** typed Attribute/monster Type/name/archetype/mentions facts and exact public queries implemented; existing card definitions still need complete sourced printed data. Effective Level/ATK/DEF remain step 6 queries. Dynamic names, Attributes, Types and material identities are not implemented. |
+| 3: events | **Partial:** destruction provenance carries effect source snapshot, activating player, effect index; costs, battle and game mechanics are distinct. MST and core negators integrated, hidden source snapshots masked/re-dealt. Raye/Roze and Vision trigger/card cases remain unscripted. |
+| 4: records/choices | **Partial:** chain, costs, targets and sequential choices exist. Per-card exact-list needs have not been audited against the new core; no blanket completion from generic fixtures. |
+| 6: continuous | **Partial:** stat modifiers, locks, negation and control exist. Per-card exact-list needs have not been audited; implement any missing continuous behaviour alongside its card. |
+| 6b: battle | **Partial:** basic battles and destruction exist. Per-card exact-list battle needs have not been audited. |
+| 8: procedures | **Partial:** generic procedures exist. Exact recipes, alternative Summons, material identity exceptions and restrictions remain per-card gates. |
+| 10: lifecycle, parity, switch | **Missing for exact-deck play:** full-duel lifecycle behaviour is not yet accepted by exact-deck tests; app migration remains explicitly deferred. |
+| 11: monster equips | **Missing:** bring this existing step's monster-equip work forward before Wishes/Tyrant and other consumers; do not postpone a required mechanic until after the app switch. Tokens/counters/dice are not silently included in this foundation. |
+| Card plan | **Missing:** all 56 absent Main/Extra cards, sourced identity for the four registered cards, per-effect/ruling/French coverage and independent review. Ghost Ogre and Veiler are the next bounded scripting consumers, not implemented here. |
+| 9 / final acceptance | **Not run:** exact lists playable, combo data, then 20 recorded Sonnet/Opus duels with failures reconciled. No duels or deck-ready claim in this foundation. |
+
+- [x] Freeze exact Main/Extra and separate Side inventories; explicitly retain unsupported names.
+- [x] Add printed identity and source-attributed destruction seams, tested red before implementation.
+- [ ] Complete every Main/Extra entry's source, printed facts, effect/ruling coverage, French text and review (card-plan inventory below).
+- [ ] Close the exact-list mechanic and lifecycle gaps above alongside consumers.
+- [ ] Verify both decks without substitutions, then run and review 20 duels.
+- [ ] Consider app parity/migration separately; this checklist does not authorize switching Junior.

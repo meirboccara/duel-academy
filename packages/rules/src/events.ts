@@ -1,4 +1,4 @@
-import type { CardInstance, DamageStep, Duel, MoveReason, Phase, Position, Side, SummonKind, Zone } from "./duel";
+import type { CardInstance, Destruction, DamageStep, Duel, MoveReason, Phase, Position, Side, SummonKind, Zone } from "./duel";
 import { type CardDef, effectOf, inFieldRange, rangeOf } from "./effects";
 
 /**
@@ -11,7 +11,7 @@ export type GameEvent =
 	 * negated, or a monster whose Summon was negated, going to the Graveyard: Konami does not treat it as sent from the
 	 * field (rule records `negated-card-not-from-field`, `negated-summon-not-from-field`). `reason: "destroyed"`: the card was
 	 * destroyed (`destroyCard`); a card sent to the Graveyard otherwise (discarded, sent by an effect, Tributed) has none. */
-	| { readonly type: "moved"; readonly before: CardInstance; readonly after: CardInstance; readonly batch?: number; readonly negated?: true; readonly reason?: MoveReason; readonly usedFor?: SummonKind; readonly by?: "battle" }
+	| { readonly type: "moved"; readonly before: CardInstance; readonly after: CardInstance; readonly batch?: number; readonly negated?: true; readonly reason?: MoveReason; readonly usedFor?: SummonKind; readonly by?: "battle"; readonly destruction?: Destruction }
 	/** A card went to a hand from another zone (a draw, a search, a recovery): `card` is the card in the hand, `from` where it was. Raised after its `moved`. */
 	| { readonly type: "added-to-hand"; readonly card: CardInstance; readonly from: Zone; readonly batch?: number }
 	/**
