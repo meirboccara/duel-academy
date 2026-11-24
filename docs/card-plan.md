@@ -80,11 +80,11 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 |---|---|---|
 | [ ] | Ancient Fairy Life Dragon | Missing |
 | [ ] | Ash Blossom & Joyous Spring | Registered; answers draw effects since 2026-11-24 (Konami Q&A fid 21685); printed facts incomplete, completeness pending |
-| [ ] | Bingo Machine, Go!!! | Missing |
+| [x] | Bingo Machine, Go!!! | Registered 2026-11-24 to the definition of done: reveal 3, the opponent's random pick (the Duel's RNG), shuffle, once per turn; the minimum of 3 revealable cards rests on YGOProJudge only; its one Q&A (Puppet Queen, not in the core) not opened |
 | [ ] | Blue-Eyes Spirit Dragon | Missing |
 | [ ] | Blue-Eyes Tyrant Dragon | Missing; its Summoning condition (Tributing 1 "Blue-Eyes White Dragon" equipped with a Fusion Monster) is built and tested with a made-up card since 2026-11-24; blocked by its third effect (end of the Damage Step, Set a Trap from the GY) and its 11 unread Q&A |
 | [ ] | Blue-Eyes Ultimate Spirit Dragon | Missing |
-| [ ] | Blue-Eyes White Dragon | Missing |
+| [x] | Blue-Eyes White Dragon | Registered 2026-11-24; complete (Normal Monster: printed facts, Konami's flavour text EN/FR; no effect) |
 | [ ] | Blue-Eyes White Dragon, the White Phantom Beast | Missing |
 | [ ] | Bystial Magnamhut | Missing |
 | [ ] | Crimson Dragon | Missing |
@@ -98,9 +98,9 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [ ] | Infinite Impermanence | Registered; completeness pending |
 | [x] | Lightning Storm | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
 | [ ] | Lightstorm Dragon | Missing |
-| [ ] | Maiden of White | Missing |
+| [x] | Maiden of White | Registered 2026-11-24 to the definition of done: all three effects (place True Light, revive from the GY, Quick Effect when targeted or attacked), EN/FR text, Konami's notes, Q&A fid 24051; Q&A fids 14540 and 56 pending (Macro Cosmos-like effect, Alternative White Dragon); a free Spell & Trap Zone for the first effect rests on YGOProJudge only |
 | [ ] | Majesty of the White Dragons | Missing |
-| [ ] | Mausoleum of White | Missing |
+| [x] | Mausoleum of White | Registered 2026-11-24 to the definition of done: all three effects, EN/FR text, Konami's notes, Q&A fid 18125; Q&A fids 18128, 18129, 24288 pending (Macro Cosmos-like effect, Double Summon, Gimmick Puppet - Fantasy Machina) |
 | [x] | Mulcharmy Fuwalos | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
 | [x] | Mulcharmy Purulia | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
 | [ ] | Mystical Space Typhoon | Registered; completeness pending |
@@ -116,7 +116,7 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [x] | Raigeki | Registered; complete (printed facts, Konami texts, one test per clause and ruling; Konami sources only) |
 | [ ] | Roar of the Blue-Eyed Dragons | Missing |
 | [ ] | S:P Little Knight | Missing |
-| [ ] | Sage with Eyes of Blue | Missing |
+| [x] | Sage with Eyes of Blue | Registered 2026-11-24 to the definition of done: both effects, EN/FR text, Konami's notes; Q&A fid 18319 pending (Phantom Knights' Dark Gauntlet); which effect the once per turn limits (the second only) rests on YGOProJudge only |
 | [ ] | Sky Striker Ace - Azalea | Missing |
 | [ ] | Sky Striker Ace - Hayate | Missing |
 | [ ] | Sky Striker Ace - Kagari | Missing |
@@ -135,6 +135,6 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [ ] | Super Starslayer TY-PHON - Sky Crisis | Missing |
 | [ ] | The Dragon that Devours the Dogma | Missing |
 | [ ] | The Fallen & The Virtuous | Missing |
-| [ ] | True Light | Missing |
+| [x] | True Light | Registered 2026-11-24 to the definition of done: protection, destruction trigger, activation alone / with its effect / Ignition Effect, EN/FR text, Konami's notes, Q&A fids 23374 and 23215; the other six Q&A entries are about cards the core does not have (titles read only) |
 | [x] | Upstart Goblin | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
 | [x] | Wishes for Eyes of Blue | Registered 2026-11-24 to the definition of done: both effects, EN/FR text, Konami's notes; its one Q&A (fid 23815) pending a "banished instead of sent to the GY" effect; tests use made-up "Blue-Eyes" cards until the real ones exist; independent review pending |

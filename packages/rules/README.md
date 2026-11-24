@@ -905,3 +905,45 @@ Known limits of this slice (what the tests do not prove):
   target that changed control or was flipped in the chain is not equipped (the core's reading of a target). Independent review pending.
 - Effects in the Graveyard: only the player's own Graveyard and banished cards are read (a card there is its owner's); a card
   banished face-down has no effect to activate. The bot's count of what a player could answer with (`evaluate`) does not count them.
+
+Blue-Eyes batch: Blue-Eyes White Dragon, Sage with Eyes of Blue, Maiden of White, True Light, Mausoleum of White, Bingo Machine, Go!!!
+(2026-11-24; `src/cards/{blue-eyes-white-dragon,sage-with-eyes-of-blue,maiden-of-white,true-light,mausoleum-of-white,bingo-machine-go}.ts`,
+tests in `test/cards/` with the made-up cards of `test/cards/blue-eyes-fixtures.ts`, every code starting with `fixture-`; no new mechanic
+was built). All six are registered in `CARD_DEFS` / `CARD_SOURCES` and in the Blue-Eyes 746021 manifest (18 of the 60 Main/Extra names are
+registered now). Konami's EN and FR card pages and the Japanese notes were read once each; every printed effect and every listed ruling that
+can arise has a test, the others are `pending` with their reason.
+- **Blue-Eyes White Dragon** (cid 4007): a Normal Monster; its flavour text is the printed text; no effect record. "Blue-Eyes" (its archetype)
+  is name-based and no Konami page lists it. The same goes for "Eyes of Blue" on Sage.
+- **Sage with Eyes of Blue** (cid 12292): the Normal Summon trigger and the hand Ignition Effect (discard, target an Effect Monster, send it, then
+  Special Summon a "Blue-Eyes" monster from the Deck). The send and the Summon are two steps in the core (the Summon sees the zone the target
+  left); Konami's notes call them simultaneous.
+- **Maiden of White** (cid 20602): three effects, the third one in two timings (chained to an activation that targets it; an attack that targets it),
+  each one a record sharing its use (`once.key`). The placed True Light is moved to a Spell & Trap Zone of the player's choice, face-up, with
+  no activation (Konami's Q&A fid 24051: it works under a "cannot activate Spell/Trap Cards" lock).
+- **True Light** (cid 16653): the card alone, the card with its effect in the same Chain Link, and the later Ignition Effect are three records
+  (the second and third share the effect's once per turn by name); the protection is a continuous `protect` layer (the opponent's card effects
+  cannot target "Blue-Eyes White Dragon" in the controller's Monster Zone); the destruction is a mandatory "if" trigger of the Graveyard that
+  reads the move's `before` (face-up, in a Spell & Trap Zone) and `negated` (Konami's notes and Q&A fid 23215: a negated activation, or a Set
+  card, does not trigger it; it triggers in the Damage Step too). The Set effect sets the card face-down and marks it as Set this turn; a
+  Field Spell is Set in the Field Zone and the one there goes to the Graveyard (the rulebook's reading, no Konami page read). Cards "you control"
+  for the different name are the face-up ones (Q&A fid 23374: a Set card of that name does not stop a Set).
+- **Mausoleum of White** (cid 12331): the additional Normal Summon is the `permit` layer, the second effect a lasting `add` modifier (kept when the
+  card leaves, Q&A fid 18125), the third a Graveyard search with its cost. The Level read is the printed Level of the monster sent.
+- **Bingo Machine, Go!!!** (cid 13844): the player picks the 3 cards (`askUpTo`), they are revealed, the opponent's random pick is `pickRandom`, the
+  card goes to the hand and the Deck is shuffled, in one resolution.
+
+Known limits of this batch (what the tests do not prove):
+- **YGOProJudge only** (asked 2026-11-24, it cited no official source; the questions are in the report of the batch): Sage's once per turn limits
+  only its second effect; Bingo Machine cannot be activated with fewer than 3 cards that meet a criterion in the Deck and the 3 may be copies of one
+  card; Maiden's first effect needs a free Spell & Trap Zone (the cost frees none: it is a monster). Each such test says so in its title.
+- The core's own readings, no page read: an effect that Special Summons or Sets from the hand, Graveyard or Deck is activated only while a card
+  can be Summoned or Set (a Summon needs a free zone; True Light's Set effect a free Spell & Trap Zone, the card it is activated from the hand
+  taking one); Sage's search needs a Level 1 LIGHT Tuner in the Deck (`search-needs-a-card`) and its second effect a "Blue-Eyes" monster that can be Summoned, the zone the target leaves counted; a Special Summon of "Blue-Eyes White Dragon" by the opponent does not
+  trigger Maiden of White (the text says "you"); Maiden's placed True Light goes where the player chooses, as the core's reading of a placement.
+- Pending Q&A (the cards or effects they are about do not exist in the core): Macro Cosmos-like "banished instead" (Maiden fid 14540, Mausoleum fid
+  18128; Mausoleum's gain is guarded by "if you do" (the Normal Monster must reach the GY), but with no replacement effect in the core that guard has no test), Blue-Eyes Alternative White Dragon (Maiden fid 56), Double Summon (Mausoleum fid 18129; YGOProJudge disagreed with that entry, see the
+  second readiness slice), Gimmick Puppet - Fantasy Machina (Mausoleum fid 24288), Phantom Knights' Dark Gauntlet (Sage fid 18319). Titles read only: True Light's other six Q&A entries (fids 24070, 24238, 23488, 23574, 23362, 24155), Bingo's one (Puppet Queen).
+- Names are printed names: "Blue-Eyes White Dragon" is asked of `facts.name` whatever the face, so Blue-Eyes Alternative White Dragon (its name
+  becomes "Blue-Eyes White Dragon" on the field and in the GY) is not modelled; effective name changes are not.
+- The Spell/Trap activation lock used in the Maiden test and the Damage Step Quick-Play Spells are made-up cards; the Damage Step windows come from
+  the existing battle model.

@@ -22,11 +22,13 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Bingo Machine, Go!!!",
-        "count": 1
+        "count": 1,
+        "code": "bingo-machine-go"
       },
       {
         "name": "Blue-Eyes White Dragon",
-        "count": 2
+        "count": 2,
+        "code": "blue-eyes-white-dragon"
       },
       {
         "name": "Blue-Eyes White Dragon, the White Phantom Beast",
@@ -66,7 +68,8 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Maiden of White",
-        "count": 3
+        "count": 3,
+        "code": "maiden-of-white"
       },
       {
         "name": "Majesty of the White Dragons",
@@ -74,7 +77,8 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Mausoleum of White",
-        "count": 1
+        "count": 1,
+        "code": "mausoleum-of-white"
       },
       {
         "name": "Pot of Prosperity",
@@ -98,11 +102,13 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Sage with Eyes of Blue",
-        "count": 3
+        "count": 3,
+        "code": "sage-with-eyes-of-blue"
       },
       {
         "name": "True Light",
-        "count": 1
+        "count": 1,
+        "code": "true-light"
       },
       {
         "name": "Wishes for Eyes of Blue",

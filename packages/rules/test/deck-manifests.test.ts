@@ -6,8 +6,8 @@ it("freezes the exact 746021 and 745443 inventories without passing off absent c
 	expect(totals).toEqual([[746021, 43, 15, 15], [745443, 40, 15, 15]]);
 	const union = new Map(READINESS_DECKS.flatMap((deck) => deckReadiness(deck, CARD_DEFS).cards.map((card) => [card.name, card] as const)));
 	expect(union.size).toBe(60);
-	expect([...union.values()].filter((card) => card.status === "missing")).toHaveLength(48);
-	expect([...union.values()].filter((card) => card.status === "registered").map((card) => card.name).sort()).toEqual(["Ash Blossom & Joyous Spring", "Droll & Lock Bird", "Effect Veiler", "Ghost Ogre & Snow Rabbit", "Infinite Impermanence", "Lightning Storm", "Mulcharmy Fuwalos", "Mulcharmy Purulia", "Mystical Space Typhoon", "Raigeki", "Upstart Goblin", "Wishes for Eyes of Blue"]);
+	expect([...union.values()].filter((card) => card.status === "missing")).toHaveLength(42);
+	expect([...union.values()].filter((card) => card.status === "registered").map((card) => card.name).sort()).toEqual(["Ash Blossom & Joyous Spring", "Bingo Machine, Go!!!", "Blue-Eyes White Dragon", "Droll & Lock Bird", "Effect Veiler", "Ghost Ogre & Snow Rabbit", "Infinite Impermanence", "Lightning Storm", "Maiden of White", "Mausoleum of White", "Mulcharmy Fuwalos", "Mulcharmy Purulia", "Mystical Space Typhoon", "Raigeki", "Sage with Eyes of Blue", "True Light", "Upstart Goblin", "Wishes for Eyes of Blue"]);
 	expect(READINESS_DECKS.map((deck) => deckReadiness(deck, CARD_DEFS).ready)).toEqual([false, false]);
 	expect(READINESS_DECKS[0]!.main).toContainEqual({ name: "Blue-Eyes White Dragon, the White Phantom Beast", count: 1 });
 	expect(READINESS_DECKS[1]!.extra).toContainEqual({ name: "Sky Striker Ace = Zero", count: 3 });
