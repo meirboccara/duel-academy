@@ -307,3 +307,16 @@ After the review fixes (playouts check the clock; a line's step comes on top of 
 The expert decision is under the spec's 1.5 s by about 4× on the heaviest board; its default budget (1,200 ms) is a cap, not the
 expected cost. The boards have no plan, so medium and strong play as basic here (the differences are noise). Node, not a browser or
 a tablet: a Worker on a slow tablet should be measured in step 10.
+
+## Real-deck readiness: choices and Deck operations (2026-11-24)
+
+Modes, declarations and coupled targets are read in `activationWays` (a record with none keeps its one facet, itself, with no new
+allocation; facets of a record with modes are cached per record). `npx vitest bench --run bench/legal-moves.bench.ts`, one run, means:
+
+| Position | `legalActions` | list + `act` | today's engine | list + `act` speed-up |
+|---|---:|---:|---:|---:|
+| opening | 0.0006 ms | 0.0200 ms | 0.776 ms | 39× |
+| midgame | 0.0022 ms | 0.0392 ms | 3.329 ms | 85× |
+| crowdedHand | 0.0023 ms | 0.0536 ms | 1.207 ms | **22.5×** |
+
+crowdedHand list + `act` stays above the 10× floor, in line with step 9's 21.5× (0.0498 ms against 1.070 ms).

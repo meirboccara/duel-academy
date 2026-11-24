@@ -7,7 +7,7 @@ import type { Duel, Position } from "../duel";
  * "attack big > small", "choose umi". It reads card codes, never ids, so the same name means the same move in another duel.
  */
 
-/** The name of an action of `legalActions(duel)`. A card with two or more effect records adds "#n" (1-based) to "activate". */
+/** The name of an action of `legalActions(duel)`. A card with two or more effect records adds "#n" (1-based) to "activate", an effect with modes ":n" (1-based), a declaration "=value". */
 export function actionName(duel: Duel, action: Action): string {
 	switch (action.type) {
 		case "pass":
@@ -15,6 +15,8 @@ export function actionName(duel: Duel, action: Action): string {
 			return action.type;
 		case "place":
 			return `place ${action.zone}`;
+		case "declare":
+			return `declare ${action.declaration.value}`;
 		case "attack":
 			return `attack ${codeOf(duel, action.card)} ${action.target === null ? "directly" : `> ${codeOf(duel, action.target)}`}`;
 		case "summon":
@@ -23,7 +25,13 @@ export function actionName(duel: Duel, action: Action): string {
 			const code = codeOf(duel, action.card);
 			const effect = (duel.defs[code]?.effects?.length ?? 0) > 1 ? ` #${action.effect + 1}` : "";
 			const paid = (action.paid ?? []).map((id) => ` ~ ${codeOf(duel, id)}`).join("");
-			return `activate ${code}${effect}${paid}${action.targets.map((id) => ` > ${codeOf(duel, id)}`).join("")}`;
+			// An effect with modes: ":n" names the mode chosen (1-based).
+			const mode = action.mode === undefined ? "" : ` :${action.mode + 1}`;
+			// A declaration made at activation: "=value".
+			const declared = action.declared === undefined ? "" : ` =${action.declared.value}`;
+			// Coupled targets: "{1,1}" names how many targets go to each group.
+			const groups = action.groups === undefined ? "" : ` {${action.groups.join(",")}}`;
+			return `activate ${code}${effect}${mode}${declared}${paid}${action.targets.map((id) => ` > ${codeOf(duel, id)}`).join("")}${groups}`;
 		}
 		default:
 			return `${action.type} ${codeOf(duel, action.card)}`;

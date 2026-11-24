@@ -96,7 +96,7 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [x] | Ghost Ogre & Snow Rabbit | Registered; complete (printed facts, Konami texts, one test per clause and ruling) |
 | [ ] | Hieratic Seal of the Heavenly Spheres | Missing |
 | [ ] | Infinite Impermanence | Registered; completeness pending |
-| [ ] | Lightning Storm | Missing |
+| [x] | Lightning Storm | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
 | [ ] | Lightstorm Dragon | Missing |
 | [ ] | Maiden of White | Missing |
 | [ ] | Majesty of the White Dragons | Missing |
@@ -113,7 +113,7 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [ ] | Prototype Sky Striker Ace - Amatsu | Missing |
 | [ ] | Psychic End Punisher | Missing |
 | [ ] | Radiant Typhoon Vision | Missing |
-| [ ] | Raigeki | Missing |
+| [x] | Raigeki | Registered; complete (printed facts, Konami texts, one test per clause and ruling; Konami sources only) |
 | [ ] | Roar of the Blue-Eyed Dragons | Missing |
 | [ ] | S:P Little Knight | Missing |
 | [ ] | Sage with Eyes of Blue | Missing |
@@ -136,5 +136,5 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [ ] | The Dragon that Devours the Dogma | Missing |
 | [ ] | The Fallen & The Virtuous | Missing |
 | [ ] | True Light | Missing |
-| [ ] | Upstart Goblin | Missing |
+| [x] | Upstart Goblin | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
 | [ ] | Wishes for Eyes of Blue | Missing |

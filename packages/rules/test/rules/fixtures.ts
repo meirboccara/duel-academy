@@ -136,6 +136,7 @@ export const codes = (duel: Duel, side: Side, zone: Zone) => cardsIn(duel, side,
 export function label(duel: Duel, action: Action): string {
 	if (action.type === "pass") return "pass";
 	if (action.type === "place") return `place ${action.zone}`;
+	if (action.type === "declare") return `declare ${action.declaration.value}`;
 	if (action.type === "pendulum-summon") return "pendulum-summon";
 	const code = duel.cards[action.card]!.code;
 	if (action.type === "set") return `set ${code}`;
@@ -143,7 +144,10 @@ export function label(duel: Duel, action: Action): string {
 	if (action.type === "choose") return `choose ${code}`;
 	if (action.type === "flip-summon" || action.type === "change-position") return `${action.type} ${code}`;
 	if (action.type === "attack") return `attack ${code} ${action.target === null ? "directly" : `> ${duel.cards[action.target]!.code}`}`;
-	return `activate ${code}${(action.paid ?? []).map((card) => ` ~ ${duel.cards[card]!.code}`).join("")}${action.targets.map((target) => ` > ${duel.cards[target]!.code}`).join("")}`;
+	const mode = action.mode === undefined ? "" : ` :${action.mode}`;
+	const declared = action.declared === undefined ? "" : ` =${action.declared.value}`;
+	const groups = action.groups === undefined ? "" : ` {${action.groups.join(",")}}`;
+	return `activate ${code}${mode}${declared}${(action.paid ?? []).map((card) => ` ~ ${duel.cards[card]!.code}`).join("")}${action.targets.map((target) => ` > ${duel.cards[target]!.code}`).join("")}${groups}`;
 }
 export const offered = (duel: Duel) => legalActions(duel).map((action) => label(duel, action)).sort();
 

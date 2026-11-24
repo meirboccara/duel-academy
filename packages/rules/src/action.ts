@@ -1,4 +1,5 @@
 import type { Position } from "./duel";
+import { type Declaration, sameDeclaration } from "./effects";
 
 /**
  * Step 7: an action that puts a card from the hand onto the field lists `zones`, the exact zones it may go to (from the player's
@@ -27,9 +28,9 @@ export type Action =
 	| { readonly type: "pass" }
 	/**
 	 * Activate a card or an effect: `effect` is its index in the card's effects, `targets` the cards it targets, `paid` the
-	 * cards chosen to pay its cost (absent when the cost has no choice).
+	 * cards chosen to pay its cost (absent when the cost has no choice), `mode` the mode chosen for an effect with modes.
 	 */
-	| ({ readonly type: "activate"; readonly card: number; readonly effect: number; readonly targets: readonly number[]; readonly paid?: readonly number[] } & Placing)
+	| ({ readonly type: "activate"; readonly card: number; readonly effect: number; readonly targets: readonly number[]; readonly paid?: readonly number[]; readonly mode?: number; readonly declared?: Declaration; readonly groups?: readonly number[] } & Placing)
 	/** Set a Spell or Trap from the hand; step 8: or a monster, in face-down Defense Position (a Normal Set, or a Tribute Set). */
 	| ({ readonly type: "set"; readonly card: number } & Placing)
 	/**
@@ -50,7 +51,9 @@ export type Action =
 	/** The card an effect asked for while it resolves (a choice that is not a target). */
 	| { readonly type: "choose"; readonly card: number }
 	/** Step 7: the zone asked for while an effect resolves or a monster goes back to its owner (from the player's left). */
-	| { readonly type: "place"; readonly zone: number; readonly positions?: readonly Position[]; readonly position?: Position };
+	| { readonly type: "place"; readonly zone: number; readonly positions?: readonly Position[]; readonly position?: Position }
+	/** What the player declares while an effect resolves (`askDeclare`): one of the values asked. */
+	| { readonly type: "declare"; readonly declaration: Declaration };
 
 export const PASS: Action = Object.freeze({ type: "pass" });
 
@@ -77,11 +80,12 @@ export function sameAction(a: Action, b: Action): boolean {
 	if (a.type !== b.type) return false;
 	if (a.type === "pass" || a.type === "pendulum-summon") return true;
 	if (a.type === "place") return a.zone === (b as typeof a).zone;
+	if (a.type === "declare") return sameDeclaration(a.declaration, (b as typeof a).declaration);
 	const other = b as typeof a;
 	if (a.card !== other.card) return false;
 	if (a.type === "summon") return a.how === (b as typeof a).how;
 	if (a.type === "attack") return a.target === (b as typeof a).target;
 	if (a.type !== "activate") return true;
 	const asked = b as typeof a;
-	return a.effect === asked.effect && sameIds(a.targets, asked.targets) && sameIds(a.paid ?? [], asked.paid ?? []);
+	return a.effect === asked.effect && a.mode === asked.mode && sameDeclaration(a.declared, asked.declared) && sameIds(a.targets, asked.targets) && sameIds(a.paid ?? [], asked.paid ?? []) && sameIds(a.groups ?? [], asked.groups ?? []);
 }

@@ -205,7 +205,8 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Lightning Storm",
-        "count": 2
+        "count": 2,
+        "code": "lightning-storm"
       },
       {
         "name": "Mulcharmy Fuwalos",
@@ -230,7 +231,8 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Raigeki",
-        "count": 3
+        "count": 3,
+        "code": "raigeki"
       },
       {
         "name": "Sky Striker Ace - Raye",
@@ -266,7 +268,8 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Upstart Goblin",
-        "count": 3
+        "count": 3,
+        "code": "upstart-goblin"
       }
     ],
     "extra": [

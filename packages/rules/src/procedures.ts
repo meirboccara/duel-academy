@@ -1,4 +1,5 @@
 import { type CardInstance, closedPriority, type Duel, freeSlots, isOnField, materialsOf, moveCard, moveCards, type Position, type Side, type Summoning, type SummonKind } from "./duel";
+import { shuffleDecksOf } from "./deck";
 import { ask, askPlace, askZone, type CardDef, type MaterialCheck, type MaterialContext, type MaterialCount, type MaterialSlot, type Procedure } from "./effects";
 import { breakEffect, raiseEvent } from "./events";
 import { level, summonLocked } from "./modifiers";
@@ -240,7 +241,11 @@ function useMaterials(duel: Duel, id: number, procedure: Procedure, ids: readonl
 			return moveCard(carried, material, { zone: "material", attachedTo: id });
 		}, duel);
 	}
-	if (procedure.kind === "fusion") return moveCards(duel, ids, procedure.contact!.to === "graveyard" ? { zone: "graveyard", reason: "material" } : { zone: procedure.contact!.to });
+	if (procedure.kind === "fusion") {
+		const to = procedure.contact!.to;
+		if (to === "deck") return shuffleDecksOf(moveCards(duel, ids, { zone: "deck" }), ids);
+		return moveCards(duel, ids, to === "graveyard" ? { zone: "graveyard", reason: "material" } : { zone: to });
+	}
 	return moveCards(duel, ids, { zone: "graveyard", reason: "material", usedFor: procedure.kind === "ritual" ? undefined : procedure.kind });
 }
 
@@ -446,7 +451,7 @@ export interface FusionOptions {
 	readonly pool: (duel: Duel, player: Side) => readonly number[];
 	/** Which Fusion Monsters of the Extra Deck (default: any). */
 	readonly monsters?: (duel: Duel, card: CardInstance) => boolean;
-	/** Where the materials go: the Graveyard (default), banished, or shuffled into the Deck (they are placed on it; the core does not shuffle here). */
+	/** Where the materials go: the Graveyard (default), banished, or shuffled into the Deck (each owner's Deck is shuffled with the Duel's RNG). */
 	readonly to?: "graveyard" | "banished" | "deck";
 }
 
@@ -476,7 +481,7 @@ export function fusionSummon(duel: Duel, player: Side, options: FusionOptions): 
 	return ask(duel, player, fusable(duel, player, options), (board, picked) =>
 		askMaterials(board, player, fusionSpec(board, player, board.cards[picked]!, options), (chosen, ids) => {
 			const to = options.to ?? "graveyard";
-			const sent = moveCards(chosen, ids, to === "deck" ? { zone: "deck" } : { zone: to, reason: "material", usedFor: "fusion" });
+			const sent = to === "deck" ? shuffleDecksOf(moveCards(chosen, ids, { zone: "deck" }), ids) : moveCards(chosen, ids, { zone: to, reason: "material", usedFor: "fusion" });
 			return askSpecialSummon(sent, player, picked, { kind: "fusion" });
 		}),
 	);

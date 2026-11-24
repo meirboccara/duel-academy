@@ -67,8 +67,8 @@ Blue-Eyes **746021** (43 Main / 15 Extra) and Sky Striker **745443** (40 Main / 
 L1 M/E/S columns, with the original deck URLs and local provenance. Each includes a separate 15-card Side inventory;
 Side scripting is not part of this acceptance. No substitutions, including for unsupported new names.
 
-**Current new-core registration:** 60 distinct Main/Extra names, 4 registered (Ash Blossom, Droll, Infinite Impermanence,
-MST), 56 absent. Registration is not completion: printed identity, all effects/rulings, French text, independent review
+**Current new-core registration:** 60 distinct Main/Extra names, 9 registered (Ash Blossom, Droll, Effect Veiler, Ghost Ogre,
+Infinite Impermanence, Lightning Storm, MST, Raigeki, Upstart Goblin), 51 absent. Registration is not completion: printed identity, all effects/rulings, French text, independent review
 and exact-deck integration still gate it. Historical research coverage describes the old engine, not readiness here.
 `deckReadiness` reports missing/partial/registered only and cannot certify a ready deck.
 
@@ -76,13 +76,13 @@ and exact-deck integration still gate it. Historical research coverage describes
 |---|---|
 | 1: printed identity | **Partial:** typed Attribute/monster Type/name/archetype/mentions facts and exact public queries implemented; existing card definitions still need complete sourced printed data. Effective Level/ATK/DEF remain step 6 queries. Dynamic names, Attributes, Types and material identities are not implemented. |
 | 3: events | **Partial:** destruction provenance carries effect source snapshot, activating player, effect index; costs, battle and game mechanics are distinct. MST and core negators integrated, hidden source snapshots masked/re-dealt. Raye/Roze and Vision trigger/card cases remain unscripted. |
-| 4: records/choices | **Partial:** chain, costs, targets and sequential choices exist. Per-card exact-list needs have not been audited against the new core; no blanket completion from generic fixtures. |
+| 4: records/choices | **Partial:** chain, costs, targets and sequential choices exist; since 2026-11-24 also modes, declarations (at activation and at resolution), "up to N" and optional choices at resolution, coupled targets, reveals, seeded Deck shuffles, bottom-of-Deck ordering, excavation, random picks and LP gains (README, last section). Per-card exact-list needs have not been audited against the new core; no blanket completion from generic fixtures. |
 | 6: continuous | **Partial:** stat modifiers, locks, negation and control exist. Per-card exact-list needs have not been audited; implement any missing continuous behaviour alongside its card. |
 | 6b: battle | **Partial:** basic battles and destruction exist. Per-card exact-list battle needs have not been audited. |
 | 8: procedures | **Partial:** generic procedures exist. Exact recipes, alternative Summons, material identity exceptions and restrictions remain per-card gates. |
 | 10: lifecycle, parity, switch | **Missing for exact-deck play:** full-duel lifecycle behaviour is not yet accepted by exact-deck tests; app migration remains explicitly deferred. |
 | 11: monster equips | **Missing:** bring this existing step's monster-equip work forward before Wishes/Tyrant and other consumers; do not postpone a required mechanic until after the app switch. Tokens/counters/dice are not silently included in this foundation. |
-| Card plan | **Missing:** all 56 absent Main/Extra cards, sourced identity for the four registered cards, per-effect/ruling/French coverage and independent review. Ghost Ogre and Veiler are the next bounded scripting consumers, not implemented here. |
+| Card plan | **Missing:** all 51 absent Main/Extra cards, sourced identity for the four older registered cards (Ash, Droll, Infinite Impermanence, MST), per-effect/ruling/French coverage and independent review. Ghost Ogre, Veiler, Raigeki, Upstart Goblin and Lightning Storm are written to the definition of done (independent review pending). |
 | 9 / final acceptance | **Not run:** exact lists playable, combo data, then 20 recorded Sonnet/Opus duels with failures reconciled. No duels or deck-ready claim in this foundation. |
 
 - [x] Freeze exact Main/Extra and separate Side inventories; explicitly retain unsupported names.

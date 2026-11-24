@@ -1,4 +1,4 @@
-import { activateAction, activateEffect, activationWays } from "./activation";
+import { activateAction, activateEffect, activationWays, operationOf } from "./activation";
 import { type Action, PASS, type Placing, sameAction, takes } from "./action";
 import { type CardInstance, closedPriority, destroyCard, type Destruction, type Duel, freeSlots, type Link, moveCard, other, PHASES, type Side } from "./duel";
 import { PENDULUM_SLOTS } from "./zones";
@@ -6,7 +6,7 @@ import { PENDULUM_SLOTS } from "./zones";
 /** The Field Zone: one zone, always open to a Field Spell (the one there is sent to the Graveyard). */
 const FIELD_ZONE: readonly number[] = Object.freeze([0]);
 import { breakEffect, type GameEvent, raiseEvent } from "./events";
-import { type CardDef, type EffectRecord, effectOf, inFieldRange, rangeOf, speedOf } from "./effects";
+import { type CardDef, type EffectRecord, effectOf, inFieldRange, rangeOf, sameDeclaration, speedOf } from "./effects";
 import { returnControl, summonLocked, withoutEnded } from "./modifiers";
 import { cardNegated, immune } from "./negation";
 import { endChain, newTurn, refund } from "./once";
@@ -65,7 +65,8 @@ export function legalActions(duel: Duel): Action[] {
 	// The Duel is over: nothing more is offered.
 	if (duel.winner) return [];
 	if (duel.asking) {
-		const { from, zones, positions, done } = duel.asking;
+		const { from, zones, positions, done, declarations } = duel.asking;
+		if (declarations) return from.map((index): Action => ({ type: "declare", declaration: declarations[index]! }));
 		if (zones) return from.map((zone): Action => (positions && positions.length > 0 ? { type: "place", zone, positions } : { type: "place", zone }));
 		const picks = from.map((card): Action => ({ type: "choose", card }));
 		// Step 8: the cards chosen so far are enough: the player may stop there.
@@ -249,8 +250,8 @@ function legalMatch(duel: Duel, action: Action): Action | null {
 		attackActions(duel, attacks);
 		return attacks.find((legal) => sameAction(legal, action)) ?? null;
 	}
-	// A zone is placed only when a choice asks for it.
-	if (action.type === "place") return null;
+	// A zone is placed, or something declared, only when a choice asks for it.
+	if (action.type === "place" || action.type === "declare") return null;
 	if (action.type === "pendulum-summon") return legalActions(duel).some((legal) => legal.type === "pendulum-summon") ? action : null;
 	const listed: Action[] = [];
 	collect(duel, listed, action.card);
@@ -316,7 +317,7 @@ function set(duel: Duel, id: number, slot: number | undefined): Duel {
 
 function activate(duel: Duel, action: Extract<Action, { type: "activate" }>): Duel {
 	const player = duel.priority.holder;
-	const next = activateEffect(duel, player, duel.cards[action.card]!, action.effect, { paid: action.paid ?? [], targets: action.targets, zone: action.zone });
+	const next = activateEffect(duel, player, duel.cards[action.card]!, action.effect, { paid: action.paid ?? [], targets: action.targets, zone: action.zone, ...(action.mode === undefined ? {} : { mode: action.mode }), ...(action.declared === undefined ? {} : { declared: action.declared }), ...(action.groups === undefined ? {} : { groups: action.groups }) });
 	return { ...next, priority: closedPriority(other(player)) };
 }
 
@@ -358,7 +359,7 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 			const index = next.chain.length - 1;
 			const link = next.chain[index]!;
 			all[index] = link;
-			result = link.activationNegated || link.effectNegated || cardNegated(next, link) ? next : effectOf(next, link).operation(next, link, index);
+			result = link.activationNegated || link.effectNegated || cardNegated(next, link) ? next : operationOf(effectOf(next, link), link)(next, link, index);
 		}
 		const asking = result.asking;
 		if (asking) {
@@ -400,7 +401,15 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 function answer(duel: Duel, action: Action): Duel {
 	const { links, then, done, carried, resume, positions } = duel.asking!;
 	const board = { ...duel, asking: null };
-	const result = action.type === "pass" ? done!(board) : action.type === "place" ? then(board, action.zone, action.position ?? positions?.[0]) : then(board, (action as Extract<Action, { type: "choose" }>).card);
+	const { declarations } = duel.asking!;
+	const result =
+		action.type === "pass"
+			? done!(board)
+			: action.type === "place"
+				? then(board, action.zone, action.position ?? positions?.[0])
+				: action.type === "declare"
+					? then(board, declarations!.findIndex((declaration) => sameDeclaration(declaration, action.declaration)))
+					: then(board, (action as Extract<Action, { type: "choose" }>).card);
 	return resume ? resumeAfter(result, resume) : resolveChain(board, links, result, carried);
 }
 

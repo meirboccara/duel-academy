@@ -101,6 +101,33 @@ export type Cost = ((duel: Duel, ctx: EffectContext) => Duel | null) | CostSpec;
  */
 export type Immunity = boolean | ((duel: Duel, link: Link) => boolean);
 
+/**
+ * One group of a coupled target ("target 1 monster you control and 1 monster your opponent controls"): the candidates and how many of
+ * them. A card is never chosen in two groups.
+ */
+export interface TargetGroup {
+	readonly from: readonly number[];
+	readonly min: number;
+	readonly max: number;
+}
+
+/** What an effect does when its link resolves (see `EffectRecord.operation`). */
+export type Operation = (duel: Duel, link: Link, index: number) => Duel;
+
+/** One mode of an effect with modes ("● ..."): what is chosen at activation, and what it does. */
+export interface EffectMode {
+	/** This mode can be chosen only while it holds (read at activation, with the record's own condition). */
+	readonly condition?: (duel: Duel, ctx: EffectContext) => boolean;
+	readonly target?: EffectRecord["target"];
+	readonly targetCount?: EffectRecord["targetCount"];
+	readonly categories?: EffectRecord["categories"];
+	readonly targetGroups?: EffectRecord["targetGroups"];
+	readonly sameCount?: true;
+	/** What the player declares at activation with this mode (see `EffectRecord.declare`). */
+	readonly declare?: EffectRecord["declare"];
+	readonly operation: Operation;
+}
+
 export interface EffectRecord {
 	/**
 	 * For `activation`: "if ..., you can activate this card from your hand", as well as the way its kind allows. The card is
@@ -185,11 +212,35 @@ export interface EffectRecord {
 	 */
 	readonly targetCount?: { readonly min: number; readonly max: number };
 	/**
+	 * Coupled targets, instead of `target`: each group is chosen from its own candidates, read on the board the cost left, and a card is
+	 * never in two groups ("target 1 card on each side": two groups of one). With `sameCount`, every group has the same number of
+	 * targets ("the same number of monsters and Spells/Traps"). Only the combinations that meet the constraints are listed, the targets
+	 * in group order; the link keeps the size of each group (`Link.targetGroups`), and `targetGroupsOf` reads them back.
+	 */
+	readonly targetGroups?: (duel: Duel, ctx: EffectContext) => readonly TargetGroup[];
+	/** With `targetGroups`: every group has the same number of targets. */
+	readonly sameCount?: true;
+	/**
 	 * Applies the effect when its link resolves. `index` is the link's place in `duel.chain`, which still holds this
 	 * link and those below it. To negate, it calls `negateActivation` or `negateEffect` on a lower link; to make the
-	 * player choose a card that is not a target, it returns `ask(...)`.
+	 * player choose a card that is not a target, it returns `ask(...)`. Required unless the record has `modes` (then each
+	 * mode has its own, and a record with both is a definition error).
 	 */
-	readonly operation: (duel: Duel, link: Link, index: number) => Duel;
+	readonly operation?: Operation;
+	/**
+	 * "Activate 1 of these effects" / "choose 1 of these effects": the player chooses one mode when activating (Konami's notes on
+	 * Lightning Storm: "this effect is activated as the effect of the ● chosen"). Each mode has its own condition, targets,
+	 * declaration and categories, read at activation and frozen on the link with the mode (`Link.mode`); the record's own
+	 * `condition`, `cost` and `once` apply to every mode. `legalActions` lists one activation per legal mode (and per target
+	 * combination of that mode).
+	 */
+	readonly modes?: readonly EffectMode[];
+	/**
+	 * "Declare 1 ...; ...": what the player may declare when activating, read on the duel before the cost. Each value is its own
+	 * activation (`Way.declared`, the action's `declared`), frozen on the link (`Link.declared`). A declaration made while the effect
+	 * resolves is `askDeclare`. For "declare 1 card name" the card lists the names (`cardNames` gives every printed name the duel knows).
+	 */
+	readonly declare?: (duel: Duel, ctx: EffectContext) => readonly Declaration[];
 	/** The once-per-turn (or Duel, or chain) limit, as printed. */
 	readonly once?: Once;
 	/**
@@ -205,11 +256,29 @@ export interface EffectRecord {
 /** A Link Arrow as printed, read with the card upright for its controller. */
 export type Arrow = "top-left" | "top" | "top-right" | "left" | "right" | "bottom-left" | "bottom" | "bottom-right";
 
-export type Attribute = "DARK" | "DIVINE" | "EARTH" | "FIRE" | "LIGHT" | "WATER" | "WIND";
-export type MonsterType =
-	| "Aqua" | "Beast" | "Beast-Warrior" | "Creator God" | "Cyberse" | "Dinosaur" | "Divine-Beast" | "Dragon" | "Fairy" | "Fiend"
-	| "Fish" | "Illusion" | "Insect" | "Machine" | "Plant" | "Psychic" | "Pyro" | "Reptile" | "Rock" | "Sea Serpent" | "Spellcaster"
-	| "Thunder" | "Warrior" | "Winged Beast" | "Wyrm" | "Zombie";
+/** Every Attribute, as printed (alphabetical): what "declare 1 Attribute" offers. */
+export const ATTRIBUTES = ["DARK", "DIVINE", "EARTH", "FIRE", "LIGHT", "WATER", "WIND"] as const;
+export type Attribute = (typeof ATTRIBUTES)[number];
+/** Every monster Type, as printed (alphabetical): what "declare 1 Type" offers. */
+export const MONSTER_TYPES = [
+	"Aqua", "Beast", "Beast-Warrior", "Creator God", "Cyberse", "Dinosaur", "Divine-Beast", "Dragon", "Fairy", "Fiend",
+	"Fish", "Illusion", "Insect", "Machine", "Plant", "Psychic", "Pyro", "Reptile", "Rock", "Sea Serpent", "Spellcaster",
+	"Thunder", "Warrior", "Winged Beast", "Wyrm", "Zombie",
+] as const;
+export type MonsterType = (typeof MONSTER_TYPES)[number];
+
+/**
+ * What a player declares ("declare 1 card name", "declare 1 Attribute", "declare 1 Type", "declare 1 Level"): the kind and the value.
+ * Declared at activation (`EffectRecord.declare`, frozen on the link as `Link.declared`) or while the effect resolves (`askDeclare`).
+ */
+export type Declaration =
+	| { readonly kind: "name"; readonly value: string }
+	| { readonly kind: "attribute"; readonly value: Attribute }
+	| { readonly kind: "type"; readonly value: MonsterType }
+	| { readonly kind: "level"; readonly value: number };
+
+/** Are these the same declaration? `b` may be a caller's malformed guess. */
+export const sameDeclaration = (a: Declaration | undefined, b: Declaration | undefined): boolean => a === b || (a !== undefined && b !== undefined && typeof b === "object" && a.kind === b.kind && a.value === b.value);
 
 /** What a card says about itself that the core reads: its Spell or Trap icon, a monster's printed Level, ATK and DEF, a Normal Monster. */
 export interface Facts {
@@ -340,6 +409,19 @@ export const effectOf = (duel: Duel, from: { readonly card: CardInstance; readon
  * target" has to still meet the targeting requirements; a card that became a new card is not the same one: R2021 and step 1.)
  */
 export const targetsOf = (duel: Duel, link: Link): CardInstance[] => link.targets.flatMap((id, i) => (duel.cards[id]!.moves === link.targetMoves[i] ? [duel.cards[id]!] : []));
+
+/** The targets of a link with coupled targets (`targetGroups`), group by group, each still the card it targeted (as `targetsOf`). */
+export function targetGroupsOf(duel: Duel, link: Link): CardInstance[][] {
+	const groups: CardInstance[][] = [];
+	let at = 0;
+	for (const size of link.targetGroups ?? [link.targets.length]) {
+		const group: CardInstance[] = [];
+		for (let i = at; i < at + size; i++) if (duel.cards[link.targets[i]!]!.moves === link.targetMoves[i]) group.push(duel.cards[link.targets[i]!]!);
+		groups.push(group);
+		at += size;
+	}
+	return groups;
+}
 
 /**
  * Is a face-up card on the field where an effect of range `field` or `pendulum` applies? A monster card's `field` effects work in the

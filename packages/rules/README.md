@@ -135,8 +135,8 @@ Known limits of step 4 (what the tests do not prove):
   two negations of one link are still not told apart (the one that resolves first takes).
 - A resolved Continuous Spell stays on the field from step 6 (`stays`); a Field Spell, an equipped Equip Spell and a Pendulum Monster
   in its Pendulum Zone stay from step 7.
-- A choice at resolution is one card from a list; "up to N" and "you may choose none" are not modelled as such (several cards
-  are several `ask`s in a row), and a player cannot decline a mandatory search.
+- A choice at resolution is one card from a list; "up to N" and "you may" are `askUpTo` and `askMay` since the 2026-11-24 readiness
+  slice (last section), and a player still cannot decline a mandatory search.
 - Zones: see step 7 below (Link Spider's pointed zone, the Field Zone).
 - Droll & Lock Bird is not a card of the core yet: its lock "for the rest of this turn" is a continuous effect (step 6), so
   it would not play as printed. It waits for step 6 (its event, Draw Phase exception and cost are easy to write as a record).
@@ -404,7 +404,8 @@ Known limits of step 8 (what the tests do not prove):
   as a Tuner", "as 2 Tributes", Fusion substitutes, "treated as Level X for an Xyz Summon"); a Synchro Monster that needs 2 Tuners or
   none; an Xyz alternative with a cost; "Tribute 3 monsters", Summons with fewer Tributes, a second Normal Summon as an action
   (`summonByEffect` gives one by effect); Gemini, Spirit and Union monsters; a Pendulum Summon performed by an effect; Special Summons
-  and Sets in face-down Defense Position by an effect; zone locks. Materials "shuffled into the Deck" are placed on it (no shuffle).
+  and Sets in face-down Defense Position by an effect; zone locks. (Materials "shuffled into the Deck" were placed on it until the
+  2026-11-24 readiness slice, which shuffles them: see the last section.)
 - "Properly Summoned" is asked of a Fusion, Synchro, Xyz, Link or Ritual Monster in the hand, the Deck, the Graveyard, banished or
   face-up on the Extra Deck; a card worded "ignoring its Summoning conditions" has no way to say so yet. A monster keeps `proper`
   when it is banished face-down. A Ritual Monster, an Extra Deck monster and a card marked `summon.cannotBeNormalSummoned` are
@@ -515,3 +516,52 @@ Ghost Ogre & Snow Rabbit and Effect Veiler (2026-11-24; `src/cards/ghost-ogre-sn
   YGOProJudge's answers only (asked 2026-11-24, no source cited; the same limit is written in Konami's notes for Infinite
   Impermanence). A face-down monster is treated as not a legal target (YGOProJudge only).
 - Limits: effective Level, Attribute, Type or name changes are not modelled.
+
+Choices at activation and resolution, Deck operations, Life Points; Raigeki, Upstart Goblin, Lightning Storm (2026-11-24; tests in
+`test/rules/choices.test.ts`, `test/rules/deck-operations.test.ts`, `test/cards/{raigeki,upstart-goblin,lightning-storm}.test.ts`):
+- **Modes** (`EffectRecord.modes`, `EffectMode`): "Activate 1 of these effects". Each mode has its own `condition`, `target` /
+  `targetCount` / `targetGroups`, `declare`, `categories` and `operation`; the record keeps the shared `condition`, `cost` and `once`
+  (a record with modes and its own `operation`, `target` or `declare` throws when read). `legalActions` lists one activation per legal
+  mode and target combination (`Action.mode`, `Way.mode`); the mode is frozen on the link (`Link.mode`) with its categories, and the
+  link resolves that mode's operation even if its condition no longer holds. Bot names: `activate card :2` (1-based).
+- **Declarations** (`Declaration`: `name`, `attribute`, `type`, `level`; `ATTRIBUTES`, `MONSTER_TYPES`, `cardNames(duel)`): at activation
+  with `EffectRecord.declare` (one action per value, `Action.declared`, frozen as `Link.declared`; bot names `=VALUE`), or while the effect
+  resolves with `askDeclare` (a new `declare` action, the only action added).
+- **Optional and "up to N" at resolution** (`src/choices.ts`): `askUpTo(duel, player, from, { min, max }, then)` picks one card at a time
+  through `choose`; once `min` are picked `pass` stops (with `min: 0`, declines). `askMay(duel, player, card, yes, no?)`: "you can ...",
+  accepted by choosing the effect's own card, declined with `pass`.
+- **Coupled targets** (`EffectRecord.targetGroups`, `TargetGroup`, `sameCount`): groups chosen from their own candidates, a card never in
+  two groups, every group the same size with `sameCount`; only legal combinations are built. `Link.targetGroups` keeps the group sizes and
+  `targetGroupsOf(duel, link)` reads the targets back, group by group, dropping those that moved. The split travels with the action
+  (`Action.groups`, `Way.groups`, shown as `{1,1}` in names): two splits of the same cards are two different actions. An effect with
+  `modes` throws if its record also sets `categories`, `targetGroups` or `sameCount`, which each mode carries instead.
+- **Deck operations** (`src/deck.ts`): `shuffleDeck` (Fisher-Yates with the Duel's seeded RNG; the RNG state moves on, so a replay
+  shuffles the same way), `shuffleDecksOf`, `pickRandom(duel, from, count)` (random hand or Deck picks through the same RNG),
+  `excavate(duel, side, n)` (the top N revealed, left on top), `askBottomOrder(duel, player, ids, then?)` (the player picks the order one
+  card at a time; the last picked is the bottom card). Step 8's limit is fixed: materials "shuffled into the Deck" by a contact Fusion or
+  `fusionSummon({ to: "deck" })` now shuffle each owner's Deck.
+- **Reveal** (`revealCards(duel, player, ids)`, a cost or part of an operation): a public `revealed` event, and `Duel.revealed`. `viewFor`
+  shows a revealed card to both players while it stays where it was revealed (same `moves` and zone; in a Deck, the same place in it), so a
+  re-dealt world keeps it; a shuffle of that Deck hides it again.
+- **Life Points**: `gainLp` (raises `lp-gained`). Damage by an effect is `loseLp`, the same loss as battle damage (0 LP decides the Duel);
+  paying LP stays `payLp`.
+- Cards: **Raigeki** (cid 4343), **Upstart Goblin** (cid 4895: no once-per-turn on its text), **Lightning Storm** (cid 14876: modes, its
+  "no face-up cards" condition, "activate 1 per turn"), each with its Konami EN/FR text and Japanese notes, registered in `CARD_DEFS` and in
+  the Sky Striker 745443 manifest.
+
+Known limits of this slice (what the tests do not prove):
+- Only YGOProJudge backs (asked 2026-11-24, no source cited): Lightning Storm's mode with nothing to destroy cannot be chosen, its condition
+  is not checked again at resolution, and Pendulum Monsters in the Pendulum Zones are among the "Spells and Traps" destroyed; Upstart
+  Goblin cannot be activated under Droll & Lock Bird's lock (`requiresAddToHand`). Konami's notes are OCG only; no TCG page was read.
+- A mode's `condition` and a `declare` list are read on the Duel before the cost is paid (like the record's condition), and checked again
+  at `act` on the same Duel; a cost that would change which modes are legal is not modelled.
+- "Declare 1 card name" offers the printed names of the Duel's own definitions (`cardNames`), not every card that exists: a name no card of
+  the Duel has cannot change how a card resolves, but a bluff is not possible.
+- `askMay`'s "yes" is `choose` of the effect's own card (no new action); `askUpTo` takes every card left without asking when they are no
+  more than the minimum still needed. Ordering for "the top of the Deck in any order" is not written (only the bottom).
+- Reveal memory is per card and place: a card revealed in the hand stays known only while it stays in the hand; a Deck card revealed stops
+  being known once anything above it moves (conservative: forgetting is the safe side). What the opponent saw before (a card searched,
+  then shuffled back) is still not remembered (step 9's limit).
+- `gainLp`'s event has no answering card yet; Konami's Q&A on a card that answers Upstart Goblin's LP gain (fid 23121, Performapal Life
+  Swordsman) was not opened. The `fusionSummon({ to: "deck" })` shuffle has no test of its own (the contact Fusion one is tested).
+- Raigeki's and Upstart Goblin's other Q&A entries concern cards the core does not have (titles read only).

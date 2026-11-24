@@ -109,7 +109,7 @@ function finish(duel: Duel): Duel {
 function add(duel: Duel, action: Activate): Duel {
 	const building = duel.building!;
 	const waiting = building.remaining.find((entry) => entry.card.id === action.card && entry.effect === action.effect)!;
-	const next = activateEffect(duel, waiting.card.controller, duel.cards[action.card]!, action.effect, { paid: action.paid ?? [], targets: action.targets }, false);
+	const next = activateEffect(duel, waiting.card.controller, duel.cards[action.card]!, action.effect, { paid: action.paid ?? [], targets: action.targets, ...(action.mode === undefined ? {} : { mode: action.mode }), ...(action.declared === undefined ? {} : { declared: action.declared }), ...(action.groups === undefined ? {} : { groups: action.groups }) }, false);
 	const remaining = building.remaining.filter((entry) => entry !== waiting);
 	return { ...next, building: { ...building, remaining, anyActivated: true } };
 }

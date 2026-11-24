@@ -3,6 +3,7 @@ import type { GameEvent, Waiting } from "../events";
 import type { CardInstance, Duel, Side } from "../duel";
 import { createRng } from "../rng";
 import { hiddenFrom } from "./hidden";
+import { revealedNow } from "../deck";
 
 /**
  * Step 9 of docs/rules-core-spec.md (design: docs/rules-core/step9/design.md): the board seen from one player's side, and the
@@ -25,13 +26,17 @@ export interface View {
 	readonly unknown: Readonly<Record<Side, Pools>>;
 }
 
-/** Cards the viewer knows whatever their place: the cards of the chain (activated, so revealed) and the cards it is being asked to choose from. */
+/**
+ * Cards the viewer knows whatever their place: the cards of the chain (activated, so revealed), the cards it is being asked to choose
+ * from, and the cards revealed to both players that are still where they were revealed (`revealCards`).
+ */
 function knownAnyway(duel: Duel, viewer: Side): Set<number> {
-	const known = new Set<number>();
+	const known = new Set<number>(revealedNow(duel));
 	for (const link of duel.chain) known.add(link.card.id);
 	if (duel.asking) {
 		for (const link of duel.asking.links) known.add(link.card.id);
-		if (duel.asking.player === viewer && !duel.asking.zones) for (const id of duel.asking.from) known.add(id);
+		// A zone question and a declaration list options, not cards: their numbers are not card ids.
+		if (duel.asking.player === viewer && !duel.asking.zones && !duel.asking.declarations) for (const id of duel.asking.from) known.add(id);
 	}
 	return known;
 }
@@ -71,6 +76,8 @@ function withSnapshots(duel: Duel, fix: (snapshot: CardInstance) => CardInstance
 			case "position-changed":
 			case "flipped":
 				return { ...raised, card: fix(raised.card) };
+			case "revealed":
+				return { ...raised, cards: raised.cards.map(fix) };
 			case "attack-declared":
 			case "battled":
 				return { ...raised, attacker: fix(raised.attacker), target: raised.target && fix(raised.target) };

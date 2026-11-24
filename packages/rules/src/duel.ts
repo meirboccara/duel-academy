@@ -1,9 +1,10 @@
-import type { CardDef, SpellSpeed } from "./effects";
+import type { CardDef, Declaration, SpellSpeed } from "./effects";
 import { type GameEvent, raiseEvent, type Waiting } from "./events";
 import { NOTHING_USED, type Used } from "./once";
 import { locked, type Modifier } from "./modifiers";
 import type { Building } from "./triggers";
 import { createRng } from "./rng";
+import type { Revealed } from "./deck";
 
 /**
  * Step 1 of docs/rules-core-spec.md: every physical card is its own instance. A card's code says what it is; its id
@@ -106,6 +107,12 @@ export interface Link {
 	readonly effectNegated: boolean;
 	/** Step 7: a Spell or Trap Card activated from where it was Set (face-down on the field), not from the hand. */
 	readonly wasSet: boolean;
+	/** The mode chosen at activation for an effect with `modes` (its index); absent otherwise. */
+	readonly mode?: number;
+	/** What the player declared at activation ("declare 1 Attribute; ..."); absent otherwise. */
+	readonly declared?: Declaration;
+	/** Coupled targets (`EffectRecord.targetGroups`): how many of `targets` each group took, in order. */
+	readonly targetGroups?: readonly number[];
 }
 
 /**
@@ -183,6 +190,8 @@ export interface Duel {
 	readonly replay: CardRef | null;
 	/** Step 6b: who won (`draw` when both reached 0 LP at the same time). Once set, nothing more is offered. */
 	readonly winner: Side | "draw" | null;
+	/** Cards shown to both players (`revealCards`, `excavate`): known while they stay where they were revealed (src/deck.ts). */
+	readonly revealed: readonly Revealed[];
 	/** How many groups of simultaneous moves (`moveCards`) have happened: the last one's number tags its events. */
 	readonly batches: number;
 	/** What each card code does, as effect records (src/effects.ts): shared by reference, never copied, never changed. */
@@ -258,6 +267,11 @@ export interface Asking {
 	readonly zones?: true;
 	/** Step 7: a choice asked outside a chain (a monster going back to its owner): what happens once it is answered, instead of the chain. */
 	readonly resume?: (duel: Duel) => Duel;
+	/**
+	 * A declaration asked while an effect resolves (`askDeclare`): `from` holds the indexes of these values, and the answer is a
+	 * `declare` action naming one of them.
+	 */
+	readonly declarations?: readonly Declaration[];
 }
 
 export interface DeckSetup {
@@ -368,6 +382,7 @@ export function createDuel(setup: DuelSetup): Duel {
 		attacked: [],
 		replay: null,
 		winner: null,
+		revealed: [],
 		batches: 0,
 		defs: setup.defs ?? {},
 	};

@@ -30,6 +30,10 @@ export type GameEvent =
 	| { readonly type: "battle-damage"; readonly player: Side; readonly amount: number }
 	/** A monster was flipped face-up: the attack target (step 6b: before damage calculation; the event is raised after it), a Flip Summon or a card effect (step 8). */
 	| { readonly type: "flipped"; readonly card: CardInstance }
+	/** Cards were shown to both players by `player` (src/deck.ts: a reveal, an excavation). */
+	| { readonly type: "revealed"; readonly player: Side; readonly cards: readonly CardInstance[] }
+	/** A player gained Life Points (src/deck.ts, `gainLp`). */
+	| { readonly type: "lp-gained"; readonly player: Side; readonly amount: number }
 	/** A phase starts; `player` is the turn player. */
 	| { readonly type: "phase"; readonly phase: Phase; readonly player: Side };
 
