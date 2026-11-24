@@ -2,7 +2,7 @@ import type { Action } from "./action";
 import { type AttackMade, type Battle, type CardInstance, type CardRef, closedPriority, type DamageStep, type Duel, isStill, moveCard, moveCards, other, refOf, type Side } from "./duel";
 import { type CardDef, type EffectRecord } from "./effects";
 import { breakEffect, raiseEvent } from "./events";
-import { loseLp } from "./life";
+import { damageFor, loseLp } from "./life";
 import { atk, type AttackAllowance, attackAllowances, attackLocked, def, spareDestruction } from "./modifiers";
 import { triggerPoint } from "./triggers";
 
@@ -303,12 +303,31 @@ function damageCalculation(duel: Duel): Duel {
 		if (spared) protectedDuel = spared;
 		return spared === null;
 	});
-	let next = raiseEvent({ ...protectedDuel, battle: { ...battle, destroyed: doomed } }, { type: "battled", attacker, target });
-	if (damage && damage.amount > 0) next = raiseEvent(loseLp(next, damage.player, damage.amount), { type: "battle-damage", ...damage });
+	let next = raiseEvent({ ...protectedDuel, battle: { ...battle, destroyed: doomed, fought: true } }, { type: "battled", attacker, target });
+	// The event carries the damage really taken ("any damage your opponent takes is halved": `damageFor`; `loseLp` applies the same).
+	if (damage && damage.amount > 0) next = raiseEvent(loseLp(next, damage.player, damage.amount), { type: "battle-damage", player: damage.player, amount: damageFor(next, damage.player, damage.amount) });
 	if (next.winner) return { ...next, battle: null, priority: { holder: next.turn.player, passed: [], open: false } };
 	const after = raiseEvent({ ...next, battle: { ...next.battle!, step: "after" as const } }, { type: "damage-step", step: "after" });
 	return triggerPoint(raiseFlip(after), closedPriority(duel.turn.player));
 }
+
+/**
+ * Did this card battle in the attack in progress: it is the attacker or the attack target, and damage calculation was performed
+ * (RB10; record `battled-needs-calc`)? What "at the end of the Damage Step, if this card battled" asks. The card is named by its id,
+ * whatever happened to it since: a monster destroyed by that battle is in the Graveyard (or banished) at the end of the Damage Step,
+ * and its effect is then activated there (Konami's Japanese notes on Blue-Eyes Tyrant Dragon, OCG only: record
+ * `end-of-damage-step-where`). `false` once the attack is over.
+ */
+export function battledNow(duel: Duel, id: number): boolean {
+	const battle = duel.battle;
+	return battle?.fought === true && (battle.attacker.id === id || battle.target?.id === id);
+}
+
+/** "If this card attacked": as `battledNow`, for the attacking monster only. */
+export const attackedNow = (duel: Duel, id: number): boolean => duel.battle?.fought === true && duel.battle.attacker.id === id;
+
+/** Was this card destroyed by the battle in progress (decided at damage calculation; it leaves the field at the end of the Damage Step)? */
+export const destroyedByBattleNow = (duel: Duel, id: number): boolean => duel.battle?.fought === true && duel.battle.destroyed.some((ref) => ref.id === id);
 
 /** At the end of the Damage Step, the monsters destroyed by battle go to the Graveyard, at the same time, if they are still there. */
 function sendDestroyed(duel: Duel): Duel {

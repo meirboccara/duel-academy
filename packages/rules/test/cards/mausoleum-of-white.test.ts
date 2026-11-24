@@ -10,6 +10,8 @@ const fixtures: Record<string, CardDef> = {
 	...blueEyesFixtures,
 	// A Quick-Play Spell: "Target 1 monster on the field; banish it", and one that destroys the Field Spell ("Destroy 1 Field Spell on the field").
 	"fixture-banisher": { code: "fixture-banisher", kind: "quick-play", effects: [{ type: "activation", target: (duel) => [...duel.piles.you.monster, ...duel.piles.rival.monster], operation: (duel, link) => targetsOf(duel, link).reduce((board, target) => moveCard(board, target.id, { zone: "banished", effect: link }), duel) }] },
+	// "Your opponent cannot banish cards from your GY."
+	"fixture-warden": { code: "fixture-warden", kind: "monster", facts: { name: "Test Warden", level: 4, atk: 0, def: 0 }, effects: [{ type: "continuous", modifies: (_duel, source) => [{ kind: "lock", what: "banish-from-graveyard", who: source.controller, banisher: "opponent" }] }] },
 	"fixture-field-breaker": { code: "fixture-field-breaker", kind: "quick-play", effects: [{ type: "activation", operation: (duel, link) => { const id = [...duel.piles.you.field, ...duel.piles.rival.field][0]; return id === undefined ? duel : destroyCard(duel, id, { destruction: effectDestruction(link) }); } }] },
 };
 // The made-up Normal Summon permits of the rules tests (a second effect that gives an additional Normal Summon) beside the real cards.
@@ -154,5 +156,10 @@ describe("Mausoleum of White, written as effect records", () => {
 		// Not without one in the Deck, not in the opponent's turn (in the hand it is the Field Spell's own activation, not this effect).
 		expect(activations(board({ graveyard: [card], deck: ["fixture-roar"] }))).toEqual([]);
 		expect(activations(board({ graveyard: [card], deck: ["fixture-burst-stream"] }, {}, {}, "rival"))).toEqual([]);
+	});
+	it("its owner banishes it as the cost, which \"your opponent cannot banish cards from your GY\" does not stop", () => {
+		const start = board({ graveyard: [card], monsters: ["fixture-warden"], deck: ["fixture-burst-stream"] });
+		expect(activations(start)).toEqual([`activate ${card}`]);
+		expect(codes(play(start, `activate ${card}`), "you", "banished")).toEqual([card]);
 	});
 });

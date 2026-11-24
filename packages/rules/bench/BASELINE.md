@@ -416,3 +416,22 @@ After the review fixes of this slice (2026-11-24; `procedureWays` is asked once 
 for a card with no contact Fusion beside another way; one more comparison in `inFieldRange`), one run read in full: crowdedHand
 `legalActions` 0.0029 ms, list + `act` 0.0601 ms, today's engine 1.162 ms (**19.3×**); opening 0.0190 / 0.834 ms, midgame
 0.0485 / 3.338 ms. Same machine, not quiet; no claim finer than "still above the 10× floor".
+
+
+## Blue-Eyes mechanic gaps (2026-11-24)
+
+What this slice adds to the listing and to a move: one more branch in `activationWays` for a cost chosen one card at a time (none of the reference
+boards has one), a lookup of the `leaves` layer per move that leaves the field (answered at once while no modifier and no continuous card
+exists: `layerKindsNow`), a note per Summon and per draw by effect, and the turn's activations read for an `oath` only when some card of the
+Duel has one (a per-`defs` cache).
+
+`npx vitest bench --run bench/legal-moves.bench.ts`, one run read in full, same machine, not quiet (means):
+
+| Position | `legalActions` | list + `act` | today's engine | list + `act` speed-up |
+|---|---:|---:|---:|---:|
+| opening | 0.0007 ms | 0.0178 ms | 0.788 ms | 44× |
+| midgame | 0.0027 ms | 0.0457 ms | 3.240 ms | 71× |
+| crowdedHand | 0.0024 ms | 0.0605 ms | 1.017 ms | **16.8×** |
+
+crowdedHand list + `act` stays above the 10× floor. No side-by-side run against the committed sources was made for this slice: the
+figures are within the range of the earlier runs on this machine (0.057 to 0.092 ms), with no claim finer than that.

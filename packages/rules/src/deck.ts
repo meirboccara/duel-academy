@@ -124,9 +124,18 @@ export function askBottomOrder(duel: Duel, player: Side, ids: readonly number[],
 export function drawCards(duel: Duel, side: Side, count: number): Duel {
 	if (count <= 0 || drawLocked(duel, side)) return duel;
 	const deck = duel.piles[side].deck;
-	const drawn = moveCards(duel, deck.slice(0, count), { zone: "hand" });
+	const moved = moveCards(duel, deck.slice(0, count), { zone: "hand" });
+	// The turn remembers that this player drew by a card effect (`drewByEffect`), once a card really came to the hand.
+	const drawn = moved.piles[side].deck.length < deck.length && !moved.drewByEffect.includes(side) ? { ...moved, drewByEffect: [...moved.drewByEffect, side] } : moved;
 	return deck.length < count ? lose(drawn, side) : drawn;
 }
+
+/**
+ * Has this player drawn a card by a card effect this turn (`drawCards`)? What "You cannot draw cards by card effects the turn you
+ * activate this card" asks before the card is activated (Konami's Japanese notes on Pot of Prosperity, OCG only: record
+ * `oath-not-after-a-draw`). The normal draw of the Draw Phase is not a draw by a card effect.
+ */
+export const drewByEffect = (duel: Duel, side: Side): boolean => duel.drewByEffect.includes(side);
 
 /** The cards of a player's Deck, from the top (a convenience over `cardsIn`). */
 export const deckCards = (duel: Duel, side: Side): CardInstance[] => cardsIn(duel, side, "deck");

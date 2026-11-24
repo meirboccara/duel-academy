@@ -1,7 +1,7 @@
 import type { CardDef, Declaration, Operation, SpellSpeed } from "./effects";
 import { type GameEvent, raiseEvent, type Waiting } from "./events";
 import { NOTHING_USED, type Used } from "./once";
-import { banishLocked, type EffectSource, locked, type Modifier, spareDestruction, unaffectedBy } from "./modifiers";
+import { banishLocked, type EffectSource, leavesFieldTo, locked, type Modifier, spareDestruction, unaffectedBy } from "./modifiers";
 import type { Delayed, Watch } from "./delayed";
 import type { Building } from "./triggers";
 import { createRng } from "./rng";
@@ -116,6 +116,8 @@ export interface Link {
 	readonly declared?: Declaration;
 	/** Coupled targets (`EffectRecord.targetGroups`): how many of `targets` each group took, in order. */
 	readonly targetGroups?: readonly number[];
+	/** A Trigger Effect: the events that triggered it (`EffectContext.triggered`), frozen when it was put on the chain. */
+	readonly triggered?: readonly GameEvent[];
 	/**
 	 * "That effect becomes '...'" (`replaceEffect`, src/chain.ts): what this link does when it resolves, instead of its card's own
 	 * operation, and the effect that replaced it. Everything else of the link stands (its player, cost, once-per-turn use, targets).
@@ -218,6 +220,10 @@ export interface Duel {
 	readonly spared: readonly string[];
 	/** The cards and effects activated this turn, negated or not, in order ("the turn you activate this effect, ..."). */
 	readonly activations: readonly Activation[];
+	/** The players who drew a card by a card effect this turn (`drawCards`, `drewByEffect` in src/deck.ts). */
+	readonly drewByEffect: readonly Side[];
+	/** The Summons that succeeded this turn and during the turn before, in order (`summonedCount`, src/summon.ts). */
+	readonly summons: readonly SummonNote[];
 	/** How many groups of simultaneous moves (`moveCards`) have happened: the last one's number tags its events. */
 	readonly batches: number;
 	/** What each card code does, as effect records (src/effects.ts): shared by reference, never copied, never changed. */
@@ -229,6 +235,16 @@ export interface Activation {
 	readonly player: Side;
 	readonly card: CardInstance;
 	readonly effect: number;
+	/** Its activation was negated (`negateActivation`): what it swore for the turn (`EffectRecord.oath`) no longer holds. */
+	readonly negated?: true;
+}
+
+/** One Summon that succeeded: in which turn, who Summoned, how, and where the monster came from. Kept for that turn and the next. */
+export interface SummonNote {
+	readonly turn: number;
+	readonly player: Side;
+	readonly how: "normal" | "flip" | "special";
+	readonly from: Zone;
 }
 
 /** A card as it was: its id and its `moves` then. It is still that card while its `moves` has not changed. */
@@ -267,6 +283,8 @@ export interface Battle {
 	readonly destroyed: readonly CardRef[];
 	/** The attack target flipped face-up before damage calculation: its "when flipped" effects wait until after it. */
 	readonly flipped: CardRef | null;
+	/** Damage calculation was performed: the attacker (and its target) "battled" (RB10). Absent until then, and for an attack that ended without it. */
+	readonly fought?: true;
 }
 
 /** The Summon in progress: it has been attempted and has not succeeded yet (step 5). The monster stays where it was, not on the field (a monster being Flip Summoned is on the field, face-down). */
@@ -436,6 +454,8 @@ export function createDuel(setup: DuelSetup): Duel {
 		watches: [],
 		spared: [],
 		activations: [],
+		drewByEffect: [],
+		summons: [],
 		batches: 0,
 		defs: setup.defs ?? {},
 	};
@@ -493,8 +513,11 @@ export type MoveReason = "destroyed" | "tributed" | "material";
  * `effect`: the move is done by this card effect (pass the resolving link): a card that is unaffected by it does not move (src/modifiers.ts).
  * A cost, a Summon procedure or a rule of the game passes none, and is never stopped by a protection.
  * `equippedTo` (step 11): the card arrives face-up in a Spell & Trap Zone as an Equip Card of that monster (`equipMonster`, src/equips.ts).
+ * `player`: who does a move that is not an effect's (the player who pays a cost, or performs a Summon procedure). Only a banishment
+ * from a Graveyard reads it today ("your opponent cannot banish cards from your GY"): one that names neither an effect nor a player
+ * is stopped by such a lock (`banishLocked`, src/modifiers.ts).
  */
-type MoveTo = { destruction?: Destruction; effect?: EffectSource; zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: MoveReason; usedFor?: SummonKind; by?: "battle"; position?: Position; slot?: number; attachedTo?: number; equippedTo?: number };
+type MoveTo = { destruction?: Destruction; effect?: EffectSource; player?: Side; zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: MoveReason; usedFor?: SummonKind; by?: "battle"; position?: Position; slot?: number; attachedTo?: number; equippedTo?: number };
 
 /**
  * Destroys a card: it goes to the Graveyard and the move says it was destroyed (`moved.reason`), which "when destroyed" triggers
@@ -558,7 +581,7 @@ function stays(duel: Duel, id: number, to: MoveTo): Duel | null {
 	const before = instance(duel, id);
 	if (before.zone === "deck" && to.zone === "hand" && locked(duel, "add-to-hand", before.owner)) return duel;
 	// "Cannot be banished from the GY", and a card unaffected by the effect that would move it: the move is not done.
-	if (before.zone === "graveyard" && to.zone === "banished" && banishLocked(duel, before)) return duel;
+	if (before.zone === "graveyard" && to.zone === "banished" && banishLocked(duel, before, to.effect?.player ?? to.player)) return duel;
 	if (to.effect && unaffectedBy(duel, id, to.effect)) return duel;
 	// Destruction by a card effect asks the protection layer; a cost, battle (decided in src/battle.ts) and the game's rules do not.
 	if (to.destruction?.cause === "effect" && !to.negated) return spareDestruction(duel, id, "effect", { card: to.destruction.source, player: to.destruction.player, effect: to.destruction.effect });
@@ -573,9 +596,13 @@ function relocate(duel: Duel, id: number, to: MoveTo, batch: number | undefined,
 	// RB10: a Pendulum Monster Card on the field that would be sent to the Graveyard is placed face-up on its owner's Extra Deck instead.
 	// A card whose activation was negated was never on the field (record `negated-card-not-from-field`): it goes to the Graveyard.
 	const pendulumOut = to.zone === "graveyard" && !to.negated && isOnField(before.zone) && duel.defs[before.code]?.facts?.pendulum !== undefined;
-	const zone = pendulumOut ? "extra" : before.extraDeck && (to.zone === "deck" || to.zone === "hand") ? "extra" : to.zone;
+	const sentTo = pendulumOut ? "extra" : before.extraDeck && (to.zone === "deck" || to.zone === "hand") ? "extra" : to.zone;
+	// "Banish it when it leaves the field" (`banishWhenItLeaves`): leaving the field for the Graveyard, the hand, the Deck or the Extra
+	// Deck, the card is banished instead, face-up. Becoming an Xyz Material is not replaced (see `banishWhenItLeaves`).
+	const banishedInstead = isOnField(before.zone) && !isOnField(sentTo) && sentTo !== "banished" && sentTo !== "material" && leavesFieldTo(duel, before) === "banished";
+	const zone = banishedInstead ? "banished" : sentTo;
 	const controller = isOnField(zone) ? (to.controller ?? before.controller) : before.owner;
-	const face = pendulumOut ? "up" : (to.face ?? (FACE_DOWN_BY_DEFAULT.has(zone) ? "down" : "up"));
+	const face = pendulumOut || banishedInstead ? "up" : (to.face ?? (FACE_DOWN_BY_DEFAULT.has(zone) ? "down" : "up"));
 	const flippedDown = isOnField(zone) && before.face === "up" && face === "down";
 	const renewed = zone !== before.zone || controller !== before.controller || flippedDown;
 	// A card that comes face-up on the field starts to apply its continuous effects now (a move in the same zone, face-up, does not restart them).
@@ -612,7 +639,12 @@ function relocate(duel: Duel, id: number, to: MoveTo, batch: number | undefined,
 	const placed = place(duel, before, after, to.at ?? "top");
 	const stamped = cameUp ? { ...placed, clock: placed.clock + 1 } : placed;
 	if (!renewed) return stamped;
-	const moved = flippedDown && zone === before.zone && controller === before.controller ? keptThroughFlip(stamped, before.id, before.moves, after.moves) : stamped;
+	// "Banish it when it leaves the field" (`banishWhenItLeaves`) is a state of the card as it was: it is a new card now, which that
+	// modifier can never reach again. It lasts for the rest of the Duel, so it is dropped here: left behind, it would keep every
+	// question about modifiers off its quick answer for the rest of the Duel.
+	const over = (modifier: Modifier): boolean => modifier.layer.kind === "leaves" && typeof modifier.affects !== "function" && modifier.affects.card === id && modifier.affects.moves === before.moves;
+	const current = stamped.modifiers.length > 0 && stamped.modifiers.some(over) ? { ...stamped, modifiers: stamped.modifiers.filter((modifier) => !over(modifier)) } : stamped;
+	const moved = flippedDown && zone === before.zone && controller === before.controller ? keptThroughFlip(current, before.id, before.moves, after.moves) : current;
 	const raised = raise(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}), ...(to.usedFor ? { usedFor: to.usedFor } : {}), ...(to.by ? { by: to.by } : {}), ...(to.reason === "destroyed" ? { destruction: to.destruction! } : {}) });
 	const added = zone === "hand" && before.zone !== "hand" ? raise(raised, { type: "added-to-hand", card: after, from: before.zone, ...(batch === undefined ? {} : { batch }) }) : raised;
 	// RB10: if the equipped monster is destroyed, flipped face-down or removed from the field, its Equip Cards are destroyed.

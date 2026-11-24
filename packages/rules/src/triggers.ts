@@ -2,7 +2,7 @@ import { type Action, PASS, sameAction } from "./action";
 import { activateAction, activateEffect, activationWays } from "./activation";
 import { closedPriority, type Duel, other, type Priority, type Side } from "./duel";
 import { effectOf } from "./effects";
-import type { Waiting } from "./events";
+import type { GameEvent, Waiting } from "./events";
 
 /**
  * Step 3 of docs/rules-core-spec.md: trigger points. After a chain resolves, or after an action that starts no chain,
@@ -46,7 +46,7 @@ function options(duel: Duel, waiting: Waiting): Activate[] {
 	if (card.moves !== waiting.card.moves) return [];
 	// The teaching chain limit stops us asking for optional effects; a mandatory one still goes on, or the card would resolve differently.
 	if (!effect.mandatory && duel.options.chainLimit !== null && duel.chain.length >= duel.options.chainLimit) return [];
-	return activationWays(duel, { player: card.controller, card }, waiting.effect, effect).map((way): Activate => activateAction(card.id, waiting.effect, way));
+	return activationWays(duel, { player: card.controller, card, triggered: waiting.events ?? [waiting.event] }, waiting.effect, effect).map((way): Activate => activateAction(card.id, waiting.effect, way));
 }
 
 /** An "each time" effect waiting twice offers the same action twice: show it once, it will be offered again. */
@@ -62,17 +62,32 @@ function candidatesInStage(duel: Duel, building: Building): Waiting[] {
 
 /** Puts what is waiting on a chain, or gives priority to `after` when nothing can be activated. */
 export function triggerPoint(duel: Duel, after: Priority): Duel {
-	const seen = new Set<string>();
-	// Only occurrences whose card has not moved since can activate; a stale earlier one must not hide a valid later one.
-	const remaining = duel.waiting.filter((waiting) => {
-		if (duel.cards[waiting.card.id]!.moves !== waiting.card.moves) return false;
+	/** Per activation that will be offered: every event it stands for (its own, then those folded into it). */
+	const seen = new Map<string, GameEvent[]>();
+	const keyOf = (waiting: Waiting): string | null => {
 		// An "each time" effect counts occurrences: cards moved at the same time (one batch) are one occurrence.
 		const batch = waiting.event.type === "moved" ? waiting.event.batch : undefined;
-		if (effectOf(duel, waiting).each && batch === undefined) return true;
-		const key = `${waiting.card.id}:${waiting.effect}${effectOf(duel, waiting).each ? `:batch ${batch}` : ""}`;
-		if (seen.has(key)) return false;
-		seen.add(key);
+		const each = effectOf(duel, waiting).each;
+		return each && batch === undefined ? null : `${waiting.card.id}:${waiting.effect}${each ? `:batch ${batch}` : ""}`;
+	};
+	// Only occurrences whose card has not moved since can activate; a stale earlier one must not hide a valid later one.
+	const kept = duel.waiting.filter((waiting) => {
+		if (duel.cards[waiting.card.id]!.moves !== waiting.card.moves) return false;
+		const key = keyOf(waiting);
+		if (key === null) return true;
+		const events = seen.get(key);
+		if (events) {
+			events.push(waiting.event);
+			return false;
+		}
+		seen.set(key, [waiting.event]);
 		return true;
+	});
+	// What triggered each one (`EffectContext.triggered`): its event, and those that met the same condition with it.
+	const remaining = seen.size === 0 ? kept : kept.map((waiting): Waiting => {
+		const key = keyOf(waiting);
+		const events = key === null ? undefined : seen.get(key);
+		return events && events.length > 1 ? { ...waiting, events } : waiting;
 	});
 	const cleared = { ...duel, waiting: [] };
 	if (remaining.length === 0) return { ...cleared, priority: after };
@@ -108,8 +123,11 @@ function finish(duel: Duel): Duel {
 
 function add(duel: Duel, action: Activate): Duel {
 	const building = duel.building!;
-	const waiting = building.remaining.find((entry) => entry.card.id === action.card && entry.effect === action.effect)!;
-	const next = activateEffect(duel, waiting.card.controller, duel.cards[action.card]!, action.effect, { paid: action.paid ?? [], targets: action.targets, ...(action.mode === undefined ? {} : { mode: action.mode }), ...(action.declared === undefined ? {} : { declared: action.declared }), ...(action.groups === undefined ? {} : { groups: action.groups }) }, false);
+	// An "each time" effect waits once per occurrence, each with its own events (and so its own costs and targets): the entry
+	// activated is the one that offers this action, not the first of that card and effect. With one entry there is nothing to tell apart.
+	const same = candidatesInStage(duel, building).filter((entry) => entry.card.id === action.card && entry.effect === action.effect);
+	const waiting = (same.length > 1 ? same.find((entry) => options(duel, entry).some((offered) => sameAction(offered, action))) : undefined) ?? same[0]!;
+	const next = activateEffect(duel, waiting.card.controller, duel.cards[action.card]!, action.effect, { paid: action.paid ?? [], targets: action.targets, ...(action.mode === undefined ? {} : { mode: action.mode }), ...(action.declared === undefined ? {} : { declared: action.declared }), ...(action.groups === undefined ? {} : { groups: action.groups }) }, false, waiting.events ?? [waiting.event]);
 	const remaining = building.remaining.filter((entry) => entry !== waiting);
 	return { ...next, building: { ...building, remaining, anyActivated: true } };
 }

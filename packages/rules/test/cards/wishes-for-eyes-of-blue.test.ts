@@ -37,6 +37,8 @@ const all: CardDef[] = [
 	{ code: "test-counter", kind: "counter-trap", effects: [{ type: "activation", condition: (duel) => duel.chain.length > 0, operation: (duel, link, index) => negateActivationAndDestroy(duel, index - 1, effectDestruction(link)) }] },
 	{ code: "test-effect-negator", kind: "trap", effects: [{ type: "activation", condition: (duel) => duel.chain.length > 0, operation: (duel, _link, index) => negateEffect(duel, index - 1) }] },
 	{ code: "test-banisher", kind: "quick-play", effects: [{ type: "activation", target: (duel) => [...duel.piles.you.monster, ...duel.piles.rival.monster], operation: (duel, link) => targetsOf(duel, link).reduce((board, target) => moveCard(board, target.id, { zone: "banished", effect: link }), duel) }] },
+	// "Your opponent cannot banish cards from your GY."
+	{ code: "test-warden", kind: "monster", facts: { name: "Test Warden", level: 4, atk: 0, def: 0 }, effects: [{ type: "continuous", modifies: (_duel, source) => [{ kind: "lock", what: "banish-from-graveyard", who: source.controller, banisher: "opponent" }] }] },
 	{ code: "test-archetype-spell", kind: "spell", facts: { name: "Test Archetype Spell", archetypes: ["Blue-Eyes"] }, effects: [{ type: "activation", condition: () => false, operation: inert }] },
 ];
 const defs: Record<string, CardDef> = Object.fromEntries(all.map((def) => [def.code, def]));
@@ -109,6 +111,10 @@ describe("Wishes for Eyes of Blue, written as effect records", () => {
 		// It lasts while the card stays equipped, not "until the end of this turn".
 		expect(atk({ ...done, turn: { ...done.turn, number: done.turn.number + 2 } }, dragon)).toBe(3400);
 		// No target, no "Blue-Eyes" monster in the Extra Deck, or no free Spell & Trap Zone (the last: YGOProJudge lead): it cannot be activated.
+		// Its owner banishes it as the cost, which "your opponent cannot banish cards from your GY" does not stop.
+		const warded = board({ graveyard: [card], monsters: ["test-bewd", "test-warden"], extra: ["test-blue-eyes-fusion"] });
+		expect(activations(warded)).toEqual([`activate ${card} > test-bewd`]);
+		expect(codes(play(warded, `activate ${card} > test-bewd`), "you", "banished")).toEqual([card]);
 		expect(activations(board({ graveyard: [card], monsters: ["test-other-dragon"], extra: ["test-blue-eyes-fusion"] }))).toEqual([]);
 		expect(activations(board({ graveyard: [card], monsters: ["test-bewd"], extra: ["test-other-fusion"] }))).toEqual([]);
 		expect(activations(board({ graveyard: [card], monsters: ["test-bewd"], set: ["test-roar", "test-roar", "test-roar", "test-roar", "test-roar"], extra: ["test-blue-eyes-fusion"] }))).toEqual([]);

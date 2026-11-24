@@ -33,7 +33,9 @@ export function actionName(duel: Duel, action: Action): string {
 			const declared = action.declared === undefined ? "" : ` =${action.declared.value}`;
 			// Coupled targets: "{1,1}" names how many targets go to each group.
 			const groups = action.groups === undefined ? "" : ` {${action.groups.join(",")}}`;
-			return `activate ${code}${effect}${mode}${declared}${paid}${action.targets.map((id) => ` > ${codeOf(duel, id)}`).join("")}${groups}`;
+			// A cost whose cards are chosen afterwards, one at a time: "x3" names how many.
+			const pay = action.pay === undefined ? "" : ` x${action.pay}`;
+			return `activate ${code}${effect}${mode}${declared}${pay}${paid}${action.targets.map((id) => ` > ${codeOf(duel, id)}`).join("")}${groups}`;
 		}
 		default:
 			return `${action.type} ${codeOf(duel, action.card)}`;

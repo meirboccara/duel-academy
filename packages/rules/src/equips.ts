@@ -52,7 +52,7 @@ export interface EquipOptions {
 }
 
 /** What an Equip Card may be given to do to its monster: anything but the layers about players (locks, permissions) and control. */
-export type EquipLayer = Exclude<Layer, { kind: "lock" | "permit" | "control" }>;
+export type EquipLayer = Exclude<Layer, { kind: "lock" | "permit" | "control" | "damage" }>;
 
 /**
  * An effect equips the monster card `id` to the monster `monsterId` ("equip 1 ... monster from your Extra Deck to that monster"): the

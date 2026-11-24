@@ -1,4 +1,4 @@
-import { type CardInstance, closedPriority, destroyCard, type Destruction, type Duel, moveCardHeld, occupant, type Position, type Side, type Summoning, type SummonKind } from "./duel";
+import { type CardInstance, closedPriority, destroyCard, type Destruction, type Duel, moveCardHeld, occupant, type Position, type Side, type Summoning, type SummonKind, type Zone } from "./duel";
 import { breakEffect, dropWhen, type GameEvent, raiseEvent } from "./events";
 import { triggerPoint } from "./triggers";
 import { summonZones } from "./zones";
@@ -100,6 +100,9 @@ export function landSummon(duel: Duel, summoning: Summoning, by?: "effect"): Due
 		next = mark(placed.duel, id, { proper: placed.duel.cards[id]!.proper || own, summonedBy: summoning.kind ?? null, specialSummoned: summoning.how === "special" });
 		arrivals.push({ id, moved: placed.events, summoned: { type: "summoned", how: summoning.how, ...kind } });
 	}
+	// The turn notes each Summon that succeeded (`summonedCount`): who, how, from where.
+	const notes = arrivals.flatMap((arrival) => (arrival.summoned ? [{ turn: next.turn.number, player: summoning.player, how: arrival.summoned.how, from: arrival.summoned.from ?? "hand" }] : []));
+	if (notes.length > 0) next = { ...next, summons: [...next.summons, ...notes] };
 	// Every monster is in place: now each one's events, in the order of the group.
 	for (const arrival of arrivals) {
 		for (const event of arrival.moved) next = raiseEvent(next, event);
@@ -108,6 +111,19 @@ export function landSummon(duel: Duel, summoning: Summoning, by?: "effect"): Due
 		next = raiseEvent(next, { ...arrival.summoned, card: next.cards[arrival.id]! });
 	}
 	return next;
+}
+
+/**
+ * How many monsters `player` Summoned in turn number `turn` (this turn or the one before: older Summons are forgotten), Summons that
+ * succeeded only, by the player's own Summons and by effects alike. `from`: only monsters that came from that place ("Special
+ * Summoned ... from the Extra Deck"); `how`: only that way of Summoning. A monster that has left since still counts. What "during
+ * the turn, or turn after, your opponent Special Summoned 2 or more monsters from the Extra Deck" asks (Super Starslayer TY-PHON -
+ * Sky Crisis).
+ */
+export function summonedCount(duel: Duel, by: { readonly player: Side; readonly turn: number; readonly from?: Zone; readonly how?: "normal" | "flip" | "special" }): number {
+	let count = 0;
+	for (const note of duel.summons) if (note.player === by.player && note.turn === by.turn && (by.from === undefined || note.from === by.from) && (by.how === undefined || note.how === by.how)) count++;
+	return count;
 }
 
 /** One monster of a Summon, placed: what is raised for it once the whole group is on the field (`landSummon`). */

@@ -1,4 +1,5 @@
-import { activateAction, activateEffect, activationWays, operationOf } from "./activation";
+import { activateAction, activateEffect, activationWays, costChoice, operationOf } from "./activation";
+import { ask } from "./effects";
 import { type Action, PASS, type Placing, sameAction, takes } from "./action";
 import { type CardInstance, closedPriority, destroyCard, type Destruction, type Duel, freeSlots, type Link, moveCard, other, PHASES, type Side } from "./duel";
 import { PENDULUM_SLOTS } from "./zones";
@@ -380,8 +381,26 @@ function set(duel: Duel, id: number, slot: number | undefined): Duel {
 
 function activate(duel: Duel, action: Extract<Action, { type: "activate" }>): Duel {
 	const player = duel.priority.holder;
-	const next = activateEffect(duel, player, duel.cards[action.card]!, action.effect, { paid: action.paid ?? [], targets: action.targets, zone: action.zone, ...(action.mode === undefined ? {} : { mode: action.mode }), ...(action.declared === undefined ? {} : { declared: action.declared }), ...(action.groups === undefined ? {} : { groups: action.groups }) });
-	return { ...next, priority: closedPriority(other(player)) };
+	const way = { targets: action.targets, zone: action.zone, ...(action.mode === undefined ? {} : { mode: action.mode }), ...(action.declared === undefined ? {} : { declared: action.declared }), ...(action.groups === undefined ? {} : { groups: action.groups }) };
+	const activated = (board: Duel, paid: readonly number[]): Duel => {
+		const next = activateEffect(board, player, board.cards[action.card]!, action.effect, { ...way, paid });
+		return { ...next, priority: closedPriority(other(player)) };
+	};
+	const pay = action.pay;
+	if (pay === undefined) return activated(duel, action.paid ?? []);
+	// A cost whose cards are chosen one at a time (`CostSpec.choose`): the player picks them now; the card or effect is activated, and
+	// the cost paid, once they are all chosen. Nothing has happened until then: the opponent answers the activation, not the choice.
+	// Each card offered can still be paid with, around the targets the action names (`costChoice`): no pick leads to a payment or a
+	// target that the activation would refuse. When the cards left are exactly those still needed, they are taken without asking.
+	const choose = (board: Duel, chosen: readonly number[]): Duel => {
+		if (chosen.length === pay) return activated(board, chosen);
+		const card = board.cards[action.card]!;
+		const from = costChoice(board, player, card, action.effect, { ...way, paid: chosen, pay }, chosen);
+		if (from.length < pay - chosen.length) throw new Error(`${card.code}: its cost cannot be paid with ${pay} cards`);
+		if (from.length === pay - chosen.length) return activated(board, [...chosen, ...from]);
+		return ask(board, player, from, (next, picked) => choose(next, [...chosen, picked]));
+	};
+	return resumeAfter(choose(duel, []), unchanged);
 }
 
 function pass(duel: Duel): Duel {
@@ -529,7 +548,7 @@ function nextPhase(duel: Duel): Duel {
 	}
 	const player: Side = other(duel.turn.player);
 	const turn = { player, number: duel.turn.number + 1, phase: PHASES[0]! };
-	const fresh = expireDelayed({ ...moved, turn, setThisTurn: [], normalSummoned: false, attacked: moved.attacked.length === 0 ? moved.attacked : [], replay: null, again: null, extraNormalSummoned: false, repositioned: [], pendulumSummoned: false, spared: moved.spared.length === 0 ? moved.spared : [], activations: moved.activations.length === 0 ? moved.activations : [] });
+	const fresh = expireDelayed({ ...moved, turn, setThisTurn: [], normalSummoned: false, attacked: moved.attacked.length === 0 ? moved.attacked : [], replay: null, again: null, extraNormalSummoned: false, repositioned: [], pendulumSummoned: false, spared: moved.spared.length === 0 ? moved.spared : [], activations: moved.activations.length === 0 ? moved.activations : [], drewByEffect: moved.drewByEffect.length === 0 ? moved.drewByEffect : [], summons: moved.summons.some((note) => note.turn < duel.turn.number) ? moved.summons.filter((note) => note.turn >= duel.turn.number) : moved.summons });
 	return triggerPoint(raiseEvent(newTurn(withoutEnded(fresh, duel.turn.number)), { type: "phase", phase: turn.phase, player }), { holder: player, passed: [], open: true });
 }
 
@@ -557,7 +576,21 @@ export function negateActivation(duel: Duel, index: number): Duel {
 	// "Cannot be negated" is read now, when the negating effect resolves (record `cannot-be-negated-checked-at-resolution`).
 	if (link && (immune(duel, link, "activation") || shielded(duel, link))) return duel;
 	const flagged = flag(duel, index, { activationNegated: true });
-	return link ? refund(flagged, link, effectOf(duel, link)) : flagged;
+	return link ? refund(forsworn(flagged, link), link, effectOf(duel, link)) : flagged;
+}
+
+/**
+ * The activation of `link` was negated: the turn's note of it says so (`Activation.negated`), and what the card swore for the turn
+ * when activated (`EffectRecord.oath`) no longer holds. Only for a card with such a restriction: the other notes stay as they are.
+ */
+function forsworn(duel: Duel, link: Link): Duel {
+	if (!effectOf(duel, link).oath) return duel;
+	let at = -1;
+	for (let i = duel.activations.length - 1; i >= 0 && at < 0; i--) {
+		const noted = duel.activations[i]!;
+		if (!noted.negated && noted.card.id === link.card.id && noted.card.moves === link.card.moves && noted.effect === link.effect) at = i;
+	}
+	return at < 0 ? duel : { ...duel, activations: duel.activations.map((noted, i) => (i === at ? { ...noted, negated: true as const } : noted)) };
 }
 
 /** Negates the effect of the link at `index`: the activation stands, the effect is not applied. */

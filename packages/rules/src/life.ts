@@ -1,4 +1,5 @@
 import type { Duel, Side } from "./duel";
+import { damageHalved } from "./modifiers";
 
 /** Pays Life Points as a cost: the duel with them paid, or `null` when the player has fewer than that. */
 export function payLp(duel: Duel, side: Side, amount: number): Duel | null {
@@ -14,12 +15,20 @@ export function payHalfLp(duel: Duel, side: Side): Duel | null {
 }
 
 /**
- * Loses Life Points (battle damage, an effect's damage): never below 0. A player at 0 LP loses; both at 0 at the same time is a draw
+ * The damage `side` really takes for `amount` of battle or effect damage, once what changes damage applies: half of it while "any
+ * damage [that player] takes is halved" (the `damage` layer, src/modifiers.ts), halved once however many such effects apply (Konami's
+ * Japanese Q&A fid 23511 on Pot of Prosperity, OCG only: record `damage-halved-does-not-stack`). Half of an odd amount is rounded up
+ * (the core's reading: no page read). `loseLp` applies it; a caller that reports the damage (the `battle-damage` event) reads it here.
+ */
+export const damageFor = (duel: Duel, side: Side, amount: number): number => (amount > 0 && damageHalved(duel, side) ? Math.ceil(amount / 2) : amount);
+
+/**
+ * Loses Life Points (battle damage, an effect's damage, as changed by `damageFor`): never below 0. A player at 0 LP loses; both at 0 at the same time is a draw
  * (RB10, record `lp-zero-wins-both-draw`). `winner` is set once and never changed afterwards.
  */
 export function loseLp(duel: Duel, side: Side, amount: number): Duel {
 	if (amount <= 0) return duel;
-	const lp = { ...duel.lp, [side]: Math.max(0, duel.lp[side] - amount) };
+	const lp = { ...duel.lp, [side]: Math.max(0, duel.lp[side] - damageFor(duel, side, amount)) };
 	return { ...duel, lp, winner: duel.winner ?? winnerOf(lp) };
 }
 

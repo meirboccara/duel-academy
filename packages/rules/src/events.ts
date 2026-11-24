@@ -1,4 +1,4 @@
-import type { CardInstance, Destruction, DamageStep, Duel, MoveReason, Phase, Position, Side, SummonKind, Zone } from "./duel";
+import { type CardInstance, type Destruction, type DamageStep, type Duel, isOnField, type MoveReason, type Phase, type Position, type Side, type SummonKind, type Zone } from "./duel";
 import { type CardDef, effectOf, inFieldRange, rangeOf } from "./effects";
 import { runWatches } from "./delayed";
 
@@ -46,6 +46,11 @@ export interface Waiting {
 	/** The index of the trigger effect in the card's effects. */
 	readonly effect: number;
 	readonly event: GameEvent;
+	/**
+	 * At a trigger point: every event this one activation stands for (`EffectContext.triggered`): `event` and the others that met the
+	 * same effect's condition (for an "each time" effect, those of the same batch). Absent while it waits.
+	 */
+	readonly events?: readonly GameEvent[];
 }
 
 interface Listening {
@@ -110,11 +115,23 @@ function noteEvent(duel: Duel, event: GameEvent): Duel {
 			for (let index = 0; index < effects.length; index++) {
 				const effect = effects[index]!;
 				if (effect.type !== "trigger" || !placedFor(duel.defs[card.code], card, rangeOf(effect)) || !effect.event?.(duel, event, { player: card.controller, card })) continue;
+				if (arrivedWith(duel, card, event)) continue;
 				waiting = [...waiting, { card, effect: index, event }];
 			}
 		}
 	}
 	return { ...duel, live: [...duel.live, event], waiting };
+}
+
+/**
+ * Did the card come to where it is at the same time as what happened to another card (one `batch` of `moveCards`)? It was not there
+ * yet: an effect that triggers from the hand, the Graveyard or banishment "if [another card] is sent ..." is not triggered by a card
+ * sent together with it (Konami's Japanese notes on Deep-Eyes White Dragon, the Blue Abyss, OCG only: record
+ * `trigger-from-gy-needs-card-there-first`). The card's own move still triggers its own effects.
+ */
+function arrivedWith(duel: Duel, card: CardInstance, event: GameEvent): boolean {
+	if (event.type !== "moved" || event.batch === undefined || event.after.id === card.id || isOnField(card.zone)) return false;
+	return duel.live.some((earlier) => earlier.type === "moved" && earlier.batch === event.batch && earlier.after.id === card.id && earlier.after.moves === card.moves);
 }
 
 /** Mandatory triggers and "if" triggers stay for the next trigger point, however much happens before it. */

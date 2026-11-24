@@ -148,7 +148,8 @@ export function label(duel: Duel, action: Action): string {
 	const mode = action.mode === undefined ? "" : ` :${action.mode}`;
 	const declared = action.declared === undefined ? "" : ` =${action.declared.value}`;
 	const groups = action.groups === undefined ? "" : ` {${action.groups.join(",")}}`;
-	return `activate ${code}${mode}${declared}${(action.paid ?? []).map((card) => ` ~ ${duel.cards[card]!.code}`).join("")}${action.targets.map((target) => ` > ${duel.cards[target]!.code}`).join("")}${groups}`;
+	const pay = action.pay === undefined ? "" : ` x${action.pay}`;
+	return `activate ${code}${mode}${declared}${pay}${(action.paid ?? []).map((card) => ` ~ ${duel.cards[card]!.code}`).join("")}${action.targets.map((target) => ` > ${duel.cards[target]!.code}`).join("")}${groups}`;
 }
 export const offered = (duel: Duel) => legalActions(duel).map((action) => label(duel, action)).sort();
 

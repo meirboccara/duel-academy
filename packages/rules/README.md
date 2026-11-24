@@ -947,3 +947,85 @@ Known limits of this batch (what the tests do not prove):
   becomes "Blue-Eyes White Dragon" on the field and in the GY) is not modelled; effective name changes are not.
 - The Spell/Trap activation lock used in the Maiden test and the Damage Step Quick-Play Spells are made-up cards; the Damage Step windows come from
   the existing battle model.
+
+Mechanic gaps of the exact Blue-Eyes list (2026-11-24; audit in [docs/rules-core/blue-eyes-gaps.md](../../docs/rules-core/blue-eyes-gaps.md);
+mechanics only, no real card written; tests in `test/rules/{trigger-events,leave-field-banish,activation-oath,set-by-effect,negate-spell-on-field,
+fusion-including,damage-halved,chosen-cost,end-of-damage-step,extra-deck-gaps,summon-history}.test.ts` with the made-up cards of
+`test/rules/blue-eyes-gap-fixtures.ts` (every code starts with `fixture-`); records in `src/blue-eyes-gap-sources.ts`):
+- **A Trigger Effect knows what triggered it**: `EffectContext.triggered` (for its condition, cost and targets) and `Link.triggered`
+  (for its operation) hold the events that met its condition at the trigger point: all of them for an effect that activates once
+  ("If ... is sent to your GY: You can target 1 of them"), those of one batch for an "each time" effect. A card that came to the hand,
+  the Graveyard or banishment in the same batch as another card's move is not triggered by that move (it was not there yet).
+- **"Banish it when it leaves the field"**: `banishWhenItLeaves(duel, id, by?)`, a `leaves` layer on the card as it is: leaving the
+  field for the Graveyard, the hand, the Deck or the Extra Deck, by anything, it is banished face-up instead (the `moved` event keeps
+  its reason). Over once the card is no longer that card (turned face-down). Not applied when it becomes an Xyz Material.
+  `Modifier.own`: a lasting modifier that is the card's own effect on itself stops while that card's effects are negated.
+- **"The turn you activate this card"**: `EffectRecord.oath` gives locks that hold from the activation to the end of the turn, read
+  from `Duel.activations` (nothing has to resolve); `negateActivation` lifts them (`Activation.negated`), a negated effect does not.
+  `drewByEffect(duel, side)` (`Duel.drewByEffect`, set by `drawCards`) is the other half: "not in a turn you already drew by a card
+  effect".
+- **Setting a Spell or Trap by an effect** (`src/set.ts`): `setByEffect(duel, player, id, { slot?, effect? })`, `askSetByEffect`
+  (the player chooses the zone), `canSetByEffect`, `setZones`: from a Deck, a hand, a Graveyard or banishment, face-down in a Spell &
+  Trap Zone of the player (a Field Spell in the Field Zone, replacing the one there), noted in `setThisTurn` (a Trap or a Quick-Play
+  Spell cannot be activated that turn).
+- **Negating a face-up Spell or Trap**: `negateCardEffects` reaches any face-up card on the field, and returns the Duel given when
+  nothing was negated (what "and if you do" reads).
+- **A Fusion Summon whose effect asks for a material**: `FusionOptions.check` ("including a "Blue-Eyes" monster").
+- **Halved damage**: the `damage` layer (`{ kind: "damage", who, halved: true }`), `damageHalved`, `damageFor(duel, side, amount)`;
+  `loseLp` applies it, and the `battle-damage` event carries the damage really taken. Several halvings halve once.
+- **A cost of several cards chosen one at a time**: `CostSpec.choose` (`from`, `counts`). `legalActions` lists the activation once
+  per count (`Action.pay`, named `x3` by the bot); `act` then asks for the cards (`choose`) and activates once they are chosen. The
+  opponent answers the activation, never the choice.
+- **The end of the Damage Step**: `battledNow(duel, id)`, `attackedNow`, `destroyedByBattleNow` (`Battle.fought`: damage calculation
+  was performed), by card id so that a monster destroyed by that battle can activate from the Graveyard or from banishment.
+- **Smaller additions**: `targetCount` may be a function of the board; `fromActivated` for "unaffected by ... activated effects";
+  a `banish-from-graveyard` lock with `banisher: "opponent"` (`banishLocked` and `canBeBanished` take the banishing player);
+  `summon.onlyByOwnProcedure` ("Must be Synchro Summoned"); `Duel.summons` / `summonedCount` (the Summons of this turn and the last);
+  `ifYouDo` on an Xyz alternative ("If you do, you cannot Normal or Special Summon for the rest of this turn").
+- Bot: one new mark on `activate` (`pay`) with its name; `viewFor` masks hidden cards inside `Link.triggered`; the new Duel fields
+  (`drewByEffect`, `summons`, `Activation.negated`, `Battle.fought`) are public and kept by a view and its re-dealt worlds.
+- Speed (`bench/BASELINE.md`, last section): crowdedHand list + `act` 0.0605 ms against 1.0165 ms for today's engine (16.8×).
+
+Sources of this slice (read 2026-11-24): Konami's TCG card texts of the 22 cards of the audit; Konami's Japanese notes (OCG only) on
+Deep-Eyes White Dragon, the Blue Abyss, Dominus Purge, Pot of Prosperity, Primite Drillbeam and Blue-Eyes Tyrant Dragon, and Q&A fids
+23378 and 23511; RB10 on "Leaves the Field", Set cards and Field Spells.
+
+Known limits of this slice (what the tests do not prove):
+- No real card is written. The audit says "ready to script" when every printed clause has a mechanic; each card still owes its
+  identity, French text, its own notes and Q&A, tests and review.
+- **YGOProJudge only** (asked 2026-11-24, three chats, no official source cited): a monster that is banished when it leaves the field
+  is banished instead of returning to the hand or the Deck, and is not banished when it becomes an Xyz Material (RB10 says only that
+  its "leaves the field" effects do not activate); a Normal Trap's effect activated in the GY with no timing stated is Spell Speed 2
+  (nothing in the core depends on it). **A YGOProJudge answer not built**: Primite Drillbeam chained to a Normal Spell would negate
+  that Spell's effect although the card is banished; in the core a lasting negation follows the card as it is, so the link of a card
+  that has left is not negated unless the script negates it.
+- The core's own readings, no page read: half of an odd damage is rounded up; `ifYouDo` applies once the materials are used and
+  stands if the Summon is negated; the Summons noted are those that succeeded, Summons by effects included, and a turn's notes are
+  kept through the next turn only; "Must be Synchro Summoned" also refuses a revival after a proper Summon; a card Set by an effect
+  from the opponent's Deck or Graveyard goes to the field of the player who Sets; `targetCount` as a function is read on the board
+  the cost left; a `banisher: "opponent"` lock stops a banishment from that GY that names nobody (neither `effect` nor `player`
+  on the move, no `by` for `canBeBanished`), the owner's own included: a cost asks `canBeBanished` with its player and moves with
+  `player` (the core's choice for a move with no player, no page read).
+- `EffectContext.triggered` is every matching event since the last trigger point for an effect that activates once, also events of
+  different moments (two cards sent by two links of one chain are both "them"): no page read. `arrivedWith` only looks at cards moved
+  in one `moveCards` batch.
+- `banishWhenItLeaves` replaces the move whatever causes it: a cost worded "send to the GY" is paid by a monster that is banished
+  instead (no page read). "Cards sent to the GY are banished instead" for every card (the pending Q&A of Wishes, Maiden and Mausoleum)
+  is not built: no card of the list has it.
+- `oath` gives locks only, for the turn of the activation. `drewByEffect` notes draws made through `drawCards`; a script that moves a
+  card from the Deck to the hand by hand does not draw.
+- `CostSpec.choose`: a count is listed when some choice of that many candidates pays, with the targets any such choice leaves; each
+  card then offered can still be paid with around the targets named (a target that paying would remove is not offered). Both try up
+  to 1,000 choices of cards per question (`COST_CHOICES_TRIED`, src/activation.ts): past that, a way only later choices allow is not
+  listed (what is listed can always be paid). A cost with targets tries every choice at each listing, so it costs more to list than
+  a cost with none (which stops at the first choice that pays). Not for a Trigger Effect; once the action is taken the player
+  cannot go back.
+- A dead `banishWhenItLeaves` modifier is dropped when its card moves; other lasting modifiers of one card that last FOREVER (the ATK
+  an effect left on it) stay in `Duel.modifiers` after the card moved: they reach nothing, but keep the modifier queries off their
+  quick answer.
+- `setByEffect` does not ask whether the card "can" be Set beyond a zone (a Spell that could never be activated is Set all the same).
+- The Damage Step still lets only Counter Traps and ATK/DEF changes be activated: the negating Quick Effects of this list are not
+  offered there (no Konami page read says they are). "During your Standby Phase: You can ..." is a trigger offered when the phase
+  begins, not later in it.
+- Blue-Eyes Tyrant Dragon's 11 Q&A entries, Pot of Prosperity's entries on a Deck lock (fids 9932, 17846) and the other cards' notes
+  were not opened.

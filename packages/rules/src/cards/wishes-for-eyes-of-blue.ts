@@ -77,7 +77,7 @@ export const WISHES_FOR_EYES_OF_BLUE: CardDef = {
 			type: "ignition",
 			range: "graveyard",
 			once: { scope: "name" },
-			cost: (duel, { card }) => (canBeBanished(duel, card.id) ? moveCard(duel, card.id, { zone: "banished" }) : null),
+			cost: (duel, { player, card }) => (canBeBanished(duel, card.id, player) ? moveCard(duel, card.id, { zone: "banished", player }) : null),
 			target: (duel, { player }) => duel.piles[player].monster.filter((id) => duel.cards[id]!.face === "up" && hasPrintedName(duel, id, BLUE_EYES_WHITE_DRAGON) && blueEyesToEquip(duel, player, id).length > 0),
 			operation: (duel, link) => {
 				const target = targetsOf(duel, link)[0];

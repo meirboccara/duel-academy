@@ -80,7 +80,7 @@ export const MAUSOLEUM_OF_WHITE: CardDef = {
 			categories: ["search"],
 			requiresAddToHand: true,
 			condition: (duel, { player }) => duel.piles[player].deck.some((id) => hasPrintedName(duel, id, BURST_STREAM)),
-			cost: (duel, { card }) => (canBeBanished(duel, card.id) ? moveCard(duel, card.id, { zone: "banished" }) : null),
+			cost: (duel, { player, card }) => (canBeBanished(duel, card.id, player) ? moveCard(duel, card.id, { zone: "banished", player }) : null),
 			operation: (duel, link) =>
 				ask(
 					duel,

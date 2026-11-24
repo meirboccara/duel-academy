@@ -35,6 +35,8 @@ export interface Recipe {
 	readonly check?: MaterialCheck;
 	readonly condition?: (duel: Duel, ctx: MaterialContext) => boolean;
 	readonly transfer?: true;
+	/** "If you do, ...": what performing the Summon this way leaves behind (an Xyz alternative's `ifYouDo`). */
+	readonly ifYouDo?: (duel: Duel, ctx: MaterialContext) => Duel;
 	/** Step 11: a Fusion Monster's other way of being Special Summoned (`FusionAlternative`): what is done with the cards. Never a Fusion Summon. */
 	readonly how?: "tribute";
 }
@@ -99,7 +101,7 @@ function build(def: CardDef, procedure: Procedure): readonly Recipe[] {
 			const rank = def.facts?.rank ?? 0;
 			const { min, max, filter } = procedure.materials ?? { min: 2 };
 			const main: Recipe = { slots: [{ min, max: max ?? min, filter: (duel, card, ctx) => hasLevel(duel, card) && level(duel, card.id) === rank && (!filter || filter(duel, card, ctx)) }], check: procedure.check };
-			return [main, ...(procedure.alternatives ?? []).map((way): Recipe => ({ slots: [counted(way.materials, way.materials.min)], condition: way.condition, transfer: way.transfer }))];
+			return [main, ...(procedure.alternatives ?? []).map((way): Recipe => ({ slots: [counted(way.materials, way.materials.min)], condition: way.condition, transfer: way.transfer, ...(way.ifYouDo ? { ifYouDo: way.ifYouDo } : {}) }))];
 		}
 		case "link":
 			return [{ slots: [counted(procedure.materials, def.facts?.link ?? procedure.materials.min)], check: procedure.check }];
@@ -301,7 +303,12 @@ export function startProcedure(duel: Duel, player: Side, id: number, position: P
 	const spec = narrowed(procedureSpec(duel, player, card)!, way);
 	return askMaterials(duel, player, spec, (board, ids) => {
 		const recipe = existsSet(board, spec, ids, true);
-		return askZone(board, player, zonesAfter(board, player, id, ids), (placed, zone) => beginSummon(useMaterials(placed, id, procedure, ids, recipe), player, id, "special", zone, { position, kind: kindOf(procedure), proper: true }));
+		return askZone(board, player, zonesAfter(board, player, id, ids), (placed, zone) => {
+			const used = useMaterials(placed, id, procedure, ids, recipe);
+			// "If you do, ...": what this way of Summoning leaves behind, from the moment the materials are used.
+			const after = recipe?.ifYouDo ? recipe.ifYouDo(used, spec.ctx) : used;
+			return beginSummon(after, player, id, "special", zone, { position, kind: kindOf(procedure), proper: true });
+		});
 	});
 }
 
@@ -437,6 +444,8 @@ export function canBeRevived(duel: Duel, id: number): boolean {
 	// On the field as a monster nothing is asked. In a Spell & Trap Zone it is a card like one off the field: an Equip Card (step 11; the
 	// core's reading of RB10), and an Extra Deck Pendulum Monster in a Pendulum Zone (YGOProJudge only, asked 2026-11-24, no source cited).
 	if (card.zone === "monster" || card.zone === "field") return true;
+	// "Must be Synchro Summoned": only its own procedure Summons it, wherever it is and whatever happened before.
+	if (duel.defs[card.code]?.summon?.onlyByOwnProcedure) return false;
 	// Face-down in the Extra Deck nothing is asked, unless the card says "Must first be ..." (step 11, `mustFirstBeProper`).
 	if (card.zone === "extra" && card.face === "down") return duel.defs[card.code]?.summon?.mustFirstBeProper !== true;
 	return !hasOwnProcedure(duel.defs[card.code]) || card.proper;
@@ -584,6 +593,11 @@ export interface FusionOptions {
 	readonly monsters?: (duel: Duel, card: CardInstance) => boolean;
 	/** Where the materials go: the Graveyard (default), banished, or shuffled into the Deck (each owner's Deck is shuffled with the Duel's RNG). */
 	readonly to?: "graveyard" | "banished" | "deck";
+	/**
+	 * A rule of the effect over the whole set of materials, beside the Fusion Monster's own: "including a "Blue-Eyes" monster" (Roar of
+	 * the Blue-Eyed Dragons). A set that fails it is not a legal set: it is never offered, and with none the effect cannot be activated.
+	 */
+	readonly check?: (duel: Duel, cards: readonly CardInstance[]) => boolean;
 }
 
 function fusionSpec(duel: Duel, player: Side, card: CardInstance, options: FusionOptions): MaterialSpec {
@@ -591,7 +605,8 @@ function fusionSpec(duel: Duel, player: Side, card: CardInstance, options: Fusio
 	// A Fusion Summon uses the printed Fusion Materials: the card's other ways of being Special Summoned (step 11) are not Fusion Summons.
 	const all = recipesOf(duel.defs[card.code]!);
 	const printed = all.length > 1 ? all.filter((recipe) => recipe.how === undefined) : all;
-	return { ctx: { player, summoned: card }, pool, recipes: printed, valid: (board, ids) => zonesAfter(board, player, card.id, ids).length > 0 };
+	const check = options.check;
+	return { ctx: { player, summoned: card }, pool, recipes: printed, valid: (board, ids) => (!check || check(board, ids.map((id) => board.cards[id]!))) && zonesAfter(board, player, card.id, ids).length > 0 };
 }
 
 /** The Fusion Monsters of the player's Extra Deck that the effect could Fusion Summon now. */
@@ -678,7 +693,7 @@ export function ritualSummon(duel: Duel, player: Side, options: RitualOptions): 
 		askMaterials(board, player, ritualSpec(board, player, board.cards[picked]!, options), (chosen, ids) => {
 			const buried = ids.filter((id) => chosen.cards[id]!.zone === "graveyard");
 			const tributed = tribute(chosen, ids.filter((id) => !buried.includes(id)));
-			return askSpecialSummon(moveCards(tributed, buried, { zone: "banished" }), player, picked, { kind: "ritual" });
+			return askSpecialSummon(moveCards(tributed, buried, { zone: "banished", player }), player, picked, { kind: "ritual" });
 		}),
 	);
 }

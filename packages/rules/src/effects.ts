@@ -1,6 +1,6 @@
-import type { CardInstance, Duel, Link, Position, Side } from "./duel";
+import type { Activation, CardInstance, Duel, Link, Position, Side } from "./duel";
 import type { GameEvent } from "./events";
-import type { Layer } from "./modifiers";
+import type { Layer, LockLayer } from "./modifiers";
 
 /**
  * Step 4 of docs/rules-core-spec.md: effect records. A card is data: a `CardDef` with one `EffectRecord` per printed
@@ -20,6 +20,13 @@ export type SpellSpeed = 1 | 2 | 3;
 export interface EffectContext {
 	readonly player: Side;
 	readonly card: CardInstance;
+	/**
+	 * For a Trigger Effect being put on a chain: the events that met its condition at this trigger point, in order ("If ... is sent to
+	 * your GY: You can target 1 of them": "them" are the cards of these events). For an "each time" effect, the events of the one
+	 * occurrence it is activated for (cards moved at the same time). Absent for anything that is not a trigger. The link keeps them
+	 * (`Link.triggered`) for the operation.
+	 */
+	readonly triggered?: readonly GameEvent[];
 }
 
 /** A card's own reaction to something that happened: a typed event (src/events.ts). */
@@ -92,6 +99,17 @@ export interface CostSpec {
 	readonly can?: (duel: Duel, ctx: EffectContext) => boolean;
 	readonly pick?: (duel: Duel, ctx: EffectContext) => readonly (readonly number[])[];
 	readonly pay: (duel: Duel, ctx: EffectContext, picked: readonly number[]) => Duel | null;
+	/**
+	 * Instead of `pick`, for a cost over many cards of the player's choice ("banish 3 or 6 cards of your choice from your Extra Deck,
+	 * face-down": 5,460 combinations of 15 cards): `from` lists the cards that may be chosen and `counts` how many may be paid. The
+	 * activation is listed once per count that can be paid (`Action.pay`), not once per combination; the player then chooses the cards
+	 * one at a time (`choose`), and only then is the card or effect activated and the cost paid with exactly those cards (`pay`). The
+	 * listing pays choices of `from` in dry runs: a count is listed when one of them pays, with the targets any of them leaves, and
+	 * each card then offered still allows the cost and the targets named (`costChoice`; up to a bound, see `COST_CHOICES_TRIED` in
+	 * src/activation.ts). `from` is read with the card placed (a card activated from the hand is no longer in the hand), as `pay` is.
+	 * Not for a Trigger Effect (a definition error).
+	 */
+	readonly choose?: { readonly from: (duel: Duel, ctx: EffectContext) => readonly number[]; readonly counts: readonly number[] };
 }
 
 export type Cost = ((duel: Duel, ctx: EffectContext) => Duel | null) | CostSpec;
@@ -111,6 +129,12 @@ export type Immunity = boolean | ((duel: Duel, link: Link) => boolean);
  */
 export interface TargetGroup {
 	readonly from: readonly number[];
+	readonly min: number;
+	readonly max: number;
+}
+
+/** How many cards an effect targets: `min` to `max` of its candidates. */
+export interface TargetCount {
 	readonly min: number;
 	readonly max: number;
 }
@@ -221,9 +245,10 @@ export interface EffectRecord {
 	/**
 	 * How many cards are targeted: `{ min: 2, max: 2 }` "target 2 ...", `{ min: 1, max: 2 }` "target up to 2",
 	 * `{ min: 0, max: 1 }` "you can target 1" (the effect may be activated with no target). Default one. Each legal
-	 * combination is its own action, and the choice is checked again after the cost is paid.
+	 * combination is its own action, and the choice is checked again after the cost is paid. A function reads the count on the board
+	 * the cost left ("target Spells/Traps on the field up to the number of Normal Monsters in your GY +1": Lightstorm Dragon).
 	 */
-	readonly targetCount?: { readonly min: number; readonly max: number };
+	readonly targetCount?: TargetCount | ((duel: Duel, ctx: EffectContext) => TargetCount);
 	/**
 	 * Coupled targets, instead of `target`: each group is chosen from its own candidates, read on the board the cost left, and a card is
 	 * never in two groups ("target 1 card on each side": two groups of one). With `sameCount`, every group has the same number of
@@ -256,6 +281,14 @@ export interface EffectRecord {
 	readonly declare?: (duel: Duel, ctx: EffectContext) => readonly Declaration[];
 	/** The once-per-turn (or Duel, or chain) limit, as printed. */
 	readonly once?: Once;
+	/**
+	 * "You cannot [draw cards by card effects] the turn you activate this card": restrictions (locks, src/modifiers.ts) that apply from
+	 * the moment this card or effect is activated until the end of that turn, whether or not it resolves. Not an effect: they are read
+	 * from the turn's activations (`Duel.activations`), so nothing has to resolve; they are lifted if the activation is negated and stay
+	 * if only the effect is negated (Konami's Japanese notes and Q&A fid 23378 on Pot of Prosperity, OCG only). The other half of the
+	 * wording ("cannot be activated in a turn you already ...") is the record's `condition` (`drewByEffect`).
+	 */
+	readonly oath?: (duel: Duel, activation: Activation) => readonly LockLayer[];
 	/**
 	 * `continuous` (step 6): what the effect does while it applies, as modifiers (src/modifiers.ts). It is never activated or put on a
 	 * chain: it is read from the board when a query asks, while the card is face-up on the field (`range` `field`), its effects are
@@ -361,7 +394,9 @@ export interface MaterialCount {
  *   non-Tuner's place.
  * - `xyz`: 2 face-up monsters you control whose Level is the Rank (or what `materials` says), which become its Xyz Materials.
  *   `alternatives`: the other ways printed on the card ("you can also Xyz Summon this card by using a Rank 4 Xyz Monster you
- *   control as material"), each with its `condition`; `transfer`: "(Transfer its materials to this card.)".
+ *   control as material"), each with its `condition`; `transfer`: "(Transfer its materials to this card.)"; `ifYouDo`: "If you do,
+ *   you cannot Normal or Special Summon for the rest of this turn" (applied once the materials are used, before the Summon is
+ *   attempted: it stands if the Summon is negated; the core's reading, no page read).
  * - `link`: face-up monsters you control that count for the Link Rating, a Link Monster for 1 or for its own Rating; sent to the
  *   Graveyard.
  * - `fusion`: the Fusion Materials listed. Not an action: the effect that Fusion Summons says where the materials come from and
@@ -372,7 +407,7 @@ export interface MaterialCount {
  */
 export type Procedure =
 	| { readonly kind: "synchro"; readonly tuner?: MaterialFilter; readonly tuners?: { readonly min: number; readonly max?: number }; readonly nonTuner?: MaterialFilter; readonly nonTuners?: { readonly min: number; readonly max?: number }; readonly check?: MaterialCheck }
-	| { readonly kind: "xyz"; readonly materials?: MaterialCount; readonly check?: MaterialCheck; readonly alternatives?: readonly { readonly materials: MaterialCount; readonly condition?: (duel: Duel, ctx: MaterialContext) => boolean; readonly transfer?: true }[] }
+	| { readonly kind: "xyz"; readonly materials?: MaterialCount; readonly check?: MaterialCheck; readonly alternatives?: readonly { readonly materials: MaterialCount; readonly condition?: (duel: Duel, ctx: MaterialContext) => boolean; readonly transfer?: true; readonly ifYouDo?: (duel: Duel, ctx: MaterialContext) => Duel }[] }
 	| { readonly kind: "link"; readonly materials: MaterialCount; readonly check?: MaterialCheck }
 	| { readonly kind: "fusion"; readonly materials: readonly MaterialSlot[]; readonly check?: MaterialCheck; readonly contact?: { readonly to: "graveyard" | "banished" | "deck" }; readonly alternatives?: readonly FusionAlternative[] }
 	| { readonly kind: "ritual" };
@@ -417,7 +452,12 @@ export interface CardDef {
 	 * own procedures Summon it (a Fusion Summon, or its `alternatives`), never an effect that just Special Summons it; from elsewhere the
 	 * rule of every Extra Deck monster applies (properly Summoned first). Konami's notes on Blue-Eyes Tyrant Dragon, OCG only.
 	 */
-	readonly summon?: { readonly cannotBeNegated?: readonly ("normal" | "special")[]; readonly cannotBeNormalSummoned?: true; readonly mustFirstBeProper?: true };
+	/**
+	 * `onlyByOwnProcedure`: "Must be Synchro Summoned" (Stardust Sifr Divine Dragon): nothing but its own procedure ever Special Summons
+	 * it, from anywhere, even after a proper Summon. A Special Summon an effect says "is treated as a Synchro Summon" is that procedure
+	 * (`specialSummon` with `kind`: Crimson Dragon's wording).
+	 */
+	readonly summon?: { readonly cannotBeNegated?: readonly ("normal" | "special")[]; readonly cannotBeNormalSummoned?: true; readonly mustFirstBeProper?: true; readonly onlyByOwnProcedure?: true };
 	/**
 	 * Printed parts of the card the core does not apply yet (for Infinite Impermanence, `"column"`: step 7). The card is
 	 * playable but not done. This is the card as the game imports it (step 10's port refuses a card that has any); its

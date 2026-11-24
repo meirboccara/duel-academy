@@ -29,8 +29,10 @@ export type Action =
 	/**
 	 * Activate a card or an effect: `effect` is its index in the card's effects, `targets` the cards it targets, `paid` the
 	 * cards chosen to pay its cost (absent when the cost has no choice), `mode` the mode chosen for an effect with modes.
+	 * `pay`: for a cost whose cards are chosen one at a time (`CostSpec.choose`), how many cards the player will pay: they are asked
+	 * for next (`choose`), before the card or effect is activated.
 	 */
-	| ({ readonly type: "activate"; readonly card: number; readonly effect: number; readonly targets: readonly number[]; readonly paid?: readonly number[]; readonly mode?: number; readonly declared?: Declaration; readonly groups?: readonly number[] } & Placing)
+	| ({ readonly type: "activate"; readonly card: number; readonly effect: number; readonly targets: readonly number[]; readonly paid?: readonly number[]; readonly pay?: number; readonly mode?: number; readonly declared?: Declaration; readonly groups?: readonly number[] } & Placing)
 	/** Set a Spell or Trap from the hand; step 8: or a monster, in face-down Defense Position (a Normal Set, or a Tribute Set). */
 	| ({ readonly type: "set"; readonly card: number } & Placing)
 	/**
@@ -100,5 +102,5 @@ export function sameAction(a: Action, b: Action): boolean {
 	if (a.type === "apply") return a.delayed === (b as typeof a).delayed;
 	if (a.type !== "activate") return true;
 	const asked = b as typeof a;
-	return a.effect === asked.effect && a.mode === asked.mode && sameDeclaration(a.declared, asked.declared) && sameIds(a.targets, asked.targets) && sameIds(a.paid ?? [], asked.paid ?? []) && sameIds(a.groups ?? [], asked.groups ?? []);
+	return a.effect === asked.effect && a.pay === asked.pay && a.mode === asked.mode && sameDeclaration(a.declared, asked.declared) && sameIds(a.targets, asked.targets) && sameIds(a.paid ?? [], asked.paid ?? []) && sameIds(a.groups ?? [], asked.groups ?? []);
 }

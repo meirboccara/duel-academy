@@ -19,6 +19,7 @@ export * from "./summon";
 export * from "./battle";
 export * from "./zones";
 export * from "./equips";
+export * from "./set";
 export * from "./identity";
 export * from "./procedures";
 export * from "./bot";

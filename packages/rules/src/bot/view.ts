@@ -85,9 +85,11 @@ function withSnapshots(duel: Duel, fix: (snapshot: CardInstance) => CardInstance
 				return raised;
 		}
 	};
-	const waiting = (entry: Waiting): Waiting => ({ ...entry, card: fix(entry.card), event: event(entry.event) });
+	const waiting = (entry: Waiting): Waiting => ({ ...entry, card: fix(entry.card), event: event(entry.event), ...(entry.events ? { events: entry.events.map(event) } : {}) });
 	return {
 		...duel,
+		// What triggered a Trigger Effect on the chain (`Link.triggered`) may carry a card that is hidden again.
+		chain: duel.chain.some((link) => link.triggered) ? duel.chain.map((link) => (link.triggered ? { ...link, triggered: link.triggered.map(event) } : link)) : duel.chain,
 		live: duel.live.map(event),
 		lingering: duel.lingering.map(event),
 		waiting: duel.waiting.map(waiting),
