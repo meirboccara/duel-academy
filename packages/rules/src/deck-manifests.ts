@@ -32,19 +32,23 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Blue-Eyes White Dragon, the White Phantom Beast",
-        "count": 1
+        "count": 1,
+        "code": "blue-eyes-white-dragon-the-white-phantom-beast"
       },
       {
         "name": "Bystial Magnamhut",
-        "count": 1
+        "count": 1,
+        "code": "bystial-magnamhut"
       },
       {
         "name": "Deep-Eyes White Dragon, the Blue Abyss",
-        "count": 3
+        "count": 3,
+        "code": "deep-eyes-white-dragon"
       },
       {
         "name": "Dominus Purge",
-        "count": 3
+        "count": 3,
+        "code": "dominus-purge"
       },
       {
         "name": "Droll & Lock Bird",
@@ -73,7 +77,8 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Majesty of the White Dragons",
-        "count": 1
+        "count": 1,
+        "code": "majesty-of-the-white-dragons"
       },
       {
         "name": "Mausoleum of White",
@@ -82,23 +87,28 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Pot of Prosperity",
-        "count": 1
+        "count": 1,
+        "code": "pot-of-prosperity"
       },
       {
         "name": "Primite Dragon Ether Beryl",
-        "count": 1
+        "count": 1,
+        "code": "primite-dragon-ether-beryl"
       },
       {
         "name": "Primite Drillbeam",
-        "count": 1
+        "count": 1,
+        "code": "primite-drillbeam"
       },
       {
         "name": "Primite Lordly Lode",
-        "count": 3
+        "count": 3,
+        "code": "primite-lordly-lode"
       },
       {
         "name": "Roar of the Blue-Eyed Dragons",
-        "count": 1
+        "count": 1,
+        "code": "roar-of-the-blue-eyed-dragons"
       },
       {
         "name": "Sage with Eyes of Blue",

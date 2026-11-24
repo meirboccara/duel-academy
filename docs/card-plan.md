@@ -85,11 +85,11 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [ ] | Blue-Eyes Tyrant Dragon | Missing; its Summoning condition (Tributing 1 "Blue-Eyes White Dragon" equipped with a Fusion Monster) is built and tested with a made-up card since 2026-11-24; blocked by its third effect (end of the Damage Step, Set a Trap from the GY) and its 11 unread Q&A |
 | [ ] | Blue-Eyes Ultimate Spirit Dragon | Missing |
 | [x] | Blue-Eyes White Dragon | Registered 2026-11-24; complete (Normal Monster: printed facts, Konami's flavour text EN/FR; no effect) |
-| [ ] | Blue-Eyes White Dragon, the White Phantom Beast | Missing |
-| [ ] | Bystial Magnamhut | Missing |
+| [x] | Blue-Eyes White Dragon, the White Phantom Beast | Registered 2026-11-24; all three effects (hand trigger, destroy and attack lock, Quick negation), EN/FR text, Konami's notes; Q&A fid 276 (Draw Phase draw) pending a normal draw in the core; independent review pending |
+| [x] | Bystial Magnamhut | Registered 2026-11-24; both effects (Ignition and Quick from the hand, End Phase add), EN/FR text, Konami's notes and Q&A fid 22474; independent review pending |
 | [ ] | Crimson Dragon | Missing |
-| [ ] | Deep-Eyes White Dragon, the Blue Abyss | Missing |
-| [ ] | Dominus Purge | Missing |
+| [x] | Deep-Eyes White Dragon, the Blue Abyss | Registered 2026-11-24; all effects, EN/FR text, Konami's notes; Q&A fid 24303 pending effective names (Blue-Eyes Alternative White Dragon); banished-when-returned is YGOProJudge only; independent review pending |
+| [x] | Dominus Purge | Registered 2026-11-24; hand activation, negation with destruction and the lock, EN/FR text, Konami's notes and three Q&A; fid 24299 (monsters with several Attributes) pending; independent review pending |
 | [ ] | Droll & Lock Bird | Registered; completeness pending |
 | [ ] | Ecclesia and the Dark Dragon | Missing |
 | [x] | Effect Veiler | Registered; complete (printed facts, Konami texts, one test per clause and ruling) |
@@ -99,22 +99,22 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [x] | Lightning Storm | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
 | [ ] | Lightstorm Dragon | Missing |
 | [x] | Maiden of White | Registered 2026-11-24 to the definition of done: all three effects (place True Light, revive from the GY, Quick Effect when targeted or attacked), EN/FR text, Konami's notes, Q&A fid 24051; Q&A fids 14540 and 56 pending (Macro Cosmos-like effect, Alternative White Dragon); a free Spell & Trap Zone for the first effect rests on YGOProJudge only |
-| [ ] | Majesty of the White Dragons | Missing |
+| [x] | Majesty of the White Dragons | Registered 2026-11-24; both effects, EN/FR text, Konami's notes; the Graveyard effect's Spell Speed 2 is YGOProJudge only; independent review pending |
 | [x] | Mausoleum of White | Registered 2026-11-24 to the definition of done: all three effects, EN/FR text, Konami's notes, Q&A fid 18125; Q&A fids 18128, 18129, 24288 pending (Macro Cosmos-like effect, Double Summon, Gimmick Puppet - Fantasy Machina) |
 | [x] | Mulcharmy Fuwalos | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
 | [x] | Mulcharmy Purulia | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
 | [ ] | Mystical Space Typhoon | Registered; completeness pending |
 | [ ] | Neo Blue-Eyes Ultimate Dragon | Missing |
-| [ ] | Pot of Prosperity | Missing |
+| [x] | Pot of Prosperity | Registered 2026-11-24; cost, halved damage, excavation, oath, EN/FR text, Konami's notes and Q&A (fids 9932, 17846, 23378, 23511); independent review pending |
 | [ ] | Pot of Sloth | Missing |
-| [ ] | Primite Dragon Ether Beryl | Missing |
-| [ ] | Primite Drillbeam | Missing |
-| [ ] | Primite Lordly Lode | Missing |
+| [x] | Primite Dragon Ether Beryl | Registered 2026-11-24; all three effects, EN/FR text, Konami's notes; the Standby Phase effect is offered once at the start of the phase (L2); independent review pending |
+| [x] | Primite Drillbeam | Registered 2026-11-24; both effects, EN/FR text, Konami's notes and both Q&A; negating the effect of a Spell it is chained to is YGOProJudge only (R3); no Tokens in the core; independent review pending |
+| [x] | Primite Lordly Lode | Registered 2026-11-24; all three effects, EN/FR text, Konami's notes and Q&A (fids 10803, 24080; 12551 pending Tokens); independent review pending |
 | [ ] | Prototype Sky Striker Ace - Amatsu | Missing |
 | [ ] | Psychic End Punisher | Missing |
 | [ ] | Radiant Typhoon Vision | Missing |
 | [x] | Raigeki | Registered; complete (printed facts, Konami texts, one test per clause and ruling; Konami sources only) |
-| [ ] | Roar of the Blue-Eyed Dragons | Missing |
+| [x] | Roar of the Blue-Eyed Dragons | Registered 2026-11-24; both effects and the shared use, EN/FR text, Konami's notes; independent review pending |
 | [ ] | S:P Little Knight | Missing |
 | [x] | Sage with Eyes of Blue | Registered 2026-11-24 to the definition of done: both effects, EN/FR text, Konami's notes; Q&A fid 18319 pending (Phantom Knights' Dark Gauntlet); which effect the once per turn limits (the second only) rests on YGOProJudge only |
 | [ ] | Sky Striker Ace - Azalea | Missing |

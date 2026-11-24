@@ -1,5 +1,7 @@
-import { type Duel, moveCard } from "../duel";
-import type { EffectContext } from "../effects";
+import { type Duel, moveCard, type Position, type Side, type SummonKind } from "../duel";
+import { askPlace, type EffectContext } from "../effects";
+import { canSpecialSummon, specialSummon } from "../procedures";
+import { summonZones } from "../zones";
 
 /** "Discard this card" / "send this card from your hand to the GY": the cost of a hand effect. */
 export const sendThisToGraveyard = (duel: Duel, { card }: EffectContext): Duel => moveCard(duel, card.id, { zone: "graveyard" });
@@ -14,4 +16,16 @@ export const spellsAndTraps = (duel: Duel): number[] => [...duel.piles.you.spell
 export const isEffectMonster = (duel: Duel, id: number): boolean => {
 	const def = duel.defs[duel.cards[id]!.code];
 	return def?.kind === "monster" && def.facts?.normal !== true && (def.facts?.effect === true || (def.effects?.length ?? 0) > 0);
+};
+
+/**
+ * "Special Summon it in Defense Position" (or Attack): as `askSpecialSummon`, with the battle position fixed by the card's text, so the
+ * player chooses only the zone. Nothing happens when the monster cannot be Summoned; `then` is not run then either.
+ */
+export const askSpecialSummonIn = (duel: Duel, player: Side, id: number, position: Position, options: { readonly kind?: SummonKind; readonly then?: (duel: Duel) => Duel } = {}): Duel => {
+	if (!canSpecialSummon(duel, player, id, options.kind)) return duel;
+	return askPlace(duel, player, summonZones(duel, player, id), [position], (board, zone) => {
+		const done = specialSummon(board, player, id, { slot: zone, position, ...(options.kind ? { kind: options.kind } : {}) });
+		return options.then && done !== board ? options.then(done) : done;
+	});
 };

@@ -1029,3 +1029,50 @@ Known limits of this slice (what the tests do not prove):
   begins, not later in it.
 - Blue-Eyes Tyrant Dragon's 11 Q&A entries, Pot of Prosperity's entries on a Deck lock (fids 9932, 17846) and the other cards' notes
   were not opened.
+
+Blue-Eyes second batch: the ten remaining Main Deck cards of the exact 746021 list (2026-11-24; `src/cards/{blue-eyes-white-dragon-the-white-phantom-beast,
+bystial-magnamhut,deep-eyes-white-dragon,dominus-purge,majesty-of-the-white-dragons,pot-of-prosperity,primite-dragon-ether-beryl,primite-drillbeam,
+primite-lordly-lode,roar-of-the-blue-eyed-dragons}.ts`, tests in `test/cards/` with the made-up cards of `test/cards/{blue-eyes,primite}-fixtures.ts`
+and `test/rules/blue-eyes-gap-fixtures.ts`, every code starting with `fixture-`; no mechanic was built). Every printed clause of the ten is a
+record, none is `unmodelled`; all are registered in `CARD_DEFS` / `CARD_SOURCES` and in the manifest (28 of the 60 Main/Extra names are now
+registered, 32 missing). Konami's EN and FR card pages were each read once, the Japanese notes of each card (OCG only) and the Q&A entries listed
+in the cards' sources; the mapping clause to test is each card's `CardSources` and its test file.
+- Added `askSpecialSummonIn` (`src/cards/helpers.ts`): "Special Summon ... in Defense Position", the player choosing the zone only.
+- Two readings that the core's records force: Pot of Prosperity reads "the number of cards banished" at resolution, and the Chain Link keeps no
+  list of the cards paid, so the one printed effect is two activation records, one per count (3 and 6) sharing the use and the oath, as
+  Maiden of White writes one effect in two places. Roar of the Blue-Eyed Dragons shares its use between its two effects by `once.key`.
+- **YGOProJudge only, no Konami page read** (labelled in the cards, the test titles and here): Majesty of the White Dragons' Graveyard
+  effect is a Quick Effect (Spell Speed 2; Konami's notes only say it makes a Chain Link); Primite Drillbeam negates the effect of a Spell Card
+  it is chained to as well as banishing it (R3 of docs/rules-core/blue-eyes-gaps.md: Drillbeam's own notes and its two Q&A entries, fids
+  24176 and 24386, say nothing about it, so it stays a lead; only a Spell or Trap Card's own activation is negated this way, a monster's
+  effect that was already activated resolves, which is the core's reading with no page read); Deep-Eyes White Dragon banished instead when it
+  returns to the hand or Deck (R1; its notes settle the face-down case: it goes to the GY); Deep-Eyes White Dragon is still Special Summoned,
+  with its ATK unchanged, when the monster it targeted has left the GY before it resolves (asked 2026-11-24, kept after two follow-ups that contested it with the targeting rule: it cites only an internal PSCT note and says "no official source retrieved"; the Summon does not use the target and
+  "and if you do" ties the ATK to the Summon; it conflicts with the general idea that an effect whose targets are all illegal does not resolve,
+  which no Konami page read settles for this shape, so it stays a lead).
+- Konami's Q&A, OCG, fid 23793 (Ash Blossom against Magical Book of Judgment, its list names Bystial Magnamhut's second effect): an effect whose
+  add from the Deck to the hand is done later, in the End Phase, still "includes" it, whether or not the Deck holds the card. Magnamhut's "if this
+  card is Special Summoned" effect declares `search`, so Ash Blossom & Joyous Spring can be chained to it. Dominus Purge, whose text has the same
+  wording, answers it too: the core's reading from the text, no Konami page names Dominus Purge here.
+- The core's own readings, no page read: a "when/if ... you can" effect that Summons, Sets or searches is offered only while it can be done (as in
+  the first batch); the Set effect of Primite Dragon Ether Beryl needs a "Primite" Spell/Trap Set-able from the Deck; Majesty of the White
+  Dragons' count of cards shown is not capped by the opponent's cards; Dominus Purge destroys, after negating, the card where it activated it
+  (field or hand, Konami's Q&A fid 23949: not if it has moved) when a Trap is in the GY; the cards of the hand revealed as costs (Primite
+  Drillbeam, the White Phantom Beast) are revealed publicly through `revealCards`.
+- Limits left in the open (clause and reason; none stops a card): the core has no Draw Phase draw, so Konami's Q&A fid 276 (the White Phantom
+  Beast can be activated when a normal draw adds it) is a pending ruling; it has no Tokens (Primite Lordly Lode's Q&A fid 12551, Primite
+  Drillbeam's "except a Token" and Token-targeting notes cannot arise); it gives a monster one printed Attribute (Dominus Purge's Q&A fid 24299
+  on monsters with several Attributes is pending); effective names are not modelled (Deep-Eyes White Dragon's Q&A fid 24303 on Blue-Eyes
+  Alternative White Dragon is pending); excavated cards are added to the hand and the rest are placed on the bottom of the Deck one after the
+  other, not simultaneously (Pot of Prosperity's notes); the Standby Phase effect of Primite Dragon Ether Beryl is offered once, when the phase
+  begins (L2); the negating Quick Effect of the White Phantom Beast is not offered in the Damage Step, which agrees with Konami's notes on that
+  card (L1 is about the other cards of the list).
+- Q&A opened beyond the cards' own notes: Pot of Prosperity fids 9932, 17846 (the lock on adding cards from the Deck) and 23511 (23378's quotes come from the audit's sources, not re-read); Primite
+  Drillbeam 24176 and 24386; Primite Lordly Lode 10803, 24080 and 12551; Bystial Magnamhut 22474 and 23793 (24059 and 21722, found by title on its list, are about other chains, not opened beyond reading them: 24059 is the Prohibition one); Deep-Eyes White Dragon 24303 (its other four, 19063, 23217, 23218 and 24006, were read for a target that has left: none says anything about it); Dominus Purge
+  23949, 24162 and 24299; the White Phantom Beast 276 and 24176. Titles only: the other Q&A entries of those cards (by their titles they are about other cards' chains),
+  and Majesty of the White Dragons' one (a revealed hand), Primite Dragon Ether Beryl's one (Amatsu) and Roar of the Blue-Eyed Dragons' one
+  (Ghost Belle): none opened.
+- The test-first loop: each card's test file was written and run with the card unregistered (red) before the card was written; some tests passed
+  with the card absent because they assert that something is not offered (Primite Lordly Lode's and Pot of Prosperity's Deck-lock tests, the
+  "not activated" tests of Bystial Magnamhut and Deep-Eyes White Dragon); the `facts` tests of the five Spells and Traps, and the Q&A tests added
+  after reading more Q&A (Lode's declaration, Magnamhut's lock, Dominus Purge's three, the White Phantom Beast's reveal), were written after the card.
