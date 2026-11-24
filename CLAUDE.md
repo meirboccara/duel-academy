@@ -18,8 +18,12 @@ Moved out of `meirboccara/project-meir` into its own repo; the docs in `docs/` c
   - `scripts/ygoprojudge-chat.sh open <conversationId>` prints the chat's sessionId;
   - `scripts/ygoprojudge-chat.sh ask <sessionId> <question-file> [cards]` sends the question (English, in a file) with
     the card names comma-separated, and prints the answer (`KIND:`, the Markdown text, `SOURCE:` lines); it can take
-    minutes, so run it in the background or with a 10-minute timeout;
+    several minutes, so ALWAYS run it with a 600000 ms timeout or in the background;
+  - `scripts/ygoprojudge-chat.sh answer <sessionId>` prints the chat's latest answer and sends nothing;
   - `scripts/ygoprojudge-chat.sh close <sessionId>` ends the chat.
+  Every message costs money: never send the same question twice. If an `ask` call was cut off or its result is unclear,
+  read the answer with `answer`, never `ask` again (`ask` also refuses a question the chat already holds). A follow-up
+  is only for a new clarification or a contest, never a repeat.
   The key is read from `YGOJ_PARTNER_KEY` or from `~/.config/ygoprojudge/key` (outside the repo, readable by the owner
   only); if neither exists, ask the owner. Never print the key or copy it into this repo. The API itself
   (`https://ygoprojudge.com/api/partner/v1`, `/chat-sessions`) is the `judge-ygo` project (`lib/partner/api-reference.ts`);
