@@ -1,6 +1,7 @@
+import type { ProcedureWay } from "./action";
 import { type CardInstance, closedPriority, type Duel, freeSlots, isOnField, materialsOf, moveCard, moveCards, type Position, type Side, type Summoning, type SummonKind } from "./duel";
 import { shuffleDecksOf } from "./deck";
-import { ask, askPlace, askZone, type CardDef, type MaterialCheck, type MaterialContext, type MaterialCount, type MaterialSlot, type Procedure } from "./effects";
+import { ask, askPlace, askZone, type CardDef, cardTypeOf, type MaterialCheck, type MaterialContext, type MaterialCount, type MaterialSlot, type Procedure } from "./effects";
 import { breakEffect, raiseEvent } from "./events";
 import { level, summonLocked, summonTogetherLocked } from "./modifiers";
 import { beginSummon, landSummon } from "./summon";
@@ -34,6 +35,8 @@ export interface Recipe {
 	readonly check?: MaterialCheck;
 	readonly condition?: (duel: Duel, ctx: MaterialContext) => boolean;
 	readonly transfer?: true;
+	/** Step 11: a Fusion Monster's other way of being Special Summoned (`FusionAlternative`): what is done with the cards. Never a Fusion Summon. */
+	readonly how?: "tribute";
 }
 
 /** A set of materials to find: the cards to choose among, the recipes (any one of them), and the rule of the kind. */
@@ -51,6 +54,12 @@ const factsOf = (duel: Duel, card: CardInstance) => duel.defs[card.code]?.facts;
 /** A monster with a printed Level: an Xyz or Link Monster has none, and cannot be used where a Level is asked for. */
 const hasLevel = (duel: Duel, card: CardInstance): boolean => factsOf(duel, card)?.level !== undefined;
 const isMonster = (duel: Duel, id: number): boolean => duel.defs[duel.cards[id]!.code]?.kind === "monster";
+/**
+ * A monster where it is now, for what takes monsters from the board (Fusion Materials, Ritual Tributes): not a monster card that is a
+ * Spell there (an Equip Card, a Pendulum Monster in a Pendulum Zone: `cardTypeOf`). `isMonster` is the printed card: what can be
+ * Summoned, from anywhere.
+ */
+const isMonsterNow = (duel: Duel, id: number): boolean => cardTypeOf(duel, duel.cards[id]!) === "monster";
 const isLink = (duel: Duel, card: CardInstance): boolean => factsOf(duel, card)?.frame === "link";
 /** RB10: a Special Summoned monster is in face-up Attack or Defense Position, the player's choice; a Link Monster is never in Defense Position. */
 export const summonPositions = (duel: Duel, id: number): readonly Position[] => (isLink(duel, duel.cards[id]!) ? ATTACK_ONLY : EITHER_POSITION);
@@ -95,7 +104,7 @@ function build(def: CardDef, procedure: Procedure): readonly Recipe[] {
 		case "link":
 			return [{ slots: [counted(procedure.materials, def.facts?.link ?? procedure.materials.min)], check: procedure.check }];
 		case "fusion":
-			return [{ slots: procedure.materials, check: procedure.check }];
+			return [{ slots: procedure.materials, check: procedure.check }, ...(procedure.alternatives ?? []).map((way): Recipe => ({ slots: way.materials, check: way.check, condition: way.condition, how: way.how }))];
 		case "ritual":
 			return [];
 	}
@@ -191,11 +200,16 @@ function countsFor(duel: Duel, ids: readonly number[], rating: number): boolean 
 	return sums.has(rating);
 }
 
-/** The material spec of a procedure the player performs as an action: Synchro, Xyz, Link, contact Fusion. `null` for a card with none. */
-function procedureSpec(duel: Duel, player: Side, card: CardInstance): MaterialSpec | null {
+/**
+ * The material spec of a procedure the player performs as an action: Synchro, Xyz, Link, contact Fusion, a Fusion Monster's other ways
+ * (step 11). `null` for a card with none. `own` false: for an effect that performs the Summon (`summonByEffect`), which never performs
+ * a Fusion Monster's other ways: they are Summoning conditions of the card, performed by the player only (Konami's notes on Blue-Eyes
+ * Tyrant Dragon, record `tribute-equipped-not-an-effect`; that no effect performs them is the core's reading).
+ */
+function procedureSpec(duel: Duel, player: Side, card: CardInstance, own = true): MaterialSpec | null {
 	const def = duel.defs[card.code];
 	const procedure = def?.procedure;
-	if (!def || !procedure || procedure.kind === "ritual" || (procedure.kind === "fusion" && !procedure.contact)) return null;
+	if (!def || !procedure || procedure.kind === "ritual" || (procedure.kind === "fusion" && !procedure.contact && !(own && procedure.alternatives?.length))) return null;
 	const ctx = { player, summoned: card };
 	const mine = duel.piles[player].monster;
 	const faceUp = mine.filter((id) => duel.cards[id]!.face === "up");
@@ -217,8 +231,30 @@ function procedureSpec(duel: Duel, player: Side, card: CardInstance): MaterialSp
 			return { ctx, pool: faceUp, recipes: open, valid: (board, ids) => countsFor(board, ids, rating) && zone(board, ids), over: (_board, ids) => ids.length > rating };
 		}
 		case "fusion":
-			return { ctx, pool: mine, recipes: open, valid: zone };
+			// The printed Fusion Materials are an action only for a contact Fusion; the other ways printed on the card always are.
+			return { ctx, pool: mine, recipes: open.filter((recipe) => (recipe.how === undefined ? procedure.contact !== undefined : own)), valid: zone };
 	}
+}
+
+/** The way a recipe of a Fusion Monster is performed as an action: its other way's own (`how`), or the contact Fusion. */
+const wayOf = (recipe: Recipe): ProcedureWay => recipe.how ?? "contact";
+
+/** The spec with only the recipes of one way (`undefined`: all of them). */
+const narrowed = (spec: MaterialSpec, way: ProcedureWay | undefined): MaterialSpec => (way === undefined ? spec : { ...spec, recipes: spec.recipes.filter((recipe) => wayOf(recipe) === way) });
+
+const NO_WAYS: readonly ProcedureWay[] = Object.freeze([]);
+
+/**
+ * Step 11: the ways the player could perform this Fusion Monster's own Special Summon now, when the card has both a contact Fusion and
+ * another way (`FusionAlternative`): each way with a legal set of cards. The same cards may fit both, and the two do different things
+ * with them, so the player says which (the `summon` action's `way`). Empty for any other card: there is nothing to tell apart.
+ */
+export function procedureWays(duel: Duel, player: Side, card: CardInstance): readonly ProcedureWay[] {
+	const procedure = duel.defs[card.code]?.procedure;
+	if (procedure?.kind !== "fusion" || !procedure.contact || !procedure.alternatives?.length) return NO_WAYS;
+	const spec = procedureSpec(duel, player, card);
+	if (!spec) return NO_WAYS;
+	return [...new Set(spec.recipes.map(wayOf))].filter((way) => existsSet(duel, narrowed(spec, way), NO_IDS, false) !== null);
 }
 
 /** Can the player start this monster's own procedure now: is it not locked, and is there one legal set of materials that leaves it a zone? */
@@ -235,7 +271,10 @@ const kindOf = (procedure: Procedure): SummonKind | undefined => (procedure.kind
  * the Xyz Monster (with the materials of a monster used "transferring its materials"; otherwise those go to the Graveyard, as that
  * monster leaves the field), contact Fusion Materials go where the card says.
  */
-function useMaterials(duel: Duel, id: number, procedure: Procedure, ids: readonly number[], transfer: boolean): Duel {
+function useMaterials(duel: Duel, id: number, procedure: Procedure, ids: readonly number[], recipe: Recipe | null): Duel {
+	const transfer = recipe?.transfer === true;
+	// Step 11: "by Tributing 1 ...": Tributed, and as Fusion Material (Konami's notes on Blue-Eyes Tyrant Dragon, record `tribute-equipped-not-fusion-summon`).
+	if (recipe?.how === "tribute") return tribute(duel, ids, "fusion");
 	if (procedure.kind === "xyz") {
 		return ids.reduce((next, material) => {
 			const carried = transfer ? materialsOf(next, material).reduce((board, under) => moveCard(board, under, { zone: "material", attachedTo: id }), next) : next;
@@ -253,15 +292,16 @@ function useMaterials(duel: Duel, id: number, procedure: Procedure, ids: readonl
 /**
  * The player performs the monster's procedure (the `summon` action of an Extra Deck monster): the materials are asked for, then the
  * zone; the materials leave, and the Summon is attempted (`beginSummon`: the window in which it can be negated). The materials are
- * not given back when the Summon is negated.
+ * not given back when the Summon is negated. `way` (step 11): the way the player chose, for a Fusion Monster with two ways open
+ * (`procedureWays`): only its recipes are used, so the cards are handled as that way says even when they would fit the other.
  */
-export function startProcedure(duel: Duel, player: Side, id: number, position: Position): Duel {
+export function startProcedure(duel: Duel, player: Side, id: number, position: Position, way?: ProcedureWay): Duel {
 	const card = duel.cards[id]!;
 	const procedure = duel.defs[card.code]!.procedure!;
-	const spec = procedureSpec(duel, player, card)!;
+	const spec = narrowed(procedureSpec(duel, player, card)!, way);
 	return askMaterials(duel, player, spec, (board, ids) => {
-		const transfer = existsSet(board, spec, ids, true)?.transfer === true;
-		return askZone(board, player, zonesAfter(board, player, id, ids), (placed, zone) => beginSummon(useMaterials(placed, id, procedure, ids, transfer), player, id, "special", zone, { position, kind: kindOf(procedure), proper: true }));
+		const recipe = existsSet(board, spec, ids, true);
+		return askZone(board, player, zonesAfter(board, player, id, ids), (placed, zone) => beginSummon(useMaterials(placed, id, procedure, ids, recipe), player, id, "special", zone, { position, kind: kindOf(procedure), proper: true }));
 	});
 }
 
@@ -280,8 +320,11 @@ export function canTribute(duel: Duel, player: Side, card: CardInstance, count: 
 	return duel.piles[player].monster.length >= count && existsSet(duel, tributeSpec(duel, player, card, count), NO_IDS, false) !== null;
 }
 
-/** Tributing: the monsters are sent to the Graveyard, and are not "destroyed" (RB10). */
-export const tribute = (duel: Duel, ids: readonly number[]): Duel => moveCards(duel, ids, { zone: "graveyard", reason: "tributed" });
+/**
+ * Tributing: the monsters are sent to the Graveyard, and are not "destroyed" (RB10). Every Tribute goes through here (a Tribute Summon
+ * or Set, a Ritual Summon, a Fusion Monster's "by Tributing" way). `usedFor`: the Tributes are also the materials of that Summon.
+ */
+export const tribute = (duel: Duel, ids: readonly number[], usedFor?: SummonKind): Duel => moveCards(duel, ids, { zone: "graveyard", reason: "tributed", ...(usedFor ? { usedFor } : {}) });
 
 /**
  * A Tribute Summon, or a Tribute Set (`set`): the Tributes are chosen, then the zone (a Tribute frees its own); the Tributes are
@@ -386,11 +429,16 @@ export const canBeNormalSummoned = (def: CardDef | undefined): boolean => def !=
  * first" goes? A Fusion, Synchro, Xyz, Link or Ritual Monster in the hand, the Deck, the Graveyard, banished or face-up on the Extra
  * Deck needs one successful Summon by its own procedure (RB10, records `special-summon-monsters-need-proper`,
  * `properly-summoned-first`; Konami's Japanese Q&A 21297, record `revive-needs-successful-proper-summon`). In the hand and the Deck
- * it never has one: only its own procedure Summons it from there. Face-down in the Extra Deck nothing is asked.
+ * it never has one: only its own procedure Summons it from there. Face-down in the Extra Deck nothing is asked. A card in a Spell &
+ * Trap Zone is asked too (step 11): an Equip Card, and an Extra Deck Pendulum Monster in a Pendulum Zone (the second: YGOProJudge only).
  */
 export function canBeRevived(duel: Duel, id: number): boolean {
 	const card = duel.cards[id]!;
-	if (isOnField(card.zone) || (card.zone === "extra" && card.face === "down")) return true;
+	// On the field as a monster nothing is asked. In a Spell & Trap Zone it is a card like one off the field: an Equip Card (step 11; the
+	// core's reading of RB10), and an Extra Deck Pendulum Monster in a Pendulum Zone (YGOProJudge only, asked 2026-11-24, no source cited).
+	if (card.zone === "monster" || card.zone === "field") return true;
+	// Face-down in the Extra Deck nothing is asked, unless the card says "Must first be ..." (step 11, `mustFirstBeProper`).
+	if (card.zone === "extra" && card.face === "down") return duel.defs[card.code]?.summon?.mustFirstBeProper !== true;
 	return !hasOwnProcedure(duel.defs[card.code]) || card.proper;
 }
 
@@ -539,8 +587,11 @@ export interface FusionOptions {
 }
 
 function fusionSpec(duel: Duel, player: Side, card: CardInstance, options: FusionOptions): MaterialSpec {
-	const pool = options.pool(duel, player).filter((id) => id !== card.id && isMonster(duel, id));
-	return { ctx: { player, summoned: card }, pool, recipes: recipesOf(duel.defs[card.code]!), valid: (board, ids) => zonesAfter(board, player, card.id, ids).length > 0 };
+	const pool = options.pool(duel, player).filter((id) => id !== card.id && isMonsterNow(duel, id));
+	// A Fusion Summon uses the printed Fusion Materials: the card's other ways of being Special Summoned (step 11) are not Fusion Summons.
+	const all = recipesOf(duel.defs[card.code]!);
+	const printed = all.length > 1 ? all.filter((recipe) => recipe.how === undefined) : all;
+	return { ctx: { player, summoned: card }, pool, recipes: printed, valid: (board, ids) => zonesAfter(board, player, card.id, ids).length > 0 };
 }
 
 /** The Fusion Monsters of the player's Extra Deck that the effect could Fusion Summon now. */
@@ -590,7 +641,7 @@ const RITUAL: readonly Recipe[] = [{ slots: [{ min: 1, max: Infinity }] }];
  */
 function ritualSpec(duel: Duel, player: Side, monster: CardInstance, options: RitualOptions): MaterialSpec {
 	const target = level(duel, monster.id);
-	const pool = options.pool(duel, player, monster).filter((id) => id !== monster.id && isMonster(duel, id));
+	const pool = options.pool(duel, player, monster).filter((id) => id !== monster.id && isMonsterNow(duel, id));
 	const whole = (board: Duel, id: number) => options.whole?.(board, board.cards[id]!, monster) === true;
 	const spare = (board: Duel, ids: readonly number[], sum: number) => ids.some((id) => sum - level(board, id) >= target);
 	const enough = (board: Duel, ids: readonly number[]): boolean => {
@@ -636,7 +687,7 @@ export function ritualSummon(duel: Duel, player: Side, options: RitualOptions): 
 export function canSummonByEffect(duel: Duel, player: Side, id: number, using: readonly number[] = NO_IDS): boolean {
 	const card = duel.cards[id]!;
 	if (card.zone === "extra") {
-		const spec = procedureSpec(duel, player, card);
+		const spec = procedureSpec(duel, player, card, false);
 		return spec !== null && !summonLocked(duel, player, card, "special") && existsSet(duel, spec, using, false) !== null;
 	}
 	const facts = factsOf(duel, card);
@@ -660,15 +711,15 @@ export function summonByEffect(duel: Duel, index: number, player: Side, id: numb
 	const attempt = (board: Duel, summoning: Summoning): Duel => (index === 0 ? { ...board, summoning: { ...summoning, pending: true } } : landSummon(board, summoning));
 	if (card.zone === "extra") {
 		const procedure = duel.defs[card.code]!.procedure!;
-		const spec = procedureSpec(duel, player, card)!;
+		const spec = procedureSpec(duel, player, card, false)!;
 		return askMaterials(
 			duel,
 			player,
 			spec,
 			(board, ids) => {
-				const transfer = existsSet(board, spec, ids, true)?.transfer === true;
+				const recipe = existsSet(board, spec, ids, true);
 				return askPlace(board, player, zonesAfter(board, player, id, ids), summonPositions(board, id), (placed, zone, position) =>
-					attempt(useMaterials(placed, id, procedure, ids, transfer), { player, cards: [id], how: "special", negated: false, slots: [zone], positions: [position], kind: kindOf(procedure), proper: true }),
+					attempt(useMaterials(placed, id, procedure, ids, recipe), { player, cards: [id], how: "special", negated: false, slots: [zone], positions: [position], kind: kindOf(procedure), proper: true }),
 				);
 			},
 			using,

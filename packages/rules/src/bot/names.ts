@@ -21,7 +21,8 @@ export function actionName(duel: Duel, action: Action): string {
 			return `attack ${codeOf(duel, action.card)} ${action.target === null ? "directly" : `> ${codeOf(duel, action.target)}`}`;
 		case "summon":
 			// A Normal Summon made in addition to the turn's Normal Summon/Set says so: "summon lv1 additional".
-			return `${action.how === "special" ? "special-summon" : "summon"} ${codeOf(duel, action.card)}${action.extra ? " additional" : ""}`;
+			// A Fusion Monster with two ways open says which: "special-summon tyrant by tribute".
+			return `${action.how === "special" ? "special-summon" : "summon"} ${codeOf(duel, action.card)}${action.extra ? " additional" : ""}${action.way ? ` by ${action.way}` : ""}`;
 		case "activate": {
 			const code = codeOf(duel, action.card);
 			const effect = (duel.defs[code]?.effects?.length ?? 0) > 1 ? ` #${action.effect + 1}` : "";

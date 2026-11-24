@@ -106,7 +106,8 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Wishes for Eyes of Blue",
-        "count": 3
+        "count": 3,
+        "code": "wishes-for-eyes-of-blue"
       }
     ],
     "extra": [

@@ -381,3 +381,38 @@ crowdedHand list + `act` stays above the 10× floor in every run, the busy ones 
 | One attack from its declaration to the end of the Damage Step, nobody responding | 0.0098 ms |
 
 Reading the permissions per attacker without the per-Duel check cost 0.0012 ms on the first case (measured once before it was added).
+
+## Step 11, monsters treated as Equip Cards; effects activated in the Graveyard (2026-11-24)
+
+What this slice adds to the paths the benchmark runs: one check per lasting modifier in `entriesFor` (`Modifier.equip`), one lookup
+per listing for the cards with an effect activated in the Graveyard or while banished (`activatedAway`, a per-`defs` cache; the
+Graveyard is read only when some card of the Duel has such an effect, and none of the reference boards has one), and one comparison
+per move (`equippedTo`). No reference board holds an Equip Card.
+
+`npx vitest bench --run bench/legal-moves.bench.ts`, crowdedHand list + `act` against today's engine, means. The machine was not
+quiet (other work running; today's engine itself took 0.99 to 1.29 ms on crowdedHand):
+- Two runs read in full: 0.0730 / 1.291 ms (17.7×, listing alone 0.0026 ms) and 0.0568 / 0.993 ms (17.5×, listing alone 0.0021 ms).
+- Three more runs, list + `act` only: 0.0705, 0.0693, 0.0918 ms.
+
+To tell load from a regression, the committed sources (commit df815b6, exported to a scratch folder) and the working tree were
+benched in one file, crowdedHand list + `act`, fourteen pairs in both orders (committed / this slice, ms): 0.0572 / 0.0613,
+0.0525 / 0.0523, 0.0591 / 0.0531, 0.0523 / 0.0567, 0.0591 / 0.0598, 0.0528 / 0.0558, 0.0510 / 0.0531, 0.0540 / 0.0536,
+0.0582 / 0.0527, 0.0501 / 0.0617, 0.0744 / 0.0535, 0.0556 / 0.0531, 0.0524 / 0.0549, 0.0665 / 0.0837. Either side wins about as
+often; the means are 0.0568 and 0.0575 ms. Three earlier pairs, taken while the machine was busier, had this slice behind each
+time (0.0565 / 0.0693, 0.0553 / 0.0678, 0.0772 / 0.0959); the later pairs in the same layout did not repeat that. Read together:
+the same within this machine's noise, with no claim finer than that.
+
+The three positions, the quieter of the two full runs:
+
+| Position | `legalActions` | list + `act` | today's engine | list + `act` speed-up |
+|---|---:|---:|---:|---:|
+| opening | 0.0006 ms | 0.0162 ms | 0.763 ms | 47× |
+| midgame | 0.0025 ms | 0.0391 ms | 3.189 ms | 82× |
+| crowdedHand | 0.0021 ms | 0.0568 ms | 0.993 ms | **17.5×** |
+
+crowdedHand list + `act` stays above the 10× floor in every run read in full.
+
+After the review fixes of this slice (2026-11-24; `procedureWays` is asked once per Extra Deck monster listed, and answers at once
+for a card with no contact Fusion beside another way; one more comparison in `inFieldRange`), one run read in full: crowdedHand
+`legalActions` 0.0029 ms, list + `act` 0.0601 ms, today's engine 1.162 ms (**19.3×**); opening 0.0190 / 0.834 ms, midgame
+0.0485 / 3.338 ms. Same machine, not quiet; no claim finer than "still above the 10× floor".

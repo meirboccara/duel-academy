@@ -1,5 +1,5 @@
 import { type CardInstance, changeControl, destroyCard, type Duel, freeSlots, type Side } from "./duel";
-import { askZone, type CardDef, type EffectContext, type EffectRecord, inFieldRange, rangeOf } from "./effects";
+import { askZone, type CardDef, cardTypeOf, type EffectContext, type EffectRecord, inFieldRange, rangeOf } from "./effects";
 import { cardColumn } from "./zones";
 
 /**
@@ -96,6 +96,8 @@ export const untilEndOfNextTurnOf = (duel: Duel, player: Side): number => duel.t
 export const fromOpponent = (_duel: Duel, by: EffectSource, target: CardInstance): boolean => by.player !== target.controller;
 /** "Trap effects": the effect of a Trap Card (Counter Traps included). */
 export const fromTraps = (duel: Duel, by: EffectSource): boolean => duel.defs[by.card.code]?.kind === "trap" || duel.defs[by.card.code]?.kind === "counter-trap";
+/** "Spell effects": the effect of a Spell Card, a monster treated as an Equip Spell included (`cardTypeOf`). */
+export const fromSpells = (duel: Duel, by: EffectSource): boolean => cardTypeOf(duel, by.card) === "spell";
 /** "Other cards' effects": any card but the protected one. */
 export const fromOtherCards = (_duel: Duel, by: EffectSource, target: CardInstance): boolean => by.card.id !== target.id;
 
@@ -142,6 +144,12 @@ export interface Modifier {
 	readonly layer: Layer;
 	/** The effect that left it (pass the resolving link): a card unaffected by that effect is not reached by it. */
 	readonly by?: EffectSource;
+	/**
+	 * Step 11: the modifier is the effect of this Equip Card (its id), given by the effect that equipped it ("as an Equip Spell that
+	 * gives it 400 ATK", `equipMonster` in src/equips.ts). It reaches the monster that card is equipped to, as an effect of that card:
+	 * not while the card's effects are negated, and not for a monster unaffected by it. It is removed when the card stops being equipped.
+	 */
+	readonly equip?: number;
 }
 
 /** Adds a lasting modifier, stamped now. */
@@ -243,7 +251,8 @@ export function negateColumn(duel: Duel, source: number, until: number, by?: Eff
  * negated (the core's reading of "unaffected", as `shielded` in src/chain.ts; no Konami page read for a column).
  */
 export function negatedWhere(duel: Duel, card: CardInstance): boolean {
-	return duel.modifiers.some((modifier) => modifier.layer.kind === "negate" && typeof modifier.affects === "function" && modifier.affects(duel, card, null) && !(modifier.by && stillUnaffected(duel, card, modifier.by)));
+	// What an Equip Card gives (`Modifier.equip`) is no negation of a place: it is read with the card's other effects (`isNegated`).
+	return duel.modifiers.some((modifier) => modifier.layer.kind === "negate" && modifier.equip === undefined && typeof modifier.affects === "function" && modifier.affects(duel, card, null) && !(modifier.by && stillUnaffected(duel, card, modifier.by)));
 }
 
 /** The card is still on the field as it was (it has not moved since the snapshot) and is unaffected by the effect `by`. */
@@ -287,7 +296,15 @@ const ON_FIELD_PILES = ["monster", "spell", "field"] as const;
  */
 function entriesFor(duel: Duel, target: CardInstance, seen: ReadonlySet<number>): Entry[] {
 	const found: Entry[] = [];
-	for (const modifier of duel.modifiers) if (!aboutPlayers(modifier.layer) && reaches(duel, modifier.affects, target, null)) found.push({ stamp: modifier.stamp, layer: modifier.layer, source: null, by: modifier.by ?? null });
+	for (const modifier of duel.modifiers) {
+		if (aboutPlayers(modifier.layer)) continue;
+		if (modifier.equip !== undefined) {
+			// What an Equip Card was given to do (step 11): its own effect, for the monster it is equipped to, while it is not negated.
+			const source = duel.cards[modifier.equip]!;
+			if (source.equippedTo !== target.id || (!seen.has(source.id) && negatedBy(duel, source, seen))) continue;
+			found.push({ stamp: modifier.stamp, layer: modifier.layer, source, by: { card: source, player: source.controller } });
+		} else if (reaches(duel, modifier.affects, target, null)) found.push({ stamp: modifier.stamp, layer: modifier.layer, source: null, by: modifier.by ?? null });
+	}
 	const codes = codesWithContinuous(duel.defs);
 	if (codes.size > 0) {
 		for (const side of ["you", "rival"] as const) {
@@ -458,13 +475,15 @@ function negatedBy(duel: Duel, card: CardInstance, seen: ReadonlySet<number>): b
  * the card activates is marked negated at activation then, so a monster that is its own cost is negated too (Konami's Q&A on
  * Infinite Impermanence, record `impermanence-negates-effect-activated-in-monster-zone`). A continuous negation (Skill Drain) is
  * not: it is read when the effect resolves, and a monster no longer face-up in the Monster Zone is not negated then
- * (Skill Drain's notes, record `skill-drain-left-the-zone`).
+ * (Skill Drain's notes, record `skill-drain-left-the-zone`). Nor is the negation an Equip Card gives its monster (step 11,
+ * `Modifier.equip`): it is that card's own effect while it is equipped, read like a continuous one when the effect resolves
+ * (`isNegated`), so that it stops while the Equip Card is negated and never reaches a monster unaffected by it (the core's reading).
  */
 export function isNegatedLasting(duel: Duel, id: number): boolean {
 	if (duel.modifiers.length === 0) return false;
 	const card = duel.cards[id]!;
 	// A negation left by an effect the card is unaffected by does not reach it (as in every other query: `unaffectedDropped`).
-	return duel.modifiers.some((modifier) => modifier.layer.kind === "negate" && reaches(duel, modifier.affects, card, null) && !(modifier.by && unaffectedBy(duel, id, modifier.by)));
+	return duel.modifiers.some((modifier) => modifier.layer.kind === "negate" && modifier.equip === undefined && reaches(duel, modifier.affects, card, null) && !(modifier.by && unaffectedBy(duel, id, modifier.by)));
 }
 
 /** Are the effects of this card on the field negated: by a lasting negation of the card as it is now, or by a continuous effect. A new card (it moved since) is not. */

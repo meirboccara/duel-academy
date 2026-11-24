@@ -11,7 +11,7 @@ import { type EffectSource, extraNormalSummon, returnControl, summonLocked, unaf
 import { cardNegated, immune } from "./negation";
 import { endChain, newTurn, refund } from "./once";
 import { beginSummon, finishSummon, openPendingSummon } from "./summon";
-import { beginFlipSummon, canBeNormalSummoned, canChangePosition, canFlipSummon, canPendulumSummon, canStartProcedure, canTribute, changePositionByHand, setMonster, startPendulumSummon, startProcedure, startTribute, summonPositions, tributesNeeded } from "./procedures";
+import { beginFlipSummon, canBeNormalSummoned, canChangePosition, canFlipSummon, canPendulumSummon, canStartProcedure, canTribute, changePositionByHand, procedureWays, setMonster, startPendulumSummon, startProcedure, startTribute, summonPositions, tributesNeeded } from "./procedures";
 import { advanceBattle, attackActions, damageStepAllows, declareAttack } from "./battle";
 import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./triggers";
 import { applyDelayed, delayedActions, expireDelayed, mustApply } from "./delayed";
@@ -83,6 +83,19 @@ export function legalActions(duel: Duel): Action[] {
 	return actions;
 }
 
+const awayCodes = new WeakMap<object, ReadonlySet<string>>();
+
+/** The codes of the cards with an Ignition or Quick Effect activated in the Graveyard or while banished, per `defs` (shared by every duel, never changed). */
+function activatedAway(defs: Duel["defs"]): ReadonlySet<string> {
+	let found = awayCodes.get(defs);
+	if (!found) {
+		const away = (effect: EffectRecord) => (effect.type === "ignition" || effect.type === "quick") && (effect.range === "graveyard" || effect.range === "banished");
+		found = new Set(Object.values(defs).filter((def: CardDef) => def.effects?.some(away)).map((def) => def.code));
+		awayCodes.set(defs, found);
+	}
+	return found;
+}
+
 /** Lists what the holder of priority can do besides passing; with no list, only tells whether there is anything. */
 function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 	const { chain, priority, turn, options, defs } = duel;
@@ -122,8 +135,8 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 	};
 
 	/** Is the effect one this card can be activated with from its zone? `ready`: a Spell or Trap Card could be activated from here now. */
-	const listedHere = (effect: EffectRecord, card: CardInstance, zone: "hand" | "field", ready: boolean): boolean =>
-		effect.type === "activation" ? ready : effect.type !== "trigger" && effect.type !== "continuous" && (zone === "hand" ? rangeOf(effect) === "hand" : inFieldRange(defs[card.code], card, rangeOf(effect)));
+	const listedHere = (effect: EffectRecord, card: CardInstance, zone: "hand" | "field" | "graveyard" | "banished", ready: boolean): boolean =>
+		effect.type === "activation" ? ready : effect.type !== "trigger" && effect.type !== "continuous" && (zone === "field" ? inFieldRange(defs[card.code], card, rangeOf(effect)) : rangeOf(effect) === zone);
 
 	for (const id of piles.hand) {
 		if (only !== undefined && id !== only) continue;
@@ -211,6 +224,28 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 			}
 		}
 	}
+	// The Ignition and Quick Effects of the player's cards in the Graveyard and face-up among the banished cards (`range`), read only
+	// when some card of the Duel has one.
+	const away = activatedAway(defs);
+	if (away.size > 0) {
+		for (const zone of ["graveyard", "banished"] as const) {
+			for (const id of piles[zone]) {
+				if (only !== undefined && id !== only) continue;
+				const card = duel.cards[id]!;
+				if (!away.has(card.code) || card.face !== "up") continue;
+				const def = defs[card.code]!;
+				const effects = def.effects!;
+				for (let index = 0; index < effects.length; index++) {
+					const effect = effects[index]!;
+					if (!listedHere(effect, card, zone, false)) continue;
+					if (offer(card, def, index, effect)) {
+						if (!out) return true;
+						found = true;
+					}
+				}
+			}
+		}
+	}
 	// Step 8: the Summons of the Extra Deck's monsters by their own procedure (Synchro, Xyz, Link, contact Fusion), each listed once
 	// when one legal set of materials exists, and the Pendulum Summon.
 	if (slow) {
@@ -220,7 +255,11 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 			if (!defs[card.code]?.procedure || !canStartProcedure(duel, player, card)) continue;
 			if (!out) return true;
 			const positions = summonPositions(duel, id);
-			out.push(positions.length > 1 ? { type: "summon", card: id, how: "special", positions } : { type: "summon", card: id, how: "special" });
+			const summon: Extract<Action, { type: "summon" }> = positions.length > 1 ? { type: "summon", card: id, how: "special", positions } : { type: "summon", card: id, how: "special" };
+			// Step 11: a Fusion Monster with two ways open is listed once per way (the player says which they perform).
+			const ways = procedureWays(duel, player, card);
+			if (ways.length > 1) for (const way of ways) out.push({ ...summon, way });
+			else out.push(summon);
 			found = true;
 		}
 		if (only === undefined && piles.spell.length >= 2 && canPendulumSummon(duel, player)) {
@@ -296,7 +335,7 @@ function apply(duel: Duel, action: Action): Duel {
 			return pass(duel);
 		case "summon": {
 			// Step 8: an Extra Deck monster's own procedure: the materials, then the zone, are asked before the Summon is attempted.
-			if (duel.cards[action.card]!.zone === "extra") return resumeAfter(startProcedure(duel, player, action.card, action.position ?? "attack"), unchanged);
+			if (duel.cards[action.card]!.zone === "extra") return resumeAfter(startProcedure(duel, player, action.card, action.position ?? "attack", action.way), unchanged);
 			const tributes = action.how === "normal" ? tributesNeeded(levelOf(duel, action.card)) : 0;
 			if (tributes > 0) return resumeAfter(startTribute(duel, player, action.card, tributes, false, action.extra === true), unchanged);
 			return beginSummon(duel, player, action.card, action.how, action.zone, action.how === "special" && action.position ? { position: action.position } : action.extra ? { extra: true } : {});

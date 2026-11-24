@@ -82,7 +82,7 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [ ] | Ash Blossom & Joyous Spring | Registered; answers draw effects since 2026-11-24 (Konami Q&A fid 21685); printed facts incomplete, completeness pending |
 | [ ] | Bingo Machine, Go!!! | Missing |
 | [ ] | Blue-Eyes Spirit Dragon | Missing |
-| [ ] | Blue-Eyes Tyrant Dragon | Missing |
+| [ ] | Blue-Eyes Tyrant Dragon | Missing; its Summoning condition (Tributing 1 "Blue-Eyes White Dragon" equipped with a Fusion Monster) is built and tested with a made-up card since 2026-11-24; blocked by its third effect (end of the Damage Step, Set a Trap from the GY) and its 11 unread Q&A |
 | [ ] | Blue-Eyes Ultimate Spirit Dragon | Missing |
 | [ ] | Blue-Eyes White Dragon | Missing |
 | [ ] | Blue-Eyes White Dragon, the White Phantom Beast | Missing |
@@ -137,4 +137,4 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [ ] | The Fallen & The Virtuous | Missing |
 | [ ] | True Light | Missing |
 | [x] | Upstart Goblin | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
-| [ ] | Wishes for Eyes of Blue | Missing |
+| [x] | Wishes for Eyes of Blue | Registered 2026-11-24 to the definition of done: both effects, EN/FR text, Konami's notes; its one Q&A (fid 23815) pending a "banished instead of sent to the GY" effect; tests use made-up "Blue-Eyes" cards until the real ones exist; independent review pending |

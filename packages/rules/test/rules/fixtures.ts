@@ -140,7 +140,7 @@ export function label(duel: Duel, action: Action): string {
 	if (action.type === "pendulum-summon") return "pendulum-summon";
 	const code = duel.cards[action.card]!.code;
 	if (action.type === "set") return `set ${code}`;
-	if (action.type === "summon") return `${action.how === "special" ? "special-summon" : "summon"} ${code}${action.extra ? " additional" : ""}`;
+	if (action.type === "summon") return `${action.how === "special" ? "special-summon" : "summon"} ${code}${action.extra ? " additional" : ""}${action.way ? ` by ${action.way}` : ""}`;
 	if (action.type === "choose") return `choose ${code}`;
 	if (action.type === "apply") return `apply ${code}`;
 	if (action.type === "flip-summon" || action.type === "change-position") return `${action.type} ${code}`;

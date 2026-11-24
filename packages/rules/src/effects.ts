@@ -27,9 +27,10 @@ export type EventMatcher = (duel: Duel, event: GameEvent, ctx: EffectContext) =>
 
 /**
  * Where the card must be for the effect: `field` means face-up on its controller's field (for a monster card, in the Monster Zone);
- * `pendulum` (step 7), a Pendulum Monster's Pendulum Effect: face-up in a Pendulum Zone.
+ * `pendulum` (step 7), a Pendulum Monster's Pendulum Effect: face-up in a Pendulum Zone; `equipped` (step 11), an effect a card has
+ * "while this card is equipped to a monster": face-up in a Spell & Trap Zone as an Equip Card (a monster treated as an Equip Spell).
  */
-export type Range = "hand" | "field" | "graveyard" | "banished" | "pendulum";
+export type Range = "hand" | "field" | "graveyard" | "banished" | "pendulum" | "equipped";
 
 /**
  * How often an effect may be used, as the printed wording says it (each wording has a card-text record in
@@ -365,15 +366,30 @@ export interface MaterialCount {
  *   Graveyard.
  * - `fusion`: the Fusion Materials listed. Not an action: the effect that Fusion Summons says where the materials come from and
  *   where they go (`fusionSummon`). `contact`: "Must first be Special Summoned (from your Extra Deck) by sending the above cards you
- *   control to the GY": an action too, with no card effect, the materials going `to`.
+ *   control to the GY": an action too, with no card effect, the materials going `to`. `alternatives` (step 11): the other ways
+ *   printed on the card, with cards that are not its Fusion Materials (`FusionAlternative`).
  * - `ritual`: a Ritual Monster, Summoned by a Ritual Spell (`ritualSummon`).
  */
 export type Procedure =
 	| { readonly kind: "synchro"; readonly tuner?: MaterialFilter; readonly tuners?: { readonly min: number; readonly max?: number }; readonly nonTuner?: MaterialFilter; readonly nonTuners?: { readonly min: number; readonly max?: number }; readonly check?: MaterialCheck }
 	| { readonly kind: "xyz"; readonly materials?: MaterialCount; readonly check?: MaterialCheck; readonly alternatives?: readonly { readonly materials: MaterialCount; readonly condition?: (duel: Duel, ctx: MaterialContext) => boolean; readonly transfer?: true }[] }
 	| { readonly kind: "link"; readonly materials: MaterialCount; readonly check?: MaterialCheck }
-	| { readonly kind: "fusion"; readonly materials: readonly MaterialSlot[]; readonly check?: MaterialCheck; readonly contact?: { readonly to: "graveyard" | "banished" | "deck" } }
+	| { readonly kind: "fusion"; readonly materials: readonly MaterialSlot[]; readonly check?: MaterialCheck; readonly contact?: { readonly to: "graveyard" | "banished" | "deck" }; readonly alternatives?: readonly FusionAlternative[] }
 	| { readonly kind: "ritual" };
+
+/**
+ * Step 11: another way a Fusion Monster says it can be Special Summoned from the Extra Deck, with cards of its own that are not its
+ * Fusion Materials ("or Special Summoned from your Extra Deck by Tributing 1 [monster] equipped with a Fusion Monster"). An action with
+ * no card effect, like a contact Fusion: `materials` are monsters the player controls (a filter may ask what is equipped to one:
+ * `equipsOf`), and `how` says what is done with them (`tribute`: they are Tributed, then the monster is Special Summoned). It is a
+ * proper Summon of the monster and not a Fusion Summon (Konami's Japanese notes on Blue-Eyes Tyrant Dragon, OCG only).
+ */
+export interface FusionAlternative {
+	readonly how: "tribute";
+	readonly materials: readonly MaterialSlot[];
+	readonly check?: MaterialCheck;
+	readonly condition?: (duel: Duel, ctx: MaterialContext) => boolean;
+}
 
 export interface CardDef {
 	readonly code: string;
@@ -396,7 +412,12 @@ export interface CardDef {
 	readonly procedure?: Procedure;
 	/** Obelisk: "This card's Normal Summon cannot be negated": the negating cards are not even offered against such a Summon. */
 	/** Step 8: `cannotBeNormalSummoned`: "Cannot be Normal Summoned/Set" (a Ritual Monster or an Extra Deck monster never can be, with no need to say so). */
-	readonly summon?: { readonly cannotBeNegated?: readonly ("normal" | "special")[]; readonly cannotBeNormalSummoned?: true };
+	/**
+	 * Step 11: `mustFirstBeProper`: "Must first be Fusion Summoned, or Special Summoned ... by ...": from the face-down Extra Deck only its
+	 * own procedures Summon it (a Fusion Summon, or its `alternatives`), never an effect that just Special Summons it; from elsewhere the
+	 * rule of every Extra Deck monster applies (properly Summoned first). Konami's notes on Blue-Eyes Tyrant Dragon, OCG only.
+	 */
+	readonly summon?: { readonly cannotBeNegated?: readonly ("normal" | "special")[]; readonly cannotBeNormalSummoned?: true; readonly mustFirstBeProper?: true };
 	/**
 	 * Printed parts of the card the core does not apply yet (for Infinite Impermanence, `"column"`: step 7). The card is
 	 * playable but not done. This is the card as the game imports it (step 10's port refuses a card that has any); its
@@ -438,16 +459,32 @@ export function targetGroupsOf(duel: Duel, link: Link): CardInstance[][] {
 }
 
 /**
- * Is a face-up card on the field where an effect of range `field` or `pendulum` applies? A monster card's `field` effects work in the
- * Monster Zone only, its `pendulum` ones only in a Pendulum Zone (the leftmost or rightmost Spell & Trap Zone); a Spell or Trap Card's
- * `field` effects anywhere on the field.
+ * Is a face-up card on the field where an effect of range `field`, `pendulum` or `equipped` applies? A monster card's `field` effects
+ * work in the Monster Zone only (so not while it is an Equip Card: RB10, it is then considered an Equip Spell), its `pendulum` ones
+ * only in a Pendulum Zone (the leftmost or rightmost Spell & Trap Zone), its `equipped` ones only while it is equipped to a monster;
+ * a Spell or Trap Card's `field` effects anywhere on the field.
  */
 export function inFieldRange(def: CardDef | undefined, card: CardInstance, range: Range): boolean {
 	if (card.face !== "up") return false;
-	if (range === "pendulum") return def?.facts?.pendulum !== undefined && card.zone === "spell" && (card.slot === 0 || card.slot === 4);
+	// An Equip Card is never in a Pendulum Zone, whichever Spell & Trap Zone it is in: it was not placed there as a Pendulum Scale.
+	if (range === "pendulum") return def?.facts?.pendulum !== undefined && card.zone === "spell" && card.equippedTo === null && (card.slot === 0 || card.slot === 4);
+	if (range === "equipped") return card.zone === "spell" && card.equippedTo !== null;
 	if (range !== "field") return false;
 	if (def?.kind === "monster") return card.zone === "monster";
 	return card.zone === "monster" || card.zone === "spell" || card.zone === "field";
+}
+
+/**
+ * What kind of card a card is where it is (pass it as it is now, or as a link holds it): a Trap Card (Counter Traps included), a
+ * Spell Card, or a monster. A monster card in a Spell & Trap Zone is a Spell there: a monster equipped to another monster is
+ * "considered to be" an Equip Spell (RB10, Equip Cards), and a Pendulum Monster in a Pendulum Zone is a Spell Card (RB10). Everywhere
+ * else a card is what is printed on it. `undefined` for a card with no definition.
+ */
+export function cardTypeOf(duel: Duel, card: CardInstance): "monster" | "spell" | "trap" | undefined {
+	const kind = duel.defs[card.code]?.kind;
+	if (kind === undefined) return undefined;
+	if (kind === "monster") return card.zone === "spell" ? "spell" : "monster";
+	return kind === "trap" || kind === "counter-trap" ? "trap" : "spell";
 }
 
 /** Where the card must be for the effect: the field unless the record says otherwise. */

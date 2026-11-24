@@ -14,10 +14,14 @@ export function immune(duel: Duel, link: Link, kind: "activation" | "effect"): b
 	return typeof flag === "function" ? flag(duel, link) : flag === true;
 }
 
-/** Is the effect one that is activated in the Monster Zone (so the negation of the card's effects reaches it)? */
+/**
+ * Is the effect one that is activated on the field by a card that stays there: in the Monster Zone, or (step 11) by a monster while it
+ * is an Equip Card (so the negation of the card's effects reaches it)?
+ */
 export function hitByCardNegation(duel: Duel, link: Pick<Link, "card" | "effect">): boolean {
 	const record = effectOf(duel, link);
-	return record.type !== "activation" && rangeOf(record) === "field";
+	const range = rangeOf(record);
+	return record.type !== "activation" && (range === "field" || range === "equipped");
 }
 
 /**

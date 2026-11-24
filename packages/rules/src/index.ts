@@ -18,6 +18,7 @@ export * from "./life";
 export * from "./summon";
 export * from "./battle";
 export * from "./zones";
+export * from "./equips";
 export * from "./identity";
 export * from "./procedures";
 export * from "./bot";

@@ -492,8 +492,9 @@ export type MoveReason = "destroyed" | "tributed" | "material";
 /**
  * `effect`: the move is done by this card effect (pass the resolving link): a card that is unaffected by it does not move (src/modifiers.ts).
  * A cost, a Summon procedure or a rule of the game passes none, and is never stopped by a protection.
+ * `equippedTo` (step 11): the card arrives face-up in a Spell & Trap Zone as an Equip Card of that monster (`equipMonster`, src/equips.ts).
  */
-type MoveTo = { destruction?: Destruction; effect?: EffectSource; zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: MoveReason; usedFor?: SummonKind; by?: "battle"; position?: Position; slot?: number; attachedTo?: number };
+type MoveTo = { destruction?: Destruction; effect?: EffectSource; zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: MoveReason; usedFor?: SummonKind; by?: "battle"; position?: Position; slot?: number; attachedTo?: number; equippedTo?: number };
 
 /**
  * Destroys a card: it goes to the Graveyard and the move says it was destroyed (`moved.reason`), which "when destroyed" triggers
@@ -585,6 +586,7 @@ function relocate(duel: Duel, id: number, to: MoveTo, batch: number | undefined,
 	const previousField = zone === "field" ? occupant(duel, controller, "field", 0) : null;
 	if (previousField && previousField.id !== before.id) duel = move(duel, previousField.id, { zone: "graveyard" }, batch, held);
 	if ((zone === "material") !== (to.attachedTo !== undefined)) throw new Error("an Xyz Material is attached to its Xyz Monster, and nothing else is");
+	if (to.equippedTo !== undefined && (zone !== "spell" || face !== "up")) throw new Error("an Equip Card is face-up in a Spell & Trap Zone");
 	const forgets = forgetsSummon(zone, face);
 	const after: CardInstance = {
 		...before,
@@ -593,17 +595,20 @@ function relocate(duel: Duel, id: number, to: MoveTo, batch: number | undefined,
 		controller,
 		position,
 		slot,
-		equippedTo: renewed && !(before.zone === "spell" && zone === "spell" && face === "up" && !flippedDown) ? null : before.equippedTo,
+		equippedTo: to.equippedTo !== undefined ? to.equippedTo : renewed && !(before.zone === "spell" && zone === "spell" && face === "up" && !flippedDown) ? null : before.equippedTo,
 		attachedTo: zone === "material" ? to.attachedTo! : null,
 		// Played onto the field now, also as a monster that was there as a Spell (a Pendulum Monster leaving its Pendulum Zone).
 		fieldEntries: isOnField(zone) && !isOnField(before.zone) ? before.fieldEntries + 1 : before.fieldEntries,
 		arrived: !isOnField(zone) ? 0 : isOnField(before.zone) && !(zone === "monster" && before.zone !== "monster") ? before.arrived : duel.turn.number,
 		proper: forgets ? false : before.proper,
 		summonedBy: forgets ? null : before.summonedBy,
-		specialSummoned: isOnField(zone) && isOnField(before.zone) ? before.specialSummoned : false,
+		// Only a monster in a Monster Zone is a "Special Summoned monster": not one that became an Equip Card (step 11; YGOProJudge only).
+		specialSummoned: zone === "monster" && isOnField(before.zone) ? before.specialSummoned : false,
 		moves: before.moves + (renewed ? 1 : 0),
 		since: cameUp ? duel.clock + 1 : before.since,
 	};
+	// Step 11: a card that stops being an Equip Card no longer does what it was given to do as one (`Modifier.equip`).
+	if (before.equippedTo !== null && after.equippedTo !== before.equippedTo && duel.modifiers.some((modifier) => modifier.equip === id)) duel = { ...duel, modifiers: duel.modifiers.filter((modifier) => modifier.equip !== id) };
 	const placed = place(duel, before, after, to.at ?? "top");
 	const stamped = cameUp ? { ...placed, clock: placed.clock + 1 } : placed;
 	if (!renewed) return stamped;
@@ -663,6 +668,8 @@ export function equip(duel: Duel, equipId: number, monsterId: number | null): Du
 	if (monsterId === null || card.zone !== "spell" || card.face !== "up") return duel;
 	const monster = duel.cards[monsterId]!;
 	if (monster.zone !== "monster" || monster.face !== "up") return duel;
+	// RB10: a Monster Card equipped to a monster "remains equipped to that monster and cannot be moved to a different target" (step 11).
+	if (card.equippedTo !== null && duel.defs[card.code]?.kind === "monster") return duel;
 	return { ...duel, cards: { ...duel.cards, [equipId]: { ...card, equippedTo: monsterId } } };
 }
 

@@ -342,9 +342,9 @@ Known limits of step 7 (what the tests do not prove):
   read; YGOProJudge says a Normal Summon's zone cannot become taken, since nothing can respond to the Summon itself); a Field Spell given to a player replaces theirs, as placing one does (RB10's one Field Spell a side).
 - `moveCard` is the low-level move: it checks occupancy, not the Extra Monster Zone rules (one per player), which belong to the
   Summon (`summonZones`). Test boards may put a player in both Extra Monster Zones.
-- Equip Cards: only Equip Spells, with the relation set by the card's own operation; equip limits ("equip only to a monster you
-  control") and monsters as Equip Cards (step 11) are not modelled; when the monster leaves, its Equip Cards are destroyed one by one
-  after its move, not in the same batch.
+- Equip Cards: Equip Spells, with the relation set by the card's own operation, and since 2026-11-24 monsters treated as Equip
+  Cards (step 11, last section); equip limits ("equip only to a monster you control") are not modelled; when the monster leaves,
+  its Equip Cards are destroyed one by one after its move, not in the same batch.
 
 Step 8 (Summon procedures as data; plan in `docs/rules-core/step8/design.md`, sources in `docs/rules-core/step8/sources.md`, records in
 `src/summon-sources.ts`):
@@ -507,7 +507,8 @@ Ghost Ogre & Snow Rabbit and Effect Veiler (2026-11-24; `src/cards/ghost-ogre-sn
 - Ghost Ogre is two records, one per place (`range: "hand"` and `"field"`), sharing the printed once-per-turn by name through `once.key`.
   It answers the top link only when its card was on the field when activated and the effect is not a card activation (`type` is not
   `activation`): a monster's effect in the Monster Zone, or an effect of a Spell/Trap already face-up (Konami's notes, OCG; a
-  monster treated as an Equip Card is read by its place, untested until step 11 adds such monsters). It destroys with
+  monster treated as an Equip Card is read by its place: tested since step 11's monster equips, `test/rules/monster-equips.test.ts`,
+  on YGOProJudge's answer). It destroys with
   `effectDestruction(link)`, it does not negate. The answered card is destroyed while it has not left the field since it was
   activated (`CardInstance.fieldEntries` unchanged): a monster turned face-down in the chain still is (Konami Q&A fid 6334), and so
   is one turned face-down and up again, or whose control changed; a card that left the field, even to come back to the same zone, is
@@ -794,3 +795,113 @@ Known limits of this slice (what the tests do not prove):
   resolve, so no test reads them. The ATK "before it left as its cost" of Amatsu's condition (Konami's Q&A fid 24164) is the card's to
   read (the link holds the card as it was when activated, not its ATK then). A choice the replaced effect asks is its own player's.
 - The Battle Phase still has no Start Step or End Step window, and "each Battle Phase" is the turn's one Battle Phase.
+
+Step 11, monsters treated as Equip Cards only; effects activated in the Graveyard; Wishes for Eyes of Blue (2026-11-24; `src/equips.ts`,
+records in `src/equip-sources.ts`, tests in `test/rules/{monster-equips,monster-equips-review,graveyard-effects}.test.ts` with the made-up cards of
+`test/rules/equip-fixtures.ts` (every code starts with `fixture-`), `test/bot/monster-equips.test.ts` and
+`test/cards/wishes-for-eyes-of-blue.test.ts`). Tokens, counters, dice and monsters treated as Continuous Spells are still open: the two
+exact lists do not need them.
+- **A monster equipped to a monster is its card in a Spell & Trap Zone** (RB10: "equipped monsters are considered to be Equip
+  Spells"): face-up, in a zone of the player whose effect equipped it, with `CardInstance.equippedTo` naming its monster, the relation
+  step 7 gave Equip Spells (`equipsOf`; destroyed and sent to the Graveyard when its monster is destroyed, leaves the field or is
+  flipped face-down; kept across a control change of its monster). No new zone and no new pile: what reads the Spell & Trap Zones finds
+  it (Mystical Space Typhoon targets it, Infinite Impermanence's column negates it), what reads the Monster Zones does not.
+  `cardTypeOf(duel, card)` says what a card is where it is (`"spell"` for a monster card in a Spell & Trap Zone, a Pendulum Monster in
+  its Pendulum Zone included); `isEquipCard`. What is printed on the card is still its own (`printedFacts`,
+  `belongsTo`: "a Fusion Monster equipped to it" is asked of the Equip Card's printed frame).
+- **Its monster effects do not apply** while it is there (a monster card's `field` range is the Monster Zone). `range: "equipped"` is
+  for an effect a card has "while this card is equipped to a monster" (Ignition, Quick, Trigger or Continuous): listed, triggered and
+  read only then. Such an activated effect is the effect of a Spell already face-up on the field: Ghost Ogre & Snow Rabbit answers it
+  and destroys the Equip Card, and the negation of the card's effects reaches it (`hitByCardNegation`).
+- **Equipping by an effect**: `equipMonster(duel, id, monsterId, { player, slot?, by?, gives? })`, `askEquipMonster` (the player
+  chooses the zone when more than one is free; nothing is asked for a card that cannot be equipped or moved),
+  `canEquipMonster(duel, player, id, monsterId)` for the activation condition: a monster card from the Extra Deck, the Deck, the hand,
+  the Graveyard, banishment or a Monster Zone; a face-up monster to equip; a free Spell & Trap Zone of `player`. Otherwise nothing
+  happens and the card stays where it was. `by`: the effect that equips; a card unaffected by it is not moved. The monster it is
+  equipped to is not asked: the effect is not applied to it (Konami's notes on Wishes for Eyes of Blue). `moveCard` takes
+  `equippedTo` (with zone `spell`, face-up), so the `moved` event carries the relation.
+- **What the Equip Card gives** ("as an Equip Spell that gives it 400 ATK"): `gives`, layers of `src/modifiers.ts` that reach the
+  monster it is equipped to, kept in `Duel.modifiers` with `Modifier.equip` (the Equip Card's id). They are that card's own effect, a
+  Spell effect: not applied while its effects are negated, not applied to a monster unaffected by Spell effects (`fromSpells`), and
+  removed when the card stops being equipped (it leaves, or its monster does). Equipped with nothing given, it does nothing.
+- **It stays with its monster** (RB10: "cannot be moved to a different target"): `equip` and `equipMonster` do nothing to a monster
+  card that is already an Equip Card.
+- **Status**. A monster that becomes an Equip Card is no longer a "Special Summoned monster" (`specialSummoned` is now kept in the
+  Monster Zone only), its own Equip Cards are destroyed and its Xyz Materials sent to the Graveyard (it left the Monster Zone). It
+  keeps `proper`: equipped after a proper Summon, it can be Special Summoned later; equipped straight from the Extra Deck, it cannot
+  be, as an Equip Card or from the Graveyard (`canBeRevived` now asks it of a card in a Spell & Trap Zone too: an Equip Card, and an
+  Extra Deck Pendulum Monster in a Pendulum Zone, which before step 11 was asked nothing).
+- **Never in a Pendulum Zone**: an Equip Card in the leftmost or rightmost Spell & Trap Zone is not a Pendulum Scale (`pendulumZones`,
+  the `pendulum` range, the Pendulum Summon). **Not a monster for materials**: `fusionSummon` and `ritualSummon` take from their pool
+  only what is a monster where it is (`cardTypeOf`), so not an Equip Card nor a Pendulum Monster in a Pendulum Zone, even if the
+  card's pool names the whole field. What can be Summoned is still read from the printed card (an Equip Card that was properly
+  Summoned can be Special Summoned from its zone).
+- **A Summon procedure that uses an equipped card**: `Procedure` `fusion` gains `alternatives` (`FusionAlternative`: `how: "tribute"`,
+  `materials`, `check`, `condition`), another way printed on a Fusion Monster of Special Summoning it from the Extra Deck with cards
+  that are not its Fusion Materials ("or Special Summoned from your Extra Deck by Tributing 1 [monster] equipped with a Fusion
+  Monster"; the filter asks `equipsOf`). It is an action like a contact Fusion (`summon`, `how: "special"`; the materials, then the
+  zone, are asked): the monsters are Tributed (`moved.reason: "tributed"`, `usedFor: "fusion"`), then the Summon is attempted in its
+  window, as a proper Summon that is not a Fusion Summon (`summonedBy` stays `null`). An effect that Fusion Summons reads the printed
+  materials only, and an effect that performs a Summon (`summonByEffect`, `canSummonByEffect`) never performs this way: it is the
+  player's own action. On a card that also has a contact Fusion, with both open, the `summon` action is listed once per way
+  (`way: "contact" | "tribute"`, `procedureWays`; named "... by tribute" by the bot's `actionName`) and the cards are handled as the
+  way chosen says, even when they fit both; with one way open it is listed once, with no `way`. Every Tribute goes through `tribute`. `CardDef.summon.mustFirstBeProper` ("Must first be ..."): from the face-down Extra Deck only its own procedures
+  Summon the card, never an effect that just Special Summons it. Konami's notes on Blue-Eyes Tyrant Dragon (OCG only).
+- **A cost that uses an equipped card** needs nothing new: `equipsOf` in a `CostSpec.pick` (tested with a made-up card).
+- **Effects activated in the Graveyard or while banished**: `legalActions` now lists the Ignition and Quick Effects with
+  `range: "graveyard"` or `"banished"` of the player's cards there (face-up ones), like those of the hand and the field. The
+  Graveyard and the banished cards are read only when some card of the Duel has such an effect (a per-`defs` cache). Trigger Effects
+  from there already worked.
+- **Wishes for Eyes of Blue** (`src/cards/wishes-for-eyes-of-blue.ts`, cid 20604; EN and FR text, Konami's notes and its one Q&A read
+  2026-11-24): both effects, each once per turn by name. The Q&A (fid 23815, discarding under "cards sent to the GY are banished
+  instead") is listed as pending: the core has no such effect. Its code is in the Blue-Eyes manifest: 12 of the 60 Main/Extra names
+  are registered.
+- The bot: no new action type (the monster and the zone are `choose` and `place`; the `summon` action's `way` is named by `actionName`); a card equipped from a hidden Extra Deck is public
+  from then on and leaves the pool of hidden codes; a view and its re-dealt worlds keep the relation and what the Equip Card gives.
+  These tests passed with no change to `src/bot`.
+- Speed (`bench/BASELINE.md`, last section): crowdedHand list + `act` 0.057 to 0.073 ms against 0.99 to 1.29 ms for today's engine
+  (17.5× to 17.7×); the committed sources and this slice benched side by side are the same within noise.
+
+Known limits of this slice (what the tests do not prove):
+- **YGOProJudge only** (asked 2026-11-24, five answers, none with an official source): the gain "as an Equip Spell that gives it 400
+  ATK" is the Equip Card's own Spell effect (it stops while that card is negated, the card staying equipped; a monster unaffected by
+  Spell effects is equipped and gains nothing); with no free Spell & Trap Zone the effect cannot be activated, and if the last zone is
+  taken before it resolves the monster stays where it was; a monster equipped after a proper Summon keeps its "properly Summoned"
+  status and is not a "Special Summoned monster" while it is an Equip Card; Ghost Ogre & Snow Rabbit answers an effect a monster
+  treated as an Equip Card activates, and Mystical Space Typhoon can destroy such a card; Wishes for Eyes of Blue adds nothing when
+  one of its two kinds is missing at resolution, and adds its two cards at the same time. The first question was first asked without
+  a card name and came back as a request for the card; it was asked again naming Wishes for Eyes of Blue. Each test that rests on one
+  says so in its title. That an Equip Card stays equipped when its monster changes control is step 7's lead (asked for Equip Spells).
+- The core's own readings, no page read: a monster equipped straight from the Extra Deck cannot be Special Summoned from its Spell &
+  Trap Zone (RB10's "properly Special Summoned first", applied to that place); an effect of range `equipped` is negated with its
+  card; a monster equipped to an opponent's monster sits in the Spell & Trap Zone of the player who equipped it.
+- Not modelled: Union monsters (equipping by their own effect, "1 Union per monster", RB10's exception that lets them be moved to
+  another monster, and Special Summoning the equipped card back); equip eligibility that is checked while equipped ("equip only to
+  a ..." becoming false destroys the Equip Card); Traps that become Equip Cards (they stay Traps); an Equip Card that is a monster
+  being flipped face-down; a monster equipped to a face-down monster. When the equipped monster leaves, its Equip Cards are still
+  destroyed one by one after its move, not in its batch (step 7's limit).
+- `gives` takes card-reaching layers only (no lock, permission or control). A `negate` layer given this way ("the equipped monster's
+  effects are negated") is read like a continuous negation, by `isNegated` when the effect resolves (it stops while the Equip Card is
+  negated, and a monster that left the Monster Zone as its cost is not negated); it is never a lasting negation (`isNegatedLasting`,
+  `negatedWhere` skip it). The core's reading, tested with a made-up card; no page read.
+- After the review of this slice (`test/rules/monster-equips-review.test.ts`): the two-way choice above is tested with a made-up card
+  (no real card with both a contact Fusion and another way was looked for); the same first-match choice between an Xyz Monster's
+  recipes (`alternatives` with `transfer`, step 8) is unchanged. "Properly Summoned first" in a Pendulum Zone rests on YGOProJudge
+  only (asked 2026-11-24, no source cited). What an Equip Card gives is pruned where the relation ends (a move of the Equip Card;
+  its monster leaving or flipped face-down destroys it) and checked again on every read (`equippedTo`); a control change of either
+  card ends nothing. The core has no "discarded" reason for a move (Wishes for Eyes of Blue's cost is a plain move to the Graveyard).
+- `mustFirstBeProper` is the flag for "Must first be ..." on a card whose own procedures are a Fusion Summon and `alternatives`; no
+  other "Must be ..." wording was audited. `alternatives` knows one `how` (`tribute`). The Tribute's event carries `usedFor:
+  "fusion"` for Konami's "Tributed as Fusion Material"; no card reads it yet.
+- **Blue-Eyes Tyrant Dragon is not written**: its Summoning condition is covered by the made-up `fixture-tyrant` (text and five notes
+  cited), "unaffected by Trap Cards or effects" and "attack all monsters, once each" by earlier slices. What blocks it: its third
+  effect ("at the end of the Damage Step, if this card battled: target 1 Trap in your GY; Set it") needs a trigger at the end of the
+  Damage Step that can also be activated from the Graveyard or from banishment when the card was destroyed by that battle (its notes)
+  and an operation that Sets a Trap from the Graveyard, neither written; its 11 Q&A entries were listed (titles read) but not opened;
+  and "Blue-Eyes White Dragon" itself is not registered.
+- Wishes for Eyes of Blue: the cards it adds are not shown to the opponent by the core (as for Terraforming; the bot's view keeps
+  them hidden); "Blue-Eyes White Dragon" is read from the printed name and "Blue-Eyes" from `facts.archetypes`, so its tests use
+  made-up monsters with those facts (and the real Effect Veiler as the Level 1 LIGHT Tuner) until the real ones are written; a
+  target that changed control or was flipped in the chain is not equipped (the core's reading of a target). Independent review pending.
+- Effects in the Graveyard: only the player's own Graveyard and banished cards are read (a card there is its owner's); a card
+  banished face-down has no effect to activate. The bot's count of what a player could answer with (`evaluate`) does not count them.

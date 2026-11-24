@@ -39,8 +39,11 @@ export type Action =
 	 * Deck: Synchro, Xyz, Link, contact Fusion). It starts no chain: the Summon is a moment of its own that the opponent may answer
 	 * ("would be Summoned") before it succeeds. `extra`: a Normal Summon made "in addition to your Normal Summon/Set" by an effect
 	 * that allows one: the player says which of the two they use (Konami's notes on Mausoleum of White), so both are listed.
+	 * `way` (step 11): a Fusion Monster with a contact Fusion and another way of being Special Summoned, both open now: the player says
+	 * which they perform (`contact`: its Fusion Materials go where the card says; `tribute`: the cards are Tributed), so both are listed.
+	 * With one way open the action is listed once, with no `way`.
 	 */
-	| ({ readonly type: "summon"; readonly card: number; readonly how: "normal" | "special"; readonly extra?: true } & Placing)
+	| ({ readonly type: "summon"; readonly card: number; readonly how: "normal" | "special"; readonly extra?: true; readonly way?: ProcedureWay } & Placing)
 	/** Step 8: Flip Summon a face-down monster. Like any Summon, a moment of its own that can be answered. */
 	| { readonly type: "flip-summon"; readonly card: number }
 	/** Step 8: change a face-up monster's battle position by hand (once per monster per turn). An action that starts no chain. */
@@ -60,6 +63,9 @@ export type Action =
 	| { readonly type: "place"; readonly zone: number; readonly positions?: readonly Position[]; readonly position?: Position }
 	/** What the player declares while an effect resolves (`askDeclare`): one of the values asked. */
 	| { readonly type: "declare"; readonly declaration: Declaration };
+
+/** The ways a Fusion Monster's own Special Summon can be performed as an action (see the `summon` action). */
+export type ProcedureWay = "contact" | "tribute";
 
 export const PASS: Action = Object.freeze({ type: "pass" });
 
@@ -89,7 +95,7 @@ export function sameAction(a: Action, b: Action): boolean {
 	if (a.type === "declare") return sameDeclaration(a.declaration, (b as typeof a).declaration);
 	const other = b as typeof a;
 	if (a.card !== other.card) return false;
-	if (a.type === "summon") return a.how === (b as typeof a).how && (a.extra === true) === ((b as typeof a).extra === true);
+	if (a.type === "summon") return a.how === (b as typeof a).how && (a.extra === true) === ((b as typeof a).extra === true) && a.way === (b as typeof a).way;
 	if (a.type === "attack") return a.target === (b as typeof a).target;
 	if (a.type === "apply") return a.delayed === (b as typeof a).delayed;
 	if (a.type !== "activate") return true;
