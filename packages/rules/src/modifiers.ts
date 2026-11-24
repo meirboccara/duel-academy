@@ -26,8 +26,10 @@ export type Stat = "atk" | "def" | "level";
  * - `draw`: drawing by a card effect (`drawCards`); the draw is not done. `who`: the player who would draw.
  * - `banish-from-graveyard`: "cannot be banished from the GY": the cards `only` accepts (default: all) in the Graveyard of `who`.
  * - `attack` / `attack-directly`: the monsters `only` accepts (default: all) controlled by `who` cannot declare an attack / a direct attack.
+ * - `summon-together`: "cannot Special Summon 2 or more monsters at the same time": `who` Special Summons one monster at a time
+ *   (`specialSummonTogether` Summons nothing, a Pendulum Summon is of one monster).
  */
-export type LockKind = "add-to-hand" | "summon" | "activate" | "draw" | "banish-from-graveyard" | "attack" | "attack-directly";
+export type LockKind = "add-to-hand" | "summon" | "activate" | "draw" | "banish-from-graveyard" | "attack" | "attack-directly" | "summon-together";
 
 /** An activation a lock may stop: who activates, which card (as it is before it is placed), and which of its effects. */
 export interface ActivationAttempt extends EffectContext {
@@ -53,8 +55,31 @@ export interface EffectSource {
  */
 export type Shield = "target" | "effect-destruction" | "battle-destruction" | "effects";
 
+/**
+ * What a monster is allowed beyond the one attack per turn on a monster, or directly when the opponent controls none (RB10):
+ * - `times`: "can make a second attack during each Battle Phase" (`count: 2`), "up to 3 attacks": that many attacks in all. With
+ *   `monstersOnly` ("can make up to 2 attacks on monsters during each Battle Phase"): the attacks after the first must be on monsters,
+ *   and there are none after a direct attack.
+ * - `all-monsters`: "can attack all monsters your opponent controls, once each": after its first attack, it may attack each monster it
+ *   has not attacked yet, never directly, and not at all once it has declared a direct attack (Konami's Japanese Q&A fid 16016).
+ * - `directly`: "can attack directly": a direct attack is open while the opponent controls monsters.
+ * - `in-defense`: "can attack while in face-up Defense Position": it may declare an attack in face-up Defense Position, and its DEF
+ *   is then used as its ATK for damage calculation.
+ * A permission is a Continuous Effect of a card, or what a resolved effect leaves (`addModifier`): negated or gone, it no longer allows.
+ * A direct attack whose permission is lost before the Damage Step is replayed (fid 16016, case D); lost in the Damage Step, it ends
+ * with no damage calculation (YGOProJudge only, asked 2026-11-24, no source cited).
+ */
+export type AttackAllowance =
+	| { readonly what: "times"; readonly count: number; readonly monstersOnly?: true }
+	| { readonly what: "all-monsters" }
+	| { readonly what: "directly" }
+	| { readonly what: "in-defense" };
+
 /** The lock layer (see `LockKind`). */
 export type LockLayer = Extract<Layer, { kind: "lock" }>;
+type PermitLayer = Extract<Layer, { kind: "permit" }>;
+/** Layers about a player, not about the cards a modifier reaches: read by `playerLayersNow`, never by a card's own queries. */
+const aboutPlayers = (layer: Layer): layer is LockLayer | PermitLayer => layer.kind === "lock" || layer.kind === "permit";
 type ProtectLayer = Extract<Layer, { kind: "protect" }>;
 
 /** "For the rest of this Duel": a modifier that no turn ends. It needs no source on the field: lasting modifiers never do. */
@@ -94,6 +119,14 @@ export type Layer =
 	 * (only for the two destructions): each card is spared once a turn (`Duel.spared`).
 	 */
 	| { readonly kind: "protect"; readonly against: Shield | readonly Shield[]; readonly from?: (duel: Duel, by: EffectSource, target: CardInstance) => boolean; readonly firstEachTurn?: true }
+	/**
+	 * A permission for a player (`who`), beyond what the rules give: `normal-summon`: "you can Normal Summon 1 [monster] in addition to
+	 * your Normal Summon/Set", for the monsters `only` accepts (default: any). One such Summon per turn, whatever gives it
+	 * (`Duel.extraNormalSummoned`; Konami's notes on Mausoleum of White, OCG only).
+	 */
+	| { readonly kind: "permit"; readonly what: "normal-summon"; readonly who: Side; readonly only?: (duel: Duel, card: CardInstance) => boolean }
+	/** A permission about attacks, for the monsters the modifier reaches (see `AttackAllowance`; src/battle.ts reads it). */
+	| { readonly kind: "attack"; readonly allows: AttackAllowance }
 	/** Bookkeeping for a control change that lasts: the card goes back to its owner when it ends. */
 	| { readonly kind: "control"; readonly to: Side };
 
@@ -254,7 +287,7 @@ const ON_FIELD_PILES = ["monster", "spell", "field"] as const;
  */
 function entriesFor(duel: Duel, target: CardInstance, seen: ReadonlySet<number>): Entry[] {
 	const found: Entry[] = [];
-	for (const modifier of duel.modifiers) if (modifier.layer.kind !== "lock" && reaches(duel, modifier.affects, target, null)) found.push({ stamp: modifier.stamp, layer: modifier.layer, source: null, by: modifier.by ?? null });
+	for (const modifier of duel.modifiers) if (!aboutPlayers(modifier.layer) && reaches(duel, modifier.affects, target, null)) found.push({ stamp: modifier.stamp, layer: modifier.layer, source: null, by: modifier.by ?? null });
 	const codes = codesWithContinuous(duel.defs);
 	if (codes.size > 0) {
 		for (const side of ["you", "rival"] as const) {
@@ -265,7 +298,7 @@ function entriesFor(duel: Duel, target: CardInstance, seen: ReadonlySet<number>)
 					for (const record of duel.defs[source.code]!.effects!) {
 						if (record.type !== "continuous" || !appliesNow(duel, source, record, seen)) continue;
 						if (record.affects ? !record.affects(duel, target, source) : source.id !== target.id) continue;
-						for (const layer of record.modifies!(duel, source)) if (layer.kind !== "lock") found.push({ stamp: source.since, layer, source, by: { card: source, player: source.controller } });
+						for (const layer of record.modifies!(duel, source)) if (!aboutPlayers(layer)) found.push({ stamp: source.since, layer, source, by: { card: source, player: source.controller } });
 					}
 				}
 			}
@@ -309,37 +342,51 @@ function unaffectedDropped(duel: Duel, target: CardInstance, entries: Entry[]): 
  */
 const appliedFirst = (negation: Entry, shield: Entry, target: CardInstance): boolean => negation.layer.kind === "negate" && negation.source !== null && shield.source?.id === target.id && negation.stamp < shield.stamp;
 
-const shieldCache = new WeakMap<Duel, boolean>();
+/** One bit per kind of layer a question may ask about without reading the field (`layerKindsNow`). */
+const PROTECT_BIT = 1;
+const ATTACK_BIT = 2;
+const EVERY_KIND = PROTECT_BIT | ATTACK_BIT;
+const bitOf = (layer: Layer): number => (layer.kind === "protect" ? PROTECT_BIT : layer.kind === "attack" ? ATTACK_BIT : 0);
+const kindsCache = new WeakMap<Duel, number>();
 
 /**
- * Could any protection apply in this Duel now: a lasting one, or a continuous record of a face-up card on the field that gives one?
- * Read once per Duel value; when there is none, no protection query looks any further (the listing asks for every target candidate).
+ * Which of the kinds of layer asked about per card (protections, attack permissions) could apply in this Duel now: those of the
+ * lasting modifiers, and those the continuous records of the face-up cards on the field give (whether or not each applies). Read once
+ * per Duel value, so that a question about a kind nobody has looks no further: the listing asks for every target candidate and every
+ * attacker.
  */
-export function anyShield(duel: Duel): boolean {
-	if (quiet(duel)) return false;
-	const cached = shieldCache.get(duel);
+function layerKindsNow(duel: Duel): number {
+	if (quiet(duel)) return 0;
+	const cached = kindsCache.get(duel);
 	if (cached !== undefined) return cached;
-	let found = duel.modifiers.some((modifier) => modifier.layer.kind === "protect");
+	let found = 0;
+	for (const modifier of duel.modifiers) found |= bitOf(modifier.layer);
 	const codes = codesWithContinuous(duel.defs);
-	if (!found && codes.size > 0) {
-		scan: for (const side of ["you", "rival"] as const) {
+	// Once every kind is found there is nothing more to learn: the rest of the field is not read.
+	if (codes.size > 0 && found !== EVERY_KIND) {
+		field: for (const side of ["you", "rival"] as const) {
 			for (const zone of ON_FIELD_PILES) {
 				for (const id of duel.piles[side][zone]) {
 					const source = duel.cards[id]!;
 					if (source.face !== "up" || !codes.has(source.code)) continue;
 					for (const record of duel.defs[source.code]!.effects!) {
-						if (record.type === "continuous" && record.modifies!(duel, source).some((layer) => layer.kind === "protect")) {
-							found = true;
-							break scan;
-						}
+						if (record.type !== "continuous") continue;
+						for (const layer of record.modifies!(duel, source)) found |= bitOf(layer);
+						if (found === EVERY_KIND) break field;
 					}
 				}
 			}
 		}
 	}
-	shieldCache.set(duel, found);
+	kindsCache.set(duel, found);
 	return found;
 }
+
+/**
+ * Could any protection apply in this Duel now: a lasting one, or a continuous record of a face-up card on the field that gives one?
+ * Read once per Duel value; when there is none, no protection query looks any further (the listing asks for every target candidate).
+ */
+export const anyShield = (duel: Duel): boolean => (layerKindsNow(duel) & PROTECT_BIT) !== 0;
 
 const NO_ENTRIES: Entry[] = [];
 
@@ -484,16 +531,30 @@ interface LockEntry {
 }
 
 const NO_LOCKS: readonly LockEntry[] = Object.freeze([]);
-/** The locks of a Duel, read once per Duel value (a Duel never changes): every listing asks about them for each effect it offers. */
-const lockCache = new WeakMap<Duel, readonly LockEntry[]>();
+const NO_PERMITS: readonly PermitLayer[] = Object.freeze([]);
+/** The layers about players that apply in a Duel: the locks, and the permissions. */
+interface PlayerLayers {
+	readonly locks: readonly LockEntry[];
+	readonly permits: readonly PermitLayer[];
+}
+const NO_PLAYER_LAYERS: PlayerLayers = Object.freeze({ locks: NO_LOCKS, permits: NO_PERMITS });
+/** The locks and permissions of a Duel, read once per Duel value (a Duel never changes): every listing asks about them for each effect it offers. */
+const playerCache = new WeakMap<Duel, PlayerLayers>();
 
 /** Every lock that applies now: the lasting ones, and the continuous ones of cards face-up on the field that are not negated. */
-function locksNow(duel: Duel): readonly LockEntry[] {
-	if (quiet(duel)) return NO_LOCKS;
-	const cached = lockCache.get(duel);
+const locksNow = (duel: Duel): readonly LockEntry[] => playerLayersNow(duel).locks;
+
+/** Every lock and permission that applies now: the lasting ones, and the continuous ones of cards face-up on the field that are not negated. */
+function playerLayersNow(duel: Duel): PlayerLayers {
+	if (quiet(duel)) return NO_PLAYER_LAYERS;
+	const cached = playerCache.get(duel);
 	if (cached) return cached;
 	const found: LockEntry[] = [];
-	for (const modifier of duel.modifiers) if (modifier.layer.kind === "lock") found.push({ layer: modifier.layer, source: null });
+	let permits: PermitLayer[] | null = null;
+	for (const modifier of duel.modifiers) {
+		if (modifier.layer.kind === "lock") found.push({ layer: modifier.layer, source: null });
+		else if (modifier.layer.kind === "permit") (permits ??= []).push(modifier.layer);
+	}
 	const codes = codesWithContinuous(duel.defs);
 	if (codes.size > 0) {
 		for (const side of ["you", "rival"] as const) {
@@ -504,16 +565,32 @@ function locksNow(duel: Duel): readonly LockEntry[] {
 					for (const record of duel.defs[source.code]!.effects!) {
 						if (record.type !== "continuous") continue;
 						// The layers are read first: whether the source applies (is it negated?) is the costly question, asked only of a record that locks.
-						const locks = record.modifies!(duel, source).filter((layer): layer is LockLayer => layer.kind === "lock");
-						if (locks.length > 0 && appliesNow(duel, source, record, NOBODY)) for (const layer of locks) found.push({ layer, source });
+						const layers = record.modifies!(duel, source).filter(aboutPlayers);
+						if (layers.length === 0 || !appliesNow(duel, source, record, NOBODY)) continue;
+						for (const layer of layers) {
+							if (layer.kind === "lock") found.push({ layer, source });
+							else (permits ??= []).push(layer);
+						}
 					}
 				}
 			}
 		}
 	}
-	const result = found.length === 0 ? NO_LOCKS : found;
-	lockCache.set(duel, result);
+	const result: PlayerLayers = found.length === 0 && permits === null ? NO_PLAYER_LAYERS : { locks: found.length === 0 ? NO_LOCKS : found, permits: permits ?? NO_PERMITS };
+	playerCache.set(duel, result);
 	return result;
+}
+
+/**
+ * May `who` Normal Summon this monster "in addition to their Normal Summon/Set" now: an effect that says so applies for them and
+ * accepts the monster, and no additional Normal Summon was made this turn. Konami's notes on Mausoleum of White (OCG only; records
+ * `extra-normal-summon-one-per-turn`, `extra-normal-summon-controller-only`): only one such effect is applied in a turn, whatever
+ * gives it; YGOProJudge answered the same for the TCG (asked 2026-11-24, no source cited).
+ */
+export function extraNormalSummon(duel: Duel, who: Side, card: CardInstance): boolean {
+	if (duel.extraNormalSummoned) return false;
+	const { permits } = playerLayersNow(duel);
+	return permits.length > 0 && permits.some((layer) => layer.what === "normal-summon" && layer.who === who && (layer.only === undefined || layer.only(duel, card)));
 }
 
 /**
@@ -538,12 +615,29 @@ export function activationLocked(duel: Duel, ctx: EffectContext, index: number, 
 	return locked(duel, "activate", ctx.player, (layer) => layer.stops === undefined || layer.stops(duel, attempt));
 }
 
+const NO_ALLOWANCES: readonly AttackAllowance[] = Object.freeze([]);
+
+/** The attack permissions that reach this monster now (`AttackAllowance`): none in a Duel with no modifier and no continuous card. */
+export function attackAllowances(duel: Duel, id: number): readonly AttackAllowance[] {
+	if ((layerKindsNow(duel) & ATTACK_BIT) === 0) return NO_ALLOWANCES;
+	let found: AttackAllowance[] | null = null;
+	for (const { layer } of entriesFor(duel, duel.cards[id]!, NOBODY)) if (layer.kind === "attack") (found ??= []).push(layer.allows);
+	return found ?? NO_ALLOWANCES;
+}
+
 /** Is this monster stopped from declaring an attack ("cannot attack"), or with `directly` a direct attack ("cannot attack directly")? */
 export function attackLocked(duel: Duel, card: CardInstance, directly = false): boolean {
 	if (locksNow(duel).length === 0) return false;
 	const on = (layer: LockLayer) => layer.only === undefined || layer.only(duel, card);
 	return locked(duel, "attack", card.controller, on) || (directly && locked(duel, "attack-directly", card.controller, on));
 }
+
+/**
+ * Is `who` stopped from Special Summoning 2 or more monsters at the same time (Blue-Eyes Spirit Dragon's wording)? Konami's Japanese
+ * Q&A fid 18176 (OCG only; records `summon-together-lock`, `summon-together-lock-at-resolution`): an effect that must Summon two or
+ * more at once cannot be activated, and Summons none if the lock began to apply in its chain.
+ */
+export const summonTogetherLocked = (duel: Duel, who: Side): boolean => locksNow(duel).length > 0 && locked(duel, "summon-together", who);
 
 /** Is this card of a Graveyard stopped from being banished ("cannot be banished from the GY")? */
 export function banishLocked(duel: Duel, card: CardInstance): boolean {

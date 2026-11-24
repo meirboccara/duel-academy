@@ -347,3 +347,37 @@ bench/legal-moves.bench.ts`, four runs on a machine that was busy for the first,
 0.0692 / 1.173 ms (17.0×), 0.0550 / 1.069 ms (19.4×), 0.0567 / 1.084 ms (19.1×), 0.0583 / 1.090 ms (18.7×). The listing alone took
 0.0023 to 0.0032 ms on crowdedHand. list + `act` is where the previous table had it (0.0568 ms); the ratio moves with today's
 engine's own time, and stays above the 10× floor.
+
+## Real-deck readiness: attack permissions, additional Normal Summon, simultaneous Summons, replaced effects (2026-11-24)
+
+The Battle Phase listing now asks each attacker for its attack permissions (`attackAllowances`), and every listing asks whether an
+additional Normal Summon is open (`extraNormalSummon`, read from the per-Duel cache of locks and permissions). Whether any attack
+permission or protection exists at all is one read per Duel value (`layerKindsNow`, a bit mask in a `WeakMap`, which replaced
+`anyShield`'s own scan), so a board with none reads no modifier per attacker.
+
+`npx vitest bench --run bench/legal-moves.bench.ts`, crowdedHand list + `act` against today's engine, means:
+- Four runs in a row on a quiet machine: 0.0546 / 1.108 ms (20.3×), 0.0567 / 1.133 ms (20.0×), 0.0571 / 1.090 ms (19.1×),
+  0.0579 / 1.166 ms (20.1×); the listing alone took 0.0023 to 0.0025 ms. That is where the previous slice had it (0.0550 to 0.0583 ms).
+- Later the machine was busy (other test runs; today's engine itself took 1.2 to 2.5 ms on crowdedHand) and runs spread from 0.054
+  to 0.098 ms, ratios from 10.0× to 37×. To tell load from a regression, the committed sources (the previous slice, copied to a
+  scratch folder and benched from there) and the working tree were run in turn, four times each: committed 0.0552, 0.0681, 0.0710,
+  0.0803 ms; this slice 0.0561, 0.0797, 0.0540, 0.0730 ms. The two are the same within that noise.
+
+The three positions, one quiet run (taken before the per-Duel check was added; the check only shortens the Battle Phase listing):
+
+| Position | `legalActions` | list + `act` | today's engine | list + `act` speed-up |
+|---|---:|---:|---:|---:|
+| opening | 0.0007 ms | 0.0200 ms | 0.906 ms | 45× |
+| midgame | 0.0025 ms | 0.0451 ms | 3.444 ms | 76× |
+| crowdedHand | 0.0029 ms | 0.0558 ms | 1.152 ms | **20.6×** |
+
+crowdedHand list + `act` stays above the 10× floor in every run, the busy ones included.
+
+`npx vitest bench --run bench/battle.bench.ts`, mean per call (step 6b had 0.0004 ms and 0.0127 ms):
+
+| Case | Mean |
+|---|---:|
+| `legalActions`: Battle Step, 3 attackers × 3 targets, a Set Shrink on the other side | 0.0005 ms |
+| One attack from its declaration to the end of the Damage Step, nobody responding | 0.0098 ms |
+
+Reading the permissions per attacker without the per-Duel check cost 0.0012 ms on the first case (measured once before it was added).

@@ -20,7 +20,8 @@ export function actionName(duel: Duel, action: Action): string {
 		case "attack":
 			return `attack ${codeOf(duel, action.card)} ${action.target === null ? "directly" : `> ${codeOf(duel, action.target)}`}`;
 		case "summon":
-			return `${action.how === "special" ? "special-summon" : "summon"} ${codeOf(duel, action.card)}`;
+			// A Normal Summon made in addition to the turn's Normal Summon/Set says so: "summon lv1 additional".
+			return `${action.how === "special" ? "special-summon" : "summon"} ${codeOf(duel, action.card)}${action.extra ? " additional" : ""}`;
 		case "activate": {
 			const code = codeOf(duel, action.card);
 			const effect = (duel.defs[code]?.effects?.length ?? 0) > 1 ? ` #${action.effect + 1}` : "";

@@ -45,6 +45,7 @@ export type Range = "hand" | "field" | "graveyard" | "banished" | "pendulum";
  * - `duel`: "once per Duel": as `name`, for the whole Duel, spent even if negated (`duel-use-spent-even-if-negated`), per
  *   player (`duel-per-player-control`, `duel-per-player-effect-used`).
  * - `chain`: "once per Chain": as `name`, until the chain it was put on has resolved, per player (*): no Konami page found.
+ * `times` makes the limit a count ("twice per turn": Neo Blue-Eyes Ultimate Dragon's wording), spent and given back one use at a time.
  * `key` lets several effects share one limit ("You can only use 1 [name] effect per turn"); the default is the card
  * code and the effect's place in the card.
  */
@@ -52,6 +53,8 @@ export type OnceScope = "instance" | "name" | "activation" | "duel" | "chain";
 export interface Once {
 	readonly scope: OnceScope;
 	readonly key?: string;
+	/** "You can use this effect ... twice per turn": how many uses the limit allows (default 1). Each activation spends one. */
+	readonly times?: number;
 }
 
 /**
@@ -352,7 +355,9 @@ export interface MaterialCount {
  * Step 8 of docs/rules-core-spec.md: a monster's Summon procedure, as data (src/procedures.ts plays it). The card writes only what
  * is printed on it; the kind adds its own rule:
  * - `synchro`: 1 Tuner and 1 or more non-Tuner monsters (or what `tuner` / `nonTuner` / `nonTuners` say), face-up on your field,
- *   whose Levels add up to the Synchro Monster's Level; sent to the Graveyard.
+ *   whose Levels add up to the Synchro Monster's Level; sent to the Graveyard. `tuners`: how many Tuners when the card does not ask
+ *   for exactly one ("2+ Tuners": `{ min: 2 }`, with no `max` any number; "2 Tuners": `{ min: 2, max: 2 }`). A Tuner never fills a
+ *   non-Tuner's place.
  * - `xyz`: 2 face-up monsters you control whose Level is the Rank (or what `materials` says), which become its Xyz Materials.
  *   `alternatives`: the other ways printed on the card ("you can also Xyz Summon this card by using a Rank 4 Xyz Monster you
  *   control as material"), each with its `condition`; `transfer`: "(Transfer its materials to this card.)".
@@ -364,7 +369,7 @@ export interface MaterialCount {
  * - `ritual`: a Ritual Monster, Summoned by a Ritual Spell (`ritualSummon`).
  */
 export type Procedure =
-	| { readonly kind: "synchro"; readonly tuner?: MaterialFilter; readonly nonTuner?: MaterialFilter; readonly nonTuners?: { readonly min: number; readonly max?: number }; readonly check?: MaterialCheck }
+	| { readonly kind: "synchro"; readonly tuner?: MaterialFilter; readonly tuners?: { readonly min: number; readonly max?: number }; readonly nonTuner?: MaterialFilter; readonly nonTuners?: { readonly min: number; readonly max?: number }; readonly check?: MaterialCheck }
 	| { readonly kind: "xyz"; readonly materials?: MaterialCount; readonly check?: MaterialCheck; readonly alternatives?: readonly { readonly materials: MaterialCount; readonly condition?: (duel: Duel, ctx: MaterialContext) => boolean; readonly transfer?: true }[] }
 	| { readonly kind: "link"; readonly materials: MaterialCount; readonly check?: MaterialCheck }
 	| { readonly kind: "fusion"; readonly materials: readonly MaterialSlot[]; readonly check?: MaterialCheck; readonly contact?: { readonly to: "graveyard" | "banished" | "deck" } }

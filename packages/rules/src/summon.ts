@@ -18,6 +18,8 @@ export interface SummonAttempt {
 	readonly position?: Position;
 	readonly kind?: SummonKind;
 	readonly proper?: boolean;
+	/** A Normal Summon made "in addition to your Normal Summon/Set": it uses the turn's additional Normal Summon, not the Normal Summon/Set. */
+	readonly extra?: boolean;
 }
 
 /**
@@ -38,7 +40,8 @@ export function beginSummon(duel: Duel, player: Side, id: number, how: "normal" 
 		...(attempt.kind === undefined ? {} : { kind: attempt.kind }),
 		...(attempt.proper ? { proper: true } : {}),
 	};
-	return { ...next, summoning, normalSummoned: how === "normal" ? true : next.normalSummoned, priority: closedPriority(duel.turn.player) };
+	const usesTurnSummon = how === "normal" && !attempt.extra;
+	return { ...next, summoning, normalSummoned: usesTurnSummon ? true : next.normalSummoned, extraNormalSummoned: attempt.extra ? true : next.extraNormalSummoned, priority: closedPriority(duel.turn.player) };
 }
 
 /**
@@ -93,7 +96,8 @@ export function landSummon(duel: Duel, summoning: Summoning, by?: "effect"): Due
 			continue;
 		}
 		const placed = moveCardHeld(next, id, { zone: "monster", face: "up", controller: summoning.player, slot, position: summoning.positions?.[i] ?? "attack" });
-		next = mark(placed.duel, id, { proper: placed.duel.cards[id]!.proper || summoning.proper === true, summonedBy: summoning.kind ?? null, specialSummoned: summoning.how === "special" });
+		const own = typeof summoning.proper === "object" ? summoning.proper[i] === true : summoning.proper === true;
+		next = mark(placed.duel, id, { proper: placed.duel.cards[id]!.proper || own, summonedBy: summoning.kind ?? null, specialSummoned: summoning.how === "special" });
 		arrivals.push({ id, moved: placed.events, summoned: { type: "summoned", how: summoning.how, ...kind } });
 	}
 	// Every monster is in place: now each one's events, in the order of the group.

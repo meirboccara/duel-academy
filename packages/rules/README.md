@@ -93,7 +93,7 @@ Step 4 (effect records + once per turn):
   card became a new card, i.e. its `moves` changed), `name` ("You can only use this effect of [name] once per turn": per
   player, spent at activation, kept when the activation is negated), `activation` ("You can only activate 1 [name] per
   turn": a negated activation gives the use back, a negated effect does not; `negateActivation` does the refund), `duel`
-  (never lifted) and `chain` (lifted once the chain has resolved). A `key` shares one limit between effects. Triggers use
+  (never lifted) and `chain` (lifted once the chain has resolved). A `key` shares one limit between effects (which must then allow the same number of uses). Triggers use
   the same check.
 - `src/cards/`: the cards Academy writes as data, as records, each with its `CardSources` and tests in `test/cards`: Ash
   Blossom & Joyous Spring, Terraforming, Mystical Space Typhoon, D.D. Crow, Pot of Greed and Link Spider
@@ -262,7 +262,8 @@ Step 6b (battle; plan in `docs/rules-core/battle/design.md`, sources in `docs/ru
 `src/battle-sources.ts`):
 - `src/battle.ts`. In the Battle Phase, with the game state open, `legalActions` lists `attack` actions (`{ type: "attack", card,
   target }`, `target: null` for a direct attack): each face-up Attack Position monster once a turn (`Duel.attacked`, per card as it
-  was), never on the Duel's first turn, directly only when the opponent has no monster. Declaring starts no chain (FET); the turn
+  was), never on the Duel's first turn, directly only when the opponent has no monster (more attacks, direct attacks past monsters
+  and Defense Position attacks are permissions since the second readiness slice: last section). Declaring starts no chain (FET); the turn
   player then the opponent may respond.
 - `Duel.battle` is the attack in progress. When both players pass with no chain it moves on: Battle Step (`declared`) → start of
   the Damage Step → before damage calculation (a face-down target is flipped face-up in Defense Position) → damage calculation
@@ -402,7 +403,8 @@ Known limits of step 8 (what the tests do not prove):
   Zone and a face-down monster still "Xyz Summoned" (17662).
 - Not expressible yet: Tokens as materials or Tributes (step 11); effects that change how a card counts as material ("can be treated
   as a Tuner", "as 2 Tributes", Fusion substitutes, "treated as Level X for an Xyz Summon"); a Synchro Monster that needs 2 Tuners or
-  none; an Xyz alternative with a cost; "Tribute 3 monsters", Summons with fewer Tributes, a second Normal Summon as an action
+  none (since the second readiness slice: `Procedure.tuners`, last section); an Xyz alternative with a cost; "Tribute 3 monsters", Summons with fewer Tributes, a second Normal Summon as an action
+  (since the same slice: the `extra` Summon)
   (`summonByEffect` gives one by effect); Gemini, Spirit and Union monsters; a Pendulum Summon performed by an effect; Special Summons
   and Sets in face-down Defense Position by an effect; zone locks. (Materials "shuffled into the Deck" were placed on it until the
   2026-11-24 readiness slice, which shuffles them: see the last section.)
@@ -688,3 +690,107 @@ Known limits of this slice (what the tests do not prove):
   (the `summoned` event), which is also what makes a negated Summon draw nothing (YGOProJudge's lead; follows from the event model).
 - Bot: `viewFor` keeps `delayed`, `watches`, `spared` and `activations` as they are (their sources were activated, so both players
   know them); a re-dealt world keeps them and plays on. The evaluation does not value a pending delayed effect or a watch.
+
+Attack permissions, Tuner counts, an additional Normal Summon, simultaneous Special Summons, a replaced effect (2026-11-24, second
+readiness slice; mechanics only, no real card written; tests in `test/rules/{extra-attacks,direct-and-defense-attacks,synchro-tuners,
+extra-normal-summon,summon-together,effect-replacement}.test.ts` and `test/bot/second-readiness.test.ts`, with the made-up cards of
+`test/rules/{attack,summon-extras,replace}-fixtures.ts` (every new code starts with `fixture-`); records in `src/attack-sources.ts` and
+`src/second-readiness-sources.ts`):
+- **Attack permissions** are a layer of the one modifier model (`{ kind: "attack", allows }`, `AttackAllowance`, `attackAllowances`),
+  given by a card's Continuous Effect or left by a resolved effect, so a negated or absent source no longer allows:
+  - `times` ("can make a second attack during each Battle Phase": `count: 2`; `monstersOnly` for "up to 2 attacks on monsters"),
+    `all-monsters` ("can attack all monsters your opponent controls, once each"), `directly` ("can attack directly"), `in-defense`
+    ("can attack while in face-up Defense Position", DEF used as ATK for damage calculation).
+  - `attackAgain(duel, id)` for "this card can attack again in a row" (`Duel.again`): one more attack, as the next attack of the turn;
+    used up when declared, lost when another monster attacks or the monster is no longer face-up in the Monster Zone. It is granted
+    only to a monster that has declared an attack this turn ("again": on one that has not, nothing happens, so its first attack
+    never uses it up), and one granted during an attack that is then replayed is kept when the same monster makes that attack again.
+    `Once.times` makes a once-per-turn limit a count ("you can use this effect twice per turn"); effects that share a `key` must
+    declare the same `times` (a definition error is thrown when a listing reads such a limit).
+  - `Duel.attacked` is now the list of the turn's attacks (`AttackMade`: the attacker as it was, its target, whether a direct attack
+    was declared in it, whether it used "again"): a monster with several attacks is there once per attack, and an attack replayed
+    and made again by the same monster stays one entry (its "direct attack declared" mark stays too). `canChangePosition` reads it as
+    before.
+  - A direct attack is listed beside the attacks on monsters (`{ type: "attack", target: null }`, named "attack X directly" as
+    before); the `attack-directly` lock removes only that action, the `attack` lock all of them.
+  - Read again before the Damage Step: a second or later attack whose permission is gone ends there; a Defense Position attacker
+    whose permission is gone ends there with no replay; a direct attack on a player who controls monsters whose permission is gone
+    is replayed, and so is a direct attack by a monster that "cannot attack directly" since it was declared (the `attack-directly`
+    lock, whatever the opponent controls; the replay offers no direct attack). In the Damage Step: a negated extra-attack permission
+    changes nothing (damage calculation is done); a negated Defense Position or direct-attack permission, or a "cannot attack
+    directly" lock that began to apply during a direct attack, ends the Damage Step with no damage calculation.
+- **Synchro Summons with a Tuner count other than one**: `Procedure.tuners` (`{ min: 2 }` for "2+ Tuners", `{ min: 2, max: 2 }` for
+  "2 Tuners"), beside `nonTuners` and the two filters; with none, exactly 1 Tuner as before. A Tuner never fills a non-Tuner's place.
+- **A Normal Summon in addition to the Normal Summon/Set** is a permission for a player (`{ kind: "permit", what: "normal-summon", who,
+  only }`: a Continuous Effect such as Mausoleum of White's, or a lasting modifier), not an effect that Summons: `legalActions` lists
+  it as a `summon` action marked `extra: true` (named "summon X additional"), beside the turn's own Normal Summon when both are open
+  (the player says which they use), in the player's own Main Phase with the game state open. It is a Normal Summon (a Tribute Summon
+  for a Level 5 or higher monster, never a Set), it opens the Summon's window like any other, and it uses `Duel.extraNormalSummoned`,
+  not `normalSummoned`: one additional Normal Summon per turn in all, whatever gives it, also when it is negated. `extraNormalSummon`
+  is the query; a card that gives the permission by an activated effect reads `duel.extraNormalSummoned` in its condition.
+- **Monsters Special Summoned at the same time** by one effect: `canSpecialSummonTogether(duel, player, ids, { leaving })` (all of
+  them or none: no "2 or more at the same time" lock, each one Summonable, a zone for each, the zones of a cost's monsters counted as
+  free), `specialSummonTogether(duel, player, picks)` (with `{ kind }`, each monster is properly Summoned only if that is its own
+  procedure) and `askSpecialSummonTogether(duel, player, ids, { then })` (the player gives
+  each monster its zone and position in turn; a zone is offered only if it leaves the others one). All are placed, then their events
+  are raised as one batch (`landSummon`), so "each time ... Special Summons" counts the group once and every "if Summoned" trigger
+  waits for the same trigger point. If they cannot all be Summoned when the effect resolves, none is.
+- **"Neither player can Special Summon 2 or more monsters at the same time"** is the lock `summon-together`
+  (`summonTogetherLocked`): `canSpecialSummonTogether` refuses two or more (so the effect cannot be activated, and Summons nothing if
+  the lock began in its chain), and a Pendulum Summon is then of one monster.
+- **Replacing an effect on the chain**: `replaceEffect(duel, index, operation, by)` sets `Link.replaced`; when that link resolves,
+  the new operation runs instead of the card's own, with the same link: it is still the effect of the card and player that activated
+  it (who makes its choices, and whose destruction it is), with its cost paid, its once-per-turn use spent and its place in
+  `Duel.activations`. The card's definition is never touched. It is not applied to the monster, so an "unaffected" monster's effect
+  is replaced too; a link negated before it resolves does neither effect; if the replacing effect's activation is negated, nothing
+  is replaced.
+- Bot: no new action type, one new mark (`extra` on `summon`) with its stable name; `viewFor` and `redeal` keep `attacked`, `again`,
+  `extraNormalSummoned` and a link's `replaced` (all public), and a re-dealt world plays on from them.
+- Speed: whether any attack permission or protection exists is read once per Duel value (`layerKindsNow`), so the Battle Phase
+  listing reads no modifier when there is none (BASELINE.md).
+
+Sources of this slice (read 2026-11-24): RB10's glossary line on direct attacks; Konami's TCG card texts of Blue-Eyes Ultimate
+Spirit Dragon, Mausoleum of White, Blue-Eyes Spirit Dragon and Prototype Sky Striker Ace - Amatsu; Konami's Japanese notes and Q&A
+(OCG only): attacks on all monsters (fids 12701, 16016), several attacks negated (11046), Neo Blue-Eyes Ultimate Dragon's notes,
+Sky Striker Ace - Hayate's notes, Defense Position attackers (24407, 23968), Mausoleum of White's notes and fid 24288, Sky Striker
+Ace = Zero's notes, Blue-Eyes Spirit Dragon's fid 18176, Amatsu's notes and fids 24166, 24165. Also opened and not cited: fids 17195,
+23993, 13862 (Hayate's list), 14252, 18129, 24189, 24150, 19892, 24393, 24164.
+
+Known limits of this slice (what the tests do not prove):
+- No real card is written: Hayate, Zero, Amatsu, Mausoleum of White, the Spirit Dragons, Tyrant Dragon, Neo Blue-Eyes Ultimate
+  Dragon and Ancient Fairy Life Dragon still owe their other clauses, printed identity, French text and tests.
+- Only YGOProJudge backs (asked 2026-11-24, six chats, no official source cited): "in a row" means the next attack declared; "up to 2
+  attacks on monsters" gives nothing after a direct attack and no direct second attack; both attacks of "a second attack" may be
+  direct; a replayed attack made again is the same attack; a direct-attack permission lost in the Damage Step ends the attack with no
+  damage calculation; a "cannot attack directly" effect that begins to apply during a direct attack causes a replay in the Battle
+  Step and ends the attack with no damage calculation in the Damage Step (a seventh chat, same day); a replaced link that is negated does neither effect, and a negated replacing effect leaves the original; a
+  Pendulum Summon of one monster under the "2 or more" lock. YGOProJudge also answered that only one additional Normal Summon is made
+  per turn across such effects and that the player declares which Summon they use: there Konami's notes say the same (OCG).
+- **A YGOProJudge example not followed**: it counted Double Summon among the "in addition to your Normal Summon/Set" effects (2
+  Summons in all with Mausoleum of White). Konami's Q&A fid 18129 gives 3 (Double Summon is worded "2 Normal Summons/Sets this turn",
+  not "in addition"). Double Summon's wording is not modelled; nothing in the core rests on that example.
+- The extra-attack Q&A pages are about Continuous Effects on other cards (Mementoal Tecuhtlica and lists that name Blue-Eyes Tyrant
+  Dragon); the core applies them to any `all-monsters` / `times` permission. "Once each" forgets a monster that left and came back (a
+  new card). A `times` and an `all-monsters` permission on one monster each open their own attacks; two `times` permissions do not
+  add up, the widest applies (two "a second attack" give two attacks in all): no page read. An attack made "again in a row" counts
+  among the attacks of a `times` permission. "Attack again in a row" given to a monster that has not attacked this turn does
+  nothing: the core's reading of the wording, no page read.
+- A "cannot attack" lock (not "directly") that begins to apply during an attack on a monster does not stop that attack: only the
+  listing and a direct attack in progress read it. With `{ kind }`, `specialSummonTogether` still marks every monster of the group
+  as Summoned by that kind (`summonedBy`), also one whose own procedure it is not.
+- Restrictions on attack targets ("your opponent cannot target other monsters for attacks", "must attack if able", "the controller
+  chooses the attack target") are not modelled (Hayate's Q&A fids 23993 and 13862 say which of them leave a direct attack open).
+- A direct attack by permission that meets a new monster on the opponent's side is replayed like any attack (RB10's replay causes;
+  no page read for this case). The `attack-declared` event does not say whether the attacker is in Defense Position (a card reads the
+  attacker's position: Konami's Q&A fid 14252, Mirror Force).
+- The additional Normal Summon is one per turn for the turn player whatever its source (OCG notes; the TCG text says "you can only
+  gain this effect once per turn", read the same way by YGOProJudge). Which effect gave it is not recorded on the Summon; a card that
+  would care ("if Summoned this way") cannot ask. A lock on Normal Summons stops it like any Normal Summon.
+- Simultaneous Summons: "as many as possible" under the "2 or more" lock (one monster: Konami's Q&A fid 24150) is for the card to
+  write (Summon one with `specialSummon`); monsters Summoned to both players' fields at once, Tokens, and a group Summoned face-down
+  are not written. `canSpecialSummonTogether` judges zones on the board as it is, minus `leaving`; a cost that frees a zone must say
+  so. The players' choice order (zone and position per monster, in the order the effect lists them) is the core's.
+- A replaced effect keeps the `categories` and targets frozen at activation: nothing can answer a link after the chain started to
+  resolve, so no test reads them. The ATK "before it left as its cost" of Amatsu's condition (Konami's Q&A fid 24164) is the card's to
+  read (the link holds the card as it was when activated, not its ATK then). A choice the replaced effect asks is its own player's.
+- The Battle Phase still has no Start Step or End Step window, and "each Battle Phase" is the turn's one Battle Phase.

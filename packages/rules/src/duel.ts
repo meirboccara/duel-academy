@@ -1,4 +1,4 @@
-import type { CardDef, Declaration, SpellSpeed } from "./effects";
+import type { CardDef, Declaration, Operation, SpellSpeed } from "./effects";
 import { type GameEvent, raiseEvent, type Waiting } from "./events";
 import { NOTHING_USED, type Used } from "./once";
 import { banishLocked, type EffectSource, locked, type Modifier, spareDestruction, unaffectedBy } from "./modifiers";
@@ -116,6 +116,11 @@ export interface Link {
 	readonly declared?: Declaration;
 	/** Coupled targets (`EffectRecord.targetGroups`): how many of `targets` each group took, in order. */
 	readonly targetGroups?: readonly number[];
+	/**
+	 * "That effect becomes '...'" (`replaceEffect`, src/chain.ts): what this link does when it resolves, instead of its card's own
+	 * operation, and the effect that replaced it. Everything else of the link stands (its player, cost, once-per-turn use, targets).
+	 */
+	readonly replaced?: { readonly operation: Operation; readonly by: EffectSource };
 }
 
 /**
@@ -187,10 +192,20 @@ export interface Duel {
 	readonly asking: Asking | null;
 	/** Step 6b: the attack in progress, from its declaration to the end of its Damage Step (src/battle.ts). */
 	readonly battle: Battle | null;
-	/** Step 6b: the monsters that have declared an attack this turn, each as it was (a card that moved is a new card). */
-	readonly attacked: readonly CardRef[];
+	/**
+	 * Step 6b: the attacks declared this turn, in order, each by its monster as it was (a card that moved is a new card). A monster
+	 * with several attacks (src/battle.ts) is there once per attack; an attack replayed and made again by the same monster stays one.
+	 */
+	readonly attacked: readonly AttackMade[];
 	/** Step 6b: after a replay, the monster that may declare an attack again although it already has. */
 	readonly replay: CardRef | null;
+	/**
+	 * "This card can attack again in a row" (`attackAgain`): the monster, as it was, that may declare one more attack as the next
+	 * attack of this turn. Gone once it has declared it, once another monster attacks, or once it is no longer that card.
+	 */
+	readonly again: CardRef | null;
+	/** The turn player has used the one Normal Summon an effect gives "in addition to your Normal Summon/Set" this turn (`extraNormalSummon`, src/modifiers.ts). */
+	readonly extraNormalSummoned: boolean;
 	/** Step 6b: who won (`draw` when both reached 0 LP at the same time). Once set, nothing more is offered. */
 	readonly winner: Side | "draw" | null;
 	/** Cards shown to both players (`revealCards`, `excavate`): known while they stay where they were revealed (src/deck.ts). */
@@ -220,6 +235,17 @@ export interface Activation {
 export interface CardRef {
 	readonly id: number;
 	readonly moves: number;
+}
+
+/**
+ * One attack declared this turn: the attacking monster (`id`, `moves`), and its attack target as it was (`null`: a direct attack).
+ * `direct`: a direct attack was declared in this attack, even if a replay then turned it onto a monster (Konami's Japanese Q&A fid
+ * 16016). `again`: it was declared with an "attack again in a row" permission (`Duel.again`).
+ */
+export interface AttackMade extends CardRef {
+	readonly target: CardRef | null;
+	readonly direct: boolean;
+	readonly again?: true;
 }
 
 export const refOf = (card: CardInstance): CardRef => ({ id: card.id, moves: card.moves });
@@ -254,8 +280,11 @@ export interface Summoning {
 	readonly positions?: readonly Position[];
 	/** Step 8: the procedure, if any: a Tribute, Synchro, Xyz, Link or Pendulum Summon. */
 	readonly kind?: SummonKind;
-	/** Step 8: the monster's own procedure: a success makes it properly Summoned. */
-	readonly proper?: boolean;
+	/**
+	 * Step 8: the monster's own procedure: a success makes it properly Summoned. One answer per monster (as `cards`) when several are
+	 * Summoned together and it is not the own procedure of each.
+	 */
+	readonly proper?: boolean | readonly boolean[];
 	/**
 	 * Step 8: the Summon is performed by an effect that was Chain Link 1 ("Synchro Summon using..."): its window opens once the chain has
 	 * finished resolving (Konami's Japanese Q&A 24054, record `summon-by-effect-chain-link-1`).
@@ -399,6 +428,8 @@ export function createDuel(setup: DuelSetup): Duel {
 		battle: null,
 		attacked: [],
 		replay: null,
+		again: null,
+		extraNormalSummoned: false,
 		winner: null,
 		revealed: [],
 		delayed: [],
@@ -600,7 +631,10 @@ function keptThroughFlip(duel: Duel, id: number, was: number, now: number): Duel
 	const modifiers = duel.modifiers.some(taken) ? duel.modifiers.map((modifier) => (taken(modifier) ? { ...modifier, affects: { card: id, moves: now } } : modifier)) : duel.modifiers;
 	const battle = duel.battle ? { ...duel.battle, attacker: same(duel.battle.attacker), target: duel.battle.target && same(duel.battle.target), defenders: duel.battle.defenders.map(same) } : null;
 	// It is still the card that declared an attack this turn (YGOProJudge's chat answer only, asked 2026-11-23, no source cited).
-	const attacked = duel.attacked.some((ref) => ref.id === id && ref.moves === was) ? duel.attacked.map(same) : duel.attacked;
+	// The attacks it declared, and those declared on it, are still about it. An "attack again in a row" permission is not kept: it
+	// ends once the monster is no longer face-up (Konami's notes on Neo Blue-Eyes Ultimate Dragon, record `attack-again-while-face-up`).
+	const touched = (made: AttackMade): boolean => (made.id === id && made.moves === was) || (made.target?.id === id && made.target.moves === was);
+	const attacked = duel.attacked.some(touched) ? duel.attacked.map((made) => (touched(made) ? { ...made, ...same(made), target: made.target && same(made.target) } : made)) : duel.attacked;
 	return modifiers === duel.modifiers && battle === null && attacked === duel.attacked ? duel : { ...duel, modifiers, battle, attacked };
 }
 

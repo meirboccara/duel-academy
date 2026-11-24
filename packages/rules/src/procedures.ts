@@ -2,7 +2,7 @@ import { type CardInstance, closedPriority, type Duel, freeSlots, isOnField, mat
 import { shuffleDecksOf } from "./deck";
 import { ask, askPlace, askZone, type CardDef, type MaterialCheck, type MaterialContext, type MaterialCount, type MaterialSlot, type Procedure } from "./effects";
 import { breakEffect, raiseEvent } from "./events";
-import { level, summonLocked } from "./modifiers";
+import { level, summonLocked, summonTogetherLocked } from "./modifiers";
 import { beginSummon, landSummon } from "./summon";
 import { triggerPoint } from "./triggers";
 import { pendulumZones, summonZones } from "./zones";
@@ -74,11 +74,12 @@ function recipesOf(def: CardDef): readonly Recipe[] {
 function build(def: CardDef, procedure: Procedure): readonly Recipe[] {
 	switch (procedure.kind) {
 		case "synchro": {
-			const { tuner, nonTuner, nonTuners, check } = procedure;
+			const { tuner, tuners, nonTuner, nonTuners, check } = procedure;
 			return [
 				{
 					slots: [
-						{ min: 1, max: 1, filter: (duel, card, ctx) => factsOf(duel, card)?.tuner === true && (!tuner || tuner(duel, card, ctx)) },
+						// RB10: 1 Tuner, unless the card's own material line says another number ("2+ Tuners").
+						{ min: tuners?.min ?? 1, max: tuners ? (tuners.max ?? Infinity) : 1, filter: (duel, card, ctx) => factsOf(duel, card)?.tuner === true && (!tuner || tuner(duel, card, ctx)) },
 						{ min: nonTuners?.min ?? 1, max: nonTuners?.max ?? Infinity, filter: (duel, card, ctx) => factsOf(duel, card)?.tuner !== true && (!nonTuner || nonTuner(duel, card, ctx)) },
 					],
 					check,
@@ -284,14 +285,14 @@ export const tribute = (duel: Duel, ids: readonly number[]): Duel => moveCards(d
 
 /**
  * A Tribute Summon, or a Tribute Set (`set`): the Tributes are chosen, then the zone (a Tribute frees its own); the Tributes are
- * paid as a cost, then the monster is Summoned (its window opens) or Set.
+ * paid as a cost, then the monster is Summoned (its window opens) or Set. `extra`: the Summon is the turn's additional Normal Summon.
  */
-export function startTribute(duel: Duel, player: Side, id: number, count: number, set: boolean): Duel {
+export function startTribute(duel: Duel, player: Side, id: number, count: number, set: boolean, extra = false): Duel {
 	const spec = tributeSpec(duel, player, duel.cards[id]!, count);
 	return askMaterials(duel, player, spec, (board, ids) =>
 		askZone(board, player, freeSlots(without(board, ids), player, "monster"), (placed, zone) => {
 			const paid = tribute(placed, ids);
-			return set ? setMonster(paid, id, zone) : beginSummon(paid, player, id, "normal", zone, { kind: "tribute" });
+			return set ? setMonster(paid, id, zone) : beginSummon(paid, player, id, "normal", zone, { kind: "tribute", extra });
 		}),
 	);
 }
@@ -443,6 +444,88 @@ export function askSpecialSummon(duel: Duel, player: Side, id: number, options: 
 		const done = specialSummon(board, player, id, { slot: zone, position, kind: options.kind });
 		return options.then && done !== board ? options.then(done) : done;
 	});
+}
+
+/** One monster of a group Special Summoned at the same time: the zone and battle position chosen for it (default: the first zone it may take, Attack Position). */
+export interface TogetherPick {
+	readonly id: number;
+	readonly slot?: number;
+	readonly position?: Position;
+}
+
+/**
+ * The zones a monster of a group may still take, the zones in `taken` being given to the others: one it may be Summoned to, not
+ * already given, and one Extra Monster Zone at most for the group (as for a Pendulum Summon).
+ */
+function roomBeside(duel: Duel, player: Side, id: number, taken: readonly number[]): number[] {
+	const usesExtraZone = taken.some((zone) => zone >= 5);
+	return summonZones(duel, player, id).filter((zone) => !taken.includes(zone) && !(zone >= 5 && usesExtraZone));
+}
+
+/**
+ * A zone for each monster of the group, those of `fixed` as given (`undefined`: any), or `null` when they cannot all be placed. A
+ * small search: the first monster takes a zone that leaves the others one each.
+ */
+function zonesTogether(duel: Duel, player: Side, ids: readonly number[], fixed: readonly (number | undefined)[] = [], taken: readonly number[] = []): number[] | null {
+	if (ids.length === taken.length) return [...taken];
+	const at = taken.length;
+	for (const zone of roomBeside(duel, player, ids[at]!, taken)) {
+		if (fixed[at] !== undefined && fixed[at] !== zone) continue;
+		const found = zonesTogether(duel, player, ids, fixed, [...taken, zone]);
+		if (found) return found;
+	}
+	return null;
+}
+
+/**
+ * Can an effect of `player` Special Summon these monsters at the same time ("Special Summon 1 X and 1 Y"): two or more monsters at
+ * once are not locked ("cannot Special Summon 2 or more monsters at the same time"), each one can be Special Summoned (no lock on it,
+ * properly Summoned first if it has to be), and there is a zone for each. All of them or none: this is the activation condition of
+ * such an effect, and what `specialSummonTogether` checks again when it resolves (Konami's notes on Sky Striker Ace = Zero, OCG
+ * only: records `summon-together-needs-both`, `summon-together-both-or-nothing`). `leaving`: monsters that will have left the field
+ * by then (a cost being paid: "Tribute this card"), whose zones count as free.
+ */
+export function canSpecialSummonTogether(duel: Duel, player: Side, ids: readonly number[], options: { readonly leaving?: readonly number[]; readonly kind?: SummonKind } = {}): boolean {
+	if (ids.length === 0 || new Set(ids).size !== ids.length) return false;
+	if (ids.length > 1 && summonTogetherLocked(duel, player)) return false;
+	if (!ids.every((id) => summonable(duel, player, id, options.kind))) return false;
+	return zonesTogether(options.leaving ? without(duel, options.leaving) : duel, player, ids) !== null;
+}
+
+/**
+ * An effect Special Summons these monsters to `player`'s field at the same time: all of them are placed, face-up, each in its zone
+ * and position, and only then are their events raised, as one batch (`landSummon`): "when Summoned" effects all wait for the same
+ * trigger point, and an "each time ... Special Summons a monster(s)" operation counts the group once. There is no window. If they
+ * cannot all be Summoned (`canSpecialSummonTogether`), or a zone given is not one the monster may take, none is Summoned and the Duel
+ * comes back as it was.
+ */
+export function specialSummonTogether(duel: Duel, player: Side, picks: readonly TogetherPick[], options: { readonly kind?: SummonKind } = {}): Duel {
+	const ids = picks.map((pick) => pick.id);
+	if (!canSpecialSummonTogether(duel, player, ids, options)) return duel;
+	const slots = zonesTogether(duel, player, ids, picks.map((pick) => pick.slot));
+	if (!slots) return duel;
+	const positions = picks.map((pick): Position => (isLink(duel, duel.cards[pick.id]!) ? "attack" : (pick.position ?? "attack")));
+	// Each monster is properly Summoned only if this is its own procedure (a Ritual Monster beside a monster that is not one).
+	const proper = ids.map((id) => isOwnKind(duel.defs[duel.cards[id]!.code], options.kind));
+	const summoning: Summoning = { player, cards: ids, how: "special", negated: false, slots, positions, ...(options.kind ? { kind: options.kind, proper } : {}) };
+	return landSummon(duel, summoning, "effect");
+}
+
+/**
+ * As `specialSummonTogether`, the player choosing the zone and the battle position of each monster in turn (a zone is offered only if
+ * it leaves the others one each), then all are Summoned at the same time. `then` continues once they are on the field; it is not
+ * run, and nothing is asked, when they cannot all be Summoned.
+ */
+export function askSpecialSummonTogether(duel: Duel, player: Side, ids: readonly number[], options: { readonly kind?: SummonKind; readonly then?: (duel: Duel) => Duel } = {}, picks: readonly TogetherPick[] = []): Duel {
+	if (!canSpecialSummonTogether(duel, player, ids, options)) return duel;
+	if (picks.length === ids.length) {
+		const done = specialSummonTogether(duel, player, picks, options);
+		return options.then && done !== duel ? options.then(done) : done;
+	}
+	const id = ids[picks.length]!;
+	const taken = picks.map((pick) => pick.slot!);
+	const zones = roomBeside(duel, player, id, taken).filter((zone) => zonesTogether(duel, player, ids, [...taken, zone]) !== null);
+	return askPlace(duel, player, zones, summonPositions(duel, id), (board, slot, position) => askSpecialSummonTogether(board, player, ids, options, [...picks, { id, slot, position }]));
 }
 
 /** What a Fusion Summoning effect says: where the materials may come from, which Fusion Monsters, and where the materials go. */
@@ -614,10 +697,7 @@ interface Pick {
 }
 
 /** The zones a monster may still take in the Pendulum Summon being put together: not one already given, and one Extra Monster Zone at most. */
-function pendulumRoom(duel: Duel, player: Side, id: number, picks: readonly Pick[]): number[] {
-	const usesExtraZone = picks.some((pick) => pick.zone >= 5);
-	return summonZones(duel, player, id).filter((zone) => !picks.some((pick) => pick.zone === zone) && !(zone >= 5 && usesExtraZone));
-}
+const pendulumRoom = (duel: Duel, player: Side, id: number, picks: readonly Pick[]): number[] => roomBeside(duel, player, id, picks.map((pick) => pick.zone));
 
 /**
  * The monsters the player may still add to the Pendulum Summon (RB10): monsters of the hand and face-up Pendulum Monsters of the
@@ -626,6 +706,8 @@ function pendulumRoom(duel: Duel, player: Side, id: number, picks: readonly Pick
 function pendulumCandidates(duel: Duel, player: Side, picks: readonly Pick[]): number[] {
 	const between = scales(duel, player);
 	if (!between) return [];
+	// "Cannot Special Summon 2 or more monsters at the same time": the Pendulum Summon is of one monster (YGOProJudge only, asked 2026-11-24, no source cited).
+	if (picks.length > 0 && summonTogetherLocked(duel, player)) return [];
 	const fits = (id: number): boolean => {
 		const card = duel.cards[id]!;
 		const facts = factsOf(duel, card);

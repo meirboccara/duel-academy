@@ -31,8 +31,43 @@ export function keyOf(effect: EffectRecord, player: Side, card: CardInstance, in
 	return once.scope === "instance" ? `instance:${card.id}.${card.moves}:${once.key ?? index}` : `${once.scope}:${player}:${base}`;
 }
 
+/** The `defs` whose shared limits were found to agree (the definitions are shared by every Duel and never changed). */
+const agreed = new WeakSet<object>();
+
+/**
+ * A limit several effects share (`Once.key`) has one count: each effect reads its own `times` when it is checked, so effects
+ * sharing a key with different `times` would disagree on whether the limit is reached. That is a mistake in the cards, not
+ * something to ignore: it throws. Read once per `defs`. An `instance` limit is per copy, so its key is shared within one card only.
+ */
+function checkSharedLimits(defs: Duel["defs"]): void {
+	if (agreed.has(defs)) return;
+	const limits = new Map<string, { readonly times: number; readonly code: string }>();
+	for (const def of Object.values(defs)) {
+		for (const effect of def.effects ?? []) {
+			const once = effect.once;
+			if (once?.key === undefined) continue;
+			const limit = once.scope === "instance" ? `instance:${def.code}:${once.key}` : `${once.scope}:${once.key}`;
+			const times = once.times ?? 1;
+			const first = limits.get(limit);
+			if (!first) limits.set(limit, { times, code: def.code });
+			else if (first.times !== times) throw new Error(`${def.code}: effects that share the once-per-turn key "${once.key}" (with ${first.code}) must allow the same number of uses (times ${first.times} and ${times})`);
+		}
+	}
+	agreed.add(defs);
+}
+
 /** Has this use already been spent? */
-export const isSpent = (duel: Duel, effect: EffectRecord, key: string | null): boolean => key !== null && duel.used[BUCKETS[effect.once!.scope]].includes(key);
+export function isSpent(duel: Duel, effect: EffectRecord, key: string | null): boolean {
+	if (key === null) return false;
+	if (effect.once!.key !== undefined) checkSharedLimits(duel.defs);
+	const used = duel.used[BUCKETS[effect.once!.scope]];
+	const times = effect.once!.times ?? 1;
+	if (times === 1) return used.includes(key);
+	// "Twice per turn": every activation noted its use; the limit is reached once there are that many.
+	let count = 0;
+	for (const spent of used) if (spent === key && ++count >= times) return true;
+	return false;
+}
 
 /** Records that the effect was activated. */
 export function spend(duel: Duel, effect: EffectRecord, key: string | null): Duel {

@@ -37,9 +37,10 @@ export type Action =
 	 * Summon a monster as an action: a Normal Summon (`normal`; a Tribute Summon for a Level 5 or higher monster) or a Special
 	 * Summon that starts no chain (`special`: a built-in Special Summon from the hand, or the own procedure of a monster of the Extra
 	 * Deck: Synchro, Xyz, Link, contact Fusion). It starts no chain: the Summon is a moment of its own that the opponent may answer
-	 * ("would be Summoned") before it succeeds.
+	 * ("would be Summoned") before it succeeds. `extra`: a Normal Summon made "in addition to your Normal Summon/Set" by an effect
+	 * that allows one: the player says which of the two they use (Konami's notes on Mausoleum of White), so both are listed.
 	 */
-	| ({ readonly type: "summon"; readonly card: number; readonly how: "normal" | "special" } & Placing)
+	| ({ readonly type: "summon"; readonly card: number; readonly how: "normal" | "special"; readonly extra?: true } & Placing)
 	/** Step 8: Flip Summon a face-down monster. Like any Summon, a moment of its own that can be answered. */
 	| { readonly type: "flip-summon"; readonly card: number }
 	/** Step 8: change a face-up monster's battle position by hand (once per monster per turn). An action that starts no chain. */
@@ -88,7 +89,7 @@ export function sameAction(a: Action, b: Action): boolean {
 	if (a.type === "declare") return sameDeclaration(a.declaration, (b as typeof a).declaration);
 	const other = b as typeof a;
 	if (a.card !== other.card) return false;
-	if (a.type === "summon") return a.how === (b as typeof a).how;
+	if (a.type === "summon") return a.how === (b as typeof a).how && (a.extra === true) === ((b as typeof a).extra === true);
 	if (a.type === "attack") return a.target === (b as typeof a).target;
 	if (a.type === "apply") return a.delayed === (b as typeof a).delayed;
 	if (a.type !== "activate") return true;

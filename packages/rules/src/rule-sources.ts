@@ -4,6 +4,8 @@ import { ZONE_SOURCES } from "./zone-sources";
 import { NEGATION_SOURCES } from "./negation-sources";
 import { SUMMON_SOURCES } from "./summon-sources";
 import { READINESS_SOURCES } from "./readiness-sources";
+import { ATTACK_SOURCES } from "./attack-sources";
+import { SECOND_READINESS_SOURCES } from "./second-readiness-sources";
 import { konamiCardUrl, type SourceRecord } from "./sources";
 
 /**
@@ -293,4 +295,6 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 	...ZONE_SOURCES,
 	...SUMMON_SOURCES,
 	...READINESS_SOURCES,
+	...ATTACK_SOURCES,
+	...SECOND_READINESS_SOURCES,
 ];

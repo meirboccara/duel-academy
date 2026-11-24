@@ -6,8 +6,8 @@ import { PENDULUM_SLOTS } from "./zones";
 /** The Field Zone: one zone, always open to a Field Spell (the one there is sent to the Graveyard). */
 const FIELD_ZONE: readonly number[] = Object.freeze([0]);
 import { breakEffect, type GameEvent, raiseEvent } from "./events";
-import { type CardDef, type EffectRecord, effectOf, inFieldRange, rangeOf, sameDeclaration, speedOf } from "./effects";
-import { returnControl, summonLocked, unaffectedBy, withoutEnded } from "./modifiers";
+import { type CardDef, type EffectRecord, effectOf, inFieldRange, type Operation, rangeOf, sameDeclaration, speedOf } from "./effects";
+import { type EffectSource, extraNormalSummon, returnControl, summonLocked, unaffectedBy, withoutEnded } from "./modifiers";
 import { cardNegated, immune } from "./negation";
 import { endChain, newTurn, refund } from "./once";
 import { beginSummon, finishSummon, openPendingSummon } from "./summon";
@@ -150,14 +150,25 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 		// player's choice; a Level 5 or higher monster by Tributing 1 or 2 monsters (step 8), listed once: the Tributes and the zone are
 		// asked afterwards. A Set (face-down Defense Position) is not a Summon, so a lock on Summons does not stop it.
 		const level = isSpellOrTrap ? undefined : def.facts?.level;
-		if (level !== undefined && slow && !duel.normalSummoned && canBeNormalSummoned(def)) {
+		// A Normal Summon "in addition to your Normal Summon/Set" (an effect's permission, src/modifiers.ts): one per turn, for the
+		// monsters the effect names; never a Set. It is listed beside the turn's own Normal Summon: the player says which they use.
+		const extra = level !== undefined && slow && !duel.extraNormalSummoned && canBeNormalSummoned(def) && extraNormalSummon(duel, player, card);
+		if (level !== undefined && slow && (!duel.normalSummoned || extra) && canBeNormalSummoned(def)) {
 			const count = tributesNeeded(level);
 			const zones = count === 0 ? (mainSlots ??= freeSlots(duel, player, "monster")) : null;
 			if (zones ? zones.length > 0 : canTribute(duel, player, card, count)) {
-				if (!out) return true;
-				if (!summonLocked(duel, player, card, "normal")) out.push(zones ? { type: "summon", card: id, how: "normal", zones } : { type: "summon", card: id, how: "normal" });
-				out.push(zones ? { type: "set", card: id, zones } : { type: "set", card: id });
-				found = true;
+				const unlocked = !summonLocked(duel, player, card, "normal");
+				if (!duel.normalSummoned) {
+					if (!out) return true;
+					if (unlocked) out.push(zones ? { type: "summon", card: id, how: "normal", zones } : { type: "summon", card: id, how: "normal" });
+					out.push(zones ? { type: "set", card: id, zones } : { type: "set", card: id });
+					found = true;
+				}
+				if (extra && unlocked) {
+					if (!out) return true;
+					out.push(zones ? { type: "summon", card: id, how: "normal", extra: true, zones } : { type: "summon", card: id, how: "normal", extra: true });
+					found = true;
+				}
 			}
 		}
 		// A built-in Special Summon from the hand, into a free Main Monster Zone, in face-up Attack or Defense Position (RB10).
@@ -287,8 +298,8 @@ function apply(duel: Duel, action: Action): Duel {
 			// Step 8: an Extra Deck monster's own procedure: the materials, then the zone, are asked before the Summon is attempted.
 			if (duel.cards[action.card]!.zone === "extra") return resumeAfter(startProcedure(duel, player, action.card, action.position ?? "attack"), unchanged);
 			const tributes = action.how === "normal" ? tributesNeeded(levelOf(duel, action.card)) : 0;
-			if (tributes > 0) return resumeAfter(startTribute(duel, player, action.card, tributes, false), unchanged);
-			return beginSummon(duel, player, action.card, action.how, action.zone, action.how === "special" && action.position ? { position: action.position } : {});
+			if (tributes > 0) return resumeAfter(startTribute(duel, player, action.card, tributes, false, action.extra === true), unchanged);
+			return beginSummon(duel, player, action.card, action.how, action.zone, action.how === "special" && action.position ? { position: action.position } : action.extra ? { extra: true } : {});
 		}
 		case "set": {
 			if (duel.defs[duel.cards[action.card]!.code]?.kind !== "monster") return set(duel, action.card, action.zone);
@@ -373,7 +384,8 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 			const index = next.chain.length - 1;
 			const link = next.chain[index]!;
 			all[index] = link;
-			result = link.activationNegated || link.effectNegated || cardNegated(next, link) ? next : operationOf(effectOf(next, link), link)(next, link, index);
+			// A link whose effect was replaced ("that effect becomes ...") does that instead of what its card says; negated, it does neither.
+			result = link.activationNegated || link.effectNegated || cardNegated(next, link) ? next : (link.replaced?.operation ?? operationOf(effectOf(next, link), link))(next, link, index);
 		}
 		// The Duel was decided while this link resolved (a draw from an empty Deck): it ends here. Nothing more is asked, the links
 		// below are not resolved and no card is swept: the Duel stays as it stood when it was lost.
@@ -478,7 +490,7 @@ function nextPhase(duel: Duel): Duel {
 	}
 	const player: Side = other(duel.turn.player);
 	const turn = { player, number: duel.turn.number + 1, phase: PHASES[0]! };
-	const fresh = expireDelayed({ ...moved, turn, setThisTurn: [], normalSummoned: false, attacked: [], replay: null, repositioned: [], pendulumSummoned: false, spared: moved.spared.length === 0 ? moved.spared : [], activations: moved.activations.length === 0 ? moved.activations : [] });
+	const fresh = expireDelayed({ ...moved, turn, setThisTurn: [], normalSummoned: false, attacked: moved.attacked.length === 0 ? moved.attacked : [], replay: null, again: null, extraNormalSummoned: false, repositioned: [], pendulumSummoned: false, spared: moved.spared.length === 0 ? moved.spared : [], activations: moved.activations.length === 0 ? moved.activations : [] });
 	return triggerPoint(raiseEvent(newTurn(withoutEnded(fresh, duel.turn.number)), { type: "phase", phase: turn.phase, player }), { holder: player, passed: [], open: true });
 }
 
@@ -514,6 +526,23 @@ export const negateEffect = (duel: Duel, index: number): Duel => {
 	const link = duel.chain[index];
 	return link && (immune(duel, link, "effect") || shielded(duel, link)) ? duel : flag(duel, index, { effectNegated: true });
 };
+
+/**
+ * "That effect becomes '...'": replaces what the link at `index` does when it resolves with `operation`, run then as any operation is,
+ * with that link: it is still the effect of the card that was activated and of the player who activated it (who makes its choices,
+ * and whose "opponent" the new text means), its cost stays paid, and its once-per-turn use and its place in `Duel.activations` stand.
+ * Only the link changes: the card's definition, shared by every Duel, is never touched. `by`: the effect that replaces (the resolving
+ * link).
+ *
+ * It is not an effect applied to the card that activated: the effect of a monster that is unaffected by `by` is replaced too. A link
+ * whose activation or effect is negated does neither the new effect nor its own (it is still that card's effect: YGOProJudge only,
+ * asked 2026-11-24, no source cited); replacing a link again keeps the last replacement (the core's reading, no page read).
+ * Konami's Japanese notes and Q&A on Prototype Sky Striker Ace - Amatsu (OCG only; records `replace-effect-not-applied-to-monster`,
+ * `replace-effect-opponent-chooses`, `replace-effect-still-opponents-effect`).
+ */
+export function replaceEffect(duel: Duel, index: number, operation: Operation, by: EffectSource): Duel {
+	return flag(duel, index, { replaced: { operation, by: { card: by.card, player: by.player, ...(by.effect === undefined ? {} : { effect: by.effect }) } } });
+}
 
 /** Did the activation of the link at `index` get negated? An operation that says "and if you do" reads this after negating. */
 export const activationNegated = (duel: Duel, index: number): boolean => duel.chain[index]?.activationNegated ?? false;

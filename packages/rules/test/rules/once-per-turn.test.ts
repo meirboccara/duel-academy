@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { act, cardsIn, cites, type Duel, moveCard } from "../../src";
+import { act, type CardDef, cardsIn, cites, type Duel, type EffectRecord, moveCard } from "../../src";
 import { offered, plainCards, play, position, recordCards } from "./fixtures";
 
 /**
@@ -93,6 +93,22 @@ describe("once per turn: \"You can only use this effect of [name] once per turn\
 		expect(count(start, "activate once-shared")).toBe(2);
 		const used = play(start, "activate once-shared", "pass", "pass");
 		expect(count(used, "activate once-shared")).toBe(0);
+	});
+	// One limit has one count: two effects that share a key and do not allow the same number of uses are a mistake in the cards.
+	it("refuses effects that share a key but not the number of uses it allows (a definition error), and counts a shared \"twice per turn\" between them", () => {
+		const shared = (code: string, first: number | undefined, second: number | undefined): CardDef => ({
+			code,
+			kind: "monster",
+			effects: [first, second].map((times): EffectRecord => ({ type: "quick", range: "field", once: { scope: "name", key: code, ...(times === undefined ? {} : { times }) }, operation: (duel) => duel })),
+		});
+		const mixed = position({ defs: { ...defsWith(), "once-mixed": shared("once-mixed", 2, undefined) }, options, you: { monsters: ["once-mixed"] } });
+		expect(() => offered(mixed)).toThrow(/once-mixed.*share.*once-mixed.*times/);
+		// The same count on both: two uses between them, whichever effect is used.
+		const start = position({ defs: { ...defsWith(), "once-pair": shared("once-pair", 2, 2) }, options, you: { monsters: ["once-pair"] } });
+		expect(count(start, "activate once-pair")).toBe(2);
+		const once = play(start, "activate once-pair", "pass", "pass");
+		expect(count(once, "activate once-pair")).toBe(2);
+		expect(count(play(once, "activate once-pair", "pass", "pass"), "activate once-pair")).toBe(0);
 	});
 	// The core's reading: a card that came back is a new card (step 1), and Q&A fid 24139 blocks a new second copy.
 	it("counts a card that came back as the same name, and lifts the limit with the turn", () => {
