@@ -26,20 +26,29 @@ import { triggerPoint } from "./triggers";
  *   the turn player may attack again, with the same monster too (`Duel.replay`), or with another, or stop.
  * - ATK and DEF are read through step 6's queries at damage calculation (never a value frozen at declaration).
  * - In the Damage Step only Counter Trap Cards and effects that directly change ATK or DEF (`categories` "change-atk" /
- *   "change-def") can be activated, and only up to damage calculation (`damageStepAllows`).
+ *   "change-def"), only up to damage calculation (RB10), can be activated, plus a Quick Effect whose Konami notes say it "can
+ *   also be activated in the Damage Step" (`EffectRecord.damageStep`): `damageStepAllows`, src/damage-step-sources.ts.
  */
 
 /** Effects that "directly change a monster's ATK or DEF" say so in their categories. */
 export const CHANGES_ATK_DEF: readonly string[] = ["change-atk", "change-def"];
 
 /**
- * May this effect be activated now, as far as the Damage Step goes? Outside the Damage Step, always. At its start and before damage
- * calculation: a Counter Trap Card, or an effect that directly changes ATK or DEF. After damage calculation and at its end: nothing
- * (RB10, record `damage-step-activation-limit`); trigger effects are put on a chain at the trigger point and are not listed here.
+ * May this effect be activated now, as far as the Damage Step goes? Outside the Damage Step, always. In it:
+ * - a Quick Effect flagged `EffectRecord.damageStep` (set only where Konami's notes on the card say so): at every timing. The flag
+ *   is read on Quick Effects only, the one kind of effect the notes read are about, and adds to what is allowed below;
+ * - a Counter Trap Card, or an effect that directly changes ATK or DEF: at its start and before damage calculation only. This is the
+ *   TCG rulebook's wording, "these cards can only be activated up until the start of damage calculation" (RB10, record
+ *   `damage-step-activation-limit`), followed by the owner's decision (2026-11-25). The official OCG rulebook names Counter Traps at
+ *   every timing (record `ocg-counter-traps-after-damage-calculation`) and Konami's Q&A fid 7966 shows one after damage calculation,
+ *   both OCG only; YGOProJudge says TCG judges allow it but, contested, conceded that no official TCG source says so (the TCG Damage
+ *   Step Rules page has no such section: checked). To follow the OCG instead, move the Counter Trap line above the `after`/`end` line;
+ * - anything else: never. Trigger effects are put on a chain at the trigger point and are not listed here.
  */
 export function damageStepAllows(duel: Duel, def: CardDef, effect: EffectRecord): boolean {
 	const step = duel.battle?.step;
 	if (step === undefined || step === "declared") return true;
+	if (effect.damageStep && effect.type === "quick") return true;
 	if (step === "after" || step === "end") return false;
 	if (def.kind === "counter-trap" && effect.type === "activation") return true;
 	return Array.isArray(effect.categories) && effect.categories.some((category) => CHANGES_ATK_DEF.includes(category));

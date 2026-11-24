@@ -169,6 +169,14 @@ export interface EffectRecord {
 	 */
 	readonly answersSummon?: boolean;
 	/**
+	 * "Can also be activated in the Damage Step": this Quick Effect may be activated at every timing of the Damage Step, although it
+	 * is neither a Counter Trap nor an effect that directly changes ATK or DEF (`damageStepAllows`, src/battle.ts). Set only on a
+	 * record whose Konami notes say so (so far: monsters' Quick Effects that negate an activation, src/damage-step-sources.ts); no
+	 * Konami page found states a general rule. The notes name no timing: "every timing" is inferred. Absent: the rulebook's limit
+	 * applies. Read on `type: "quick"` only: ignored on any other record (a Trigger Effect is put on a chain at its trigger point).
+	 */
+	readonly damageStep?: boolean;
+	/**
 	 * `activation` of a Continuous Spell or Trap Card (step 6): the card stays on the field face-up after the chain, instead of being
 	 * sent to the Graveyard. Its continuous effect is another record, `type: "continuous"`.
 	 */

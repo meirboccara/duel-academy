@@ -273,7 +273,8 @@ Step 6b (battle; plan in `docs/rules-core/battle/design.md`, sources in `docs/ru
 - Replay: a target gone or a new monster on the opponent's side before the Damage Step stops the attack; the attacker may attack
   again (`Duel.replay`), or another monster does and the first stays used.
 - In the Damage Step, up to damage calculation, only Counter Trap Cards and effects whose `categories` say they directly change ATK
-  or DEF (`change-atk`, `change-def`; Shrink has it) can be activated; afterwards nothing but triggers (`damageStepAllows`).
+  or DEF (`change-atk`, `change-def`; Shrink has it) can be activated; afterwards nothing but triggers (`damageStepAllows`). Since
+  2026-11-25 (last section) a Quick Effect flagged `damageStep` is also offered at every timing; Counter Traps keep RB10's limit.
 - `CardInstance.position` (`attack` / `defense`); `loseLp` and `Duel.winner` (0 LP loses, both at once is a draw); a won Duel
   offers nothing.
 
@@ -281,7 +282,8 @@ Known limits of step 6b (what the tests do not prove):
 - The Battle Phase's Start Step and End Step are not separate windows (the `phase` event of the Battle Phase stands for the Start
   Step); damage calculation itself has no window ("during damage calculation" effects: none of our cards).
 - After damage calculation and at the end of the Damage Step nothing is listed but triggers, as RB10 says. YGOProJudge (lead, no
-  source) would also allow Counter Traps and activation negators there; no Konami page read says so.
+  source) would also allow Counter Traps and activation negators there; no Konami page read says so. (Superseded on 2026-11-25 by
+  the official OCG rulebook and Konami's notes: last section.)
 - A monster Quick Effect that does not change ATK/DEF is refused in the Damage Step (RB10's wording); no Konami page on hand traps
   there was read (YGOProJudge agrees, no source). Whether an effect "directly changes ATK or DEF" is the card's `categories`.
 - Changing battle positions, Flip Summons and FLIP effects as such are step 8 (the `flipped` event exists; a FLIP card is a trigger on
@@ -1119,3 +1121,37 @@ cards' sources (OCG only).
   source.
 - Tests that passed with the card absent (they assert something is not offered): Ancient Fairy Life Dragon 1, Crimson Dragon 2, Hieratic Seal 2, Spirit with Eyes of Blue 1, Lightstorm Dragon 2; the Q&A tests
   of Ancient Fairy Life Dragon and Crimson Dragon were written after the card and passed at once against existing core rules. Every other test was red first.
+
+What can be activated in the Damage Step (limit L1, 2026-11-25; `damageStepAllows` in `src/battle.ts`, `src/damage-step-sources.ts`,
+`test/rules/damage-step-flag.test.ts`, `test/rules/battle.test.ts`):
+- No general rule for negations. No Konami page found says that effects which negate an activation can be activated in the Damage Step.
+  Searched: the TCG rulebook (RB10: "you can only activate Counter Trap Cards, or cards with effects that directly change a monster's
+  ATK or DEF"), Konami's TCG "Damage Step Rules" page (EU; the US page is gone and its 2021 archived copy has the same text: neither
+  lists card kinds), and the official OCG rulebook (Master Rule, 2020-04-01, pp. 77-78), which names "basically" (基本的に) only effects
+  worded for that timing, ATK/DEF changes and Counter Traps. Only each card's notes say "it can also be activated in the Damage Step".
+  YGOProJudge calls it a general mechanic, with no source. So the design stays per record.
+- `EffectRecord.damageStep` (a boolean) lets a Quick Effect be activated at every timing of the Damage Step the core has (`start`,
+  `before`, `after`, `end`). It is set only on a record whose Konami notes say so: the negations of Blue-Eyes Spirit Dragon (its second
+  effect; its third effect's notes say it cannot), Blue-Eyes Ultimate Spirit Dragon (second effect) and Neo Blue-Eyes Ultimate Dragon
+  (second effect, the Quick Effect activated in the GY by banishing itself). All OCG only. It is read on `type: "quick"` only (the
+  notes read are all about monsters' Quick Effects) and ignored on any other record; it adds to what the record is otherwise allowed.
+  Unflagged, the rulebook's limit applies.
+- Inferred: the notes name no timing. That the flag also covers "after damage calculation" and "end" rests on Konami Q&A fid 12836
+  (a monster's negating Quick Effect chained during damage calculation, so not held to "up until the start of damage calculation") and
+  on YGOProJudge's lead; no Konami page read shows such a monster effect at those two timings.
+- Counter Traps keep the TCG rulebook's limit: only at the start of the Damage Step and before damage calculation (RB10: "these cards
+  can only be activated up until the start of damage calculation"), the owner's decision of 2026-11-25 to follow the TCG text. The
+  official OCG rulebook (under "after damage calculation" and "end of the Damage Step": basically no other card except Counter Traps)
+  and Konami Q&A fid 7966 (Nine Pillars of Yang Zing negating D.D. Warrior's effect after damage calculation) allow them later, both
+  OCG only, and are not followed. YGOProJudge said TCG judges allow it; contested in the same chat (2026-11-25), it conceded that no
+  official TCG source says so, and the section of the TCG Damage Step Rules page it named does not exist (page checked). To follow the
+  OCG instead, see the comment on `damageStepAllows`.
+- `SourceKind` has `ocg-rule` (the official OCG rulebook; needs no card id).
+- Limits: damage calculation itself still has no window, so an effect shown activated "during damage calculation" (fid 12836, and
+  the OCG rulebook's list for that timing) can only be activated at the timings the core has. The flag is not read for Trigger
+  Effects (put on a chain at their trigger point). The OCG rulebook's quotes were typed from the PDF's page images (it has no text layer).
+- YGOProJudge, 2026-11-25, three chats, all closed: (1) Counter Traps after damage calculation and at the end of the Damage Step in
+  the TCG: yes, "no explicit official TCG document", judge practice follows the OCG; (2) negating Quick Effects at every timing, and
+  a general Konami rule: yes at every timing, "a general game mechanic", no Konami source cited; (3) the Counter Trap question again,
+  asking for a TCG source, with one follow-up contesting it: still yes, but "there is no exact sentence in an official TCG document",
+  "based on general judge practice"; the TCG page section it named does not exist. The TCG rulebook's wording was kept.

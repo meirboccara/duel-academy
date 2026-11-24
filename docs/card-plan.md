@@ -81,7 +81,7 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [x] | Ancient Fairy Life Dragon | Registered 2026-11-24; Synchro procedure, draw or World of Spirits search, Defense Position attack permission, EN/FR text, Konami's notes and its three Q&A (fids 24407, 23968, 14252); independent review pending |
 | [ ] | Ash Blossom & Joyous Spring | Registered; answers draw effects since 2026-11-24 (Konami Q&A fid 21685); printed facts incomplete, completeness pending |
 | [x] | Bingo Machine, Go!!! | Registered 2026-11-24 to the definition of done: reveal 3, the opponent's random pick (the Duel's RNG), shuffle, once per turn; the minimum of 3 revealable cards rests on YGOProJudge only; its one Q&A (Puppet Queen, not in the core) not opened |
-| [ ] | Blue-Eyes Spirit Dragon | Missing; blocked by limit L1 of docs/rules-core/blue-eyes-gaps.md: Konami's notes say its negating Quick Effect can be activated in the Damage Step, which the core does not offer; not registered |
+| [ ] | Blue-Eyes Spirit Dragon | Missing; ready to script: limit L1 is resolved (`EffectRecord.damageStep`, set on its negation per Konami's notes); not registered |
 | [ ] | Blue-Eyes Tyrant Dragon | Missing; its Summoning condition (Tributing 1 "Blue-Eyes White Dragon" equipped with a Fusion Monster) is built and tested with a made-up card since 2026-11-24; blocked by its third effect (end of the Damage Step, Set a Trap from the GY) and its 11 unread Q&A |
 | [ ] | Blue-Eyes Ultimate Spirit Dragon | Missing |
 | [x] | Blue-Eyes White Dragon | Registered 2026-11-24; complete (Normal Monster: printed facts, Konami's flavour text EN/FR; no effect) |

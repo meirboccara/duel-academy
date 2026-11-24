@@ -20,6 +20,10 @@ describe("validateSource: every test cites one well-formed source record", () =>
 			validateSource({ id: "qa-1", kind: "jp-qa", cid: 4041, fid: 12345, url: "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=12345", read: "2026-11-22", quote: "「ブラック・マジシャン」は通常モンスターです。" }),
 		).toEqual([]);
 	});
+	it("accepts a page of the official OCG rulebook, which is about no card", () => {
+		const page: SourceRecord = { id: "ocg-rulebook", kind: "ocg-rule", url: "https://www.yugioh-card.com/japan/howto/data/rulebook_masterrule20200401_ver1.0.pdf", read: "2026-11-25", quote: "基本的に、その他のカードはカウンター罠以外は発動できません。" };
+		expect(validateSource(page)).toEqual([]);
+	});
 	it("needs the Konami card id for card text, and the Q&A id too for a Japanese ruling", () => {
 		const { cid: _cid, ...noCid } = cardText;
 		expect(validateSource(noCid)).toEqual(["cid-missing"]);

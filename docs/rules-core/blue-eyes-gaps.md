@@ -179,10 +179,19 @@ French text, the reading of its own Japanese notes and Q&A, its tests and an ind
 
 ## Limits that remain (not built)
 
-- **L1. Negation Quick Effects in the Damage Step.** `damageStepAllows` lets only Counter Traps and effects that directly change
-  ATK/DEF be activated there (RB10's sentence). The negating Quick Effects of the White Phantom Beast, the two Spirit Dragons and Neo
-  Blue-Eyes Ultimate Dragon would not be offered in the Damage Step. No Konami page read says they can be (YGOProJudge's earlier lead
-  says so, no source): unchanged in this slice.
+- **L1. Negation Quick Effects in the Damage Step: resolved (2026-11-25).** `EffectRecord.damageStep` (a boolean, read on Quick
+  Effects only) lets a Quick Effect be activated at every timing of the Damage Step. It is set only on a record whose Konami notes
+  say it "can also be activated in the Damage Step" (src/damage-step-sources.ts, OCG only). No Konami page found states a general
+  rule for effects that negate an activation (searched: the TCG rulebook, Konami's TCG Damage Step Rules page, the official OCG
+  rulebook pp. 77-78; YGOProJudge calls it general and cites no source), so it is per record; the notes name no timing, so "after
+  damage calculation" and "end" are inferred (packages/rules/README.md, last section). Notes read: Blue-Eyes Spirit Dragon's second
+  effect, the negation (yes; its third effect, the Tribute, no); Blue-Eyes Ultimate Spirit Dragon's second effect, the negation
+  (yes; its third effect, a Trigger Effect, yes too and needs no flag); Neo Blue-Eyes Ultimate Dragon's second effect (yes): the
+  Quick Effect activated in the GY, "You can banish this card from your GY; negate the activation, and if you do, destroy that
+  card" (its first effect, whose cost sends a "Blue-Eyes" Fusion Monster from the Extra Deck to the GY, is the attack-again Trigger
+  Effect and needs no flag). Set `damageStep: true` on those three negation records when scripting them. The White Phantom Beast's
+  notes say its negation ("negate that effect") is NOT usable in the Damage Step: leave it unflagged. Counter Traps keep
+  the TCG rulebook's limit (up to damage calculation); the OCG rulebook and Konami Q&A fid 7966 allowing them later are not followed.
 - **L2. "During your Standby Phase: You can ..."** is offered once, when the phase begins (a trigger on the `phase` event); the player
   cannot activate it later in the same Standby Phase.
 - **"Cards sent to the GY are banished instead"** (the pending Q&A of Wishes for Eyes of Blue fid 23815, Maiden of White fid 14540,

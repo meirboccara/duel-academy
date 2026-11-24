@@ -123,7 +123,7 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 		if (duel.summoning && chain.length === 0 && !effect.answersSummon) return false;
 		const speed = speedOf(def, effect);
 		if (speed === 1 ? !slow : speed < topSpeed) return false;
-		// In the Damage Step, only Counter Traps and effects that directly change ATK/DEF, up to damage calculation (step 6b).
+		// In the Damage Step, only what `damageStepAllows` lets through: Counter Traps, ATK/DEF changes up to damage calculation, flagged Quick Effects.
 		if (duel.battle && !damageStepAllows(duel, def, effect)) return false;
 		const ctx = { player, card };
 		// An effect that answers an event needs that event to be the last thing that happened.

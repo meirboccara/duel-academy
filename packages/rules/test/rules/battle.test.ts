@@ -179,7 +179,7 @@ describe("what can be activated in the Damage Step", () => {
 			expect(labels.filter((label) => /plain-trap|hand-quick|infinite-impermanence/.test(label))).toEqual([]);
 		}
 	});
-	it(`${cites("rules", "damage-step-activation-limit")} after damage calculation and at the end of the Damage Step, none of them`, () => {
+	it(`${cites("rules", "damage-step-activation-limit")} after damage calculation and at the end of the Damage Step, no effect that changes ATK or DEF`, () => {
 		const declared = play(battle({ monsters: ["huge"] }, { monsters: ["pump"], set: ["shrink"] }, every), "attack huge > pump");
 		for (const step of ["after", "end"] as const) {
 			const window = play(toStep(declared, step), "pass");
@@ -202,6 +202,30 @@ describe("what can be activated in the Damage Step", () => {
 		// The attacker is gone: no damage calculation, no damage.
 		expect(over.lp).toEqual({ you: 8000, rival: 6500 });
 		expect(codes(over, "rival", "monster")).toEqual(["big"]);
+	});
+	// The TCG rulebook's wording is followed (owner's decision, 2026-11-25): Counter Traps "can only be activated up until the start of
+	// damage calculation" (RB10). The OCG rulebook (record `ocg-counter-traps-after-damage-calculation`) and Konami's Q&A fid 7966 (record
+	// `counter-trap-negates-after-damage-calculation`), both OCG only, allow them later; YGOProJudge (asked 2026-11-25, contested once)
+	// conceded that no official TCG source says so, and the TCG Damage Step Rules page has no such section (checked).
+	it(`${cites("rules", "damage-step-activation-limit")} ${cites("rules", "counter-trap-negates-after-damage-calculation")} ${cites("rules", "ocg-counter-traps-after-damage-calculation")} a Counter Trap is not offered after damage calculation (TCG rulebook; the OCG rule allowing it is not followed)`, () => {
+		const log: string[] = [];
+		// Your 1000 ATK monster attacks the rival's 2000 ATK "when this card battles" monster; you hold Solemn Strike.
+		const start = position({ defs: battleCards(log), phase: "battle", options: every, you: { monsters: ["even"], set: ["solemn-strike"] }, rival: { monsters: ["battle-watcher"] } });
+		const after = toStep(play(start, "attack even > battle-watcher"), "after");
+		expect(after.chain.map((link) => link.card.code)).toEqual(["battle-watcher"]);
+		expect(after.priority.holder).toBe("you");
+		expect(offered(after)).toEqual(["pass"]);
+		toStep(after, null);
+		expect(log).toEqual(["battled"]);
+	});
+	it(`${cites("rules", "damage-step-activation-limit")} ${cites("rules", "ocg-counter-traps-after-damage-calculation")} ${cites("rules", "destruction-sent-at-end")} a Counter Trap is not offered at the end of the Damage Step, against the effect of a monster destroyed by that battle (TCG rulebook)`, () => {
+		const log: string[] = [];
+		const start = position({ defs: battleCards(log), phase: "battle", options: every, you: { monsters: ["huge"], set: ["solemn-strike"] }, rival: { monsters: ["fallen"] } });
+		const end = toStep(play(start, "attack huge > fallen"), "end");
+		expect(end.chain.map((link) => [link.card.code, link.card.zone])).toEqual([["fallen", "graveyard"]]);
+		expect(offered(end)).toEqual(["pass"]);
+		toStep(end, null);
+		expect(log).toEqual(["fallen"]);
 	});
 	it(`${cites("rules", "defense-attacker-stops")} an attacker changed to Defense Position before damage calculation can no longer attack: no damage calculation, the Damage Step ends`, () => {
 		const start = battle({ monsters: ["big"] }, { monsters: ["small"] }, every);

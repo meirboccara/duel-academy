@@ -2,11 +2,12 @@
  * Where a rule or a card's behaviour comes from (definition of done, wayfinder ticket #9). Each test cites one record.
  * - `card-text`: the card's official text on Konami's card database (needs the Konami card id, `cid`).
  * - `tcg-rule`: the TCG rulebook or one of Konami's rules pages.
+ * - `ocg-rule`: Konami's official OCG rulebook (Japanese; OCG only, no formal authority over the TCG).
  * - `jp-qa`: a Q&A entry of Konami's Japanese database for the card (needs `cid` and the Q&A id, `fid`).
  * - `jp-notes`: the 補足情報 notes at the top of a card's Q&A list on the same database (needs `cid`; the notes have no Q&A id).
  * The record always points at Konami's own page; an aggregator is at most where the text was fetched from.
  */
-export type SourceKind = "card-text" | "tcg-rule" | "jp-qa" | "jp-notes";
+export type SourceKind = "card-text" | "tcg-rule" | "ocg-rule" | "jp-qa" | "jp-notes";
 
 export interface SourceRecord {
 	/** Unique within its card (or rule set): what tests cite. */
@@ -44,7 +45,7 @@ export function isRealDate(text: string): boolean {
 
 export function validateSource(record: SourceRecord): SourceProblem[] {
 	const problems: SourceProblem[] = [];
-	if (record.kind !== "tcg-rule" && record.cid === undefined) problems.push("cid-missing");
+	if (record.kind !== "tcg-rule" && record.kind !== "ocg-rule" && record.cid === undefined) problems.push("cid-missing");
 	if (record.kind === "jp-qa" && record.fid === undefined) problems.push("fid-missing");
 	if (!isRealDate(record.read)) problems.push("read-invalid");
 	if (record.quote.trim() === "") problems.push("quote-missing");
