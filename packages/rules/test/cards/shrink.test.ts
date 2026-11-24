@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { atk, cites, originalAtk } from "../../src";
 import { continuousCards, nextTurn } from "../rules/continuous-fixtures";
 import { offered, play, position, REAL_CARDS } from "../rules/fixtures";
+import { readinessCards } from "../rules/readiness-fixtures";
 
 const defs = { ...REAL_CARDS, ...continuousCards() };
 const options = { everyWindow: true };
@@ -19,5 +20,13 @@ describe("Shrink, written as an effect record", () => {
 		// It lasts through the End Phase of that turn, and is over when the next turn begins.
 		const later = nextTurn(done, 4);
 		expect(atk(later, idOf(later, "huge"))).toBe(3000);
+	});
+	it(`${cites("rules", "unaffected-targeted-not-applied")} a monster unaffected by other cards' effects can be targeted, and its ATK is not halved; one unaffected by Trap effects only is halved (Shrink is a Spell)`, () => {
+		const immuneDefs = { ...REAL_CARDS, ...readinessCards() };
+		const start = position({ defs: immuneDefs, options, you: { hand: ["shrink", "shrink"] }, rival: { monsters: ["fixture-immune", "fixture-trap-immune"] } });
+		expect(offered(start)).toContain("activate shrink > fixture-immune");
+		const done = play(start, "activate shrink > fixture-immune", "pass", "pass", "activate shrink > fixture-trap-immune", "pass", "pass");
+		expect([atk(done, idOf(done, "fixture-immune")), originalAtk(done, idOf(done, "fixture-immune"))]).toEqual([1000, 1000]);
+		expect([atk(done, idOf(done, "fixture-trap-immune")), originalAtk(done, idOf(done, "fixture-trap-immune"))]).toEqual([500, 500]);
 	});
 });

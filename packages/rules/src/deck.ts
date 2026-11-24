@@ -1,6 +1,8 @@
 import { type CardInstance, cardsIn, type Duel, moveCards, type Side, type Zone } from "./duel";
 import { ask } from "./effects";
 import { raiseEvent } from "./events";
+import { lose } from "./life";
+import { drawLocked } from "./modifiers";
 import { createRng, type Rng } from "./rng";
 
 /**
@@ -111,6 +113,19 @@ export function askBottomOrder(duel: Duel, player: Side, ids: readonly number[],
 		return ask(board, player, left, (next, picked) => step(next, [...order, picked]));
 	};
 	return step(duel, []);
+}
+
+/**
+ * Draws by a card effect ("draw 2 cards", "immediately draw 1 card"): the top `count` cards of the Deck go to the hand at the same
+ * time (one batch). Nothing is drawn while the player cannot draw by card effects or cards cannot be added from the Deck to the hand
+ * (`drawLocked`: Konami's Q&A on Droll & Lock Bird, card record `draws-fail`). A player who has to draw more cards than the Deck holds
+ * loses the Duel (Konami's notes on Mulcharmy Fuwalos, card record `notes-cannot-draw`: OCG only).
+ */
+export function drawCards(duel: Duel, side: Side, count: number): Duel {
+	if (count <= 0 || drawLocked(duel, side)) return duel;
+	const deck = duel.piles[side].deck;
+	const drawn = moveCards(duel, deck.slice(0, count), { zone: "hand" });
+	return deck.length < count ? lose(drawn, side) : drawn;
 }
 
 /** The cards of a player's Deck, from the top (a convenience over `cardsIn`). */

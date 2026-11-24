@@ -3,7 +3,7 @@ import { type Battle, type CardInstance, type CardRef, closedPriority, type Dama
 import { type CardDef, type EffectRecord } from "./effects";
 import { breakEffect, raiseEvent } from "./events";
 import { loseLp } from "./life";
-import { atk, def } from "./modifiers";
+import { atk, attackLocked, def, spareDestruction } from "./modifiers";
 import { triggerPoint } from "./triggers";
 
 /**
@@ -58,6 +58,8 @@ export function attackActions(duel: Duel, out: Action[] | null): boolean {
 	let found = false;
 	for (const id of duel.piles[turn.player].monster) {
 		if (!mayAttack(duel, duel.cards[id]!)) continue;
+		// "Cannot attack" / "cannot attack directly" (a lock, src/modifiers.ts): the attack is not offered.
+		if (attackLocked(duel, duel.cards[id]!, defenders.length === 0)) continue;
 		if (!out) return true;
 		found = true;
 		if (defenders.length === 0) out.push({ type: "attack", card: id, target: null });
@@ -172,7 +174,14 @@ function damageCalculation(duel: Duel): Duel {
 		if (power > guard) destroyed.push(refOf(target));
 		else if (power < guard) damage = { player: attackerSide, amount: guard - power };
 	}
-	let next = raiseEvent({ ...duel, battle: { ...battle, destroyed } }, { type: "battled", attacker, target });
+	// "Cannot be destroyed by battle" and "the first time it would be destroyed each turn": the monster is not destroyed; the damage stands.
+	let protectedDuel = duel;
+	const doomed = destroyed.filter((ref) => {
+		const spared = spareDestruction(protectedDuel, ref.id, "battle", null);
+		if (spared) protectedDuel = spared;
+		return spared === null;
+	});
+	let next = raiseEvent({ ...protectedDuel, battle: { ...battle, destroyed: doomed } }, { type: "battled", attacker, target });
 	if (damage && damage.amount > 0) next = raiseEvent(loseLp(next, damage.player, damage.amount), { type: "battle-damage", ...damage });
 	if (next.winner) return { ...next, battle: null, priority: { holder: next.turn.player, passed: [], open: false } };
 	const after = raiseEvent({ ...next, battle: { ...next.battle!, step: "after" as const } }, { type: "damage-step", step: "after" });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { type CardDef, cites, type Duel, moveCard } from "../../src";
+import { type CardDef, cites, type Duel, legalActions, moveCard } from "../../src";
 import { codes, offered, play, position, REAL_CARDS } from "../rules/fixtures";
+import { readinessCards } from "../rules/readiness-fixtures";
 
 const card = "upstart-goblin";
 const options = { everyWindow: true };
@@ -34,11 +35,19 @@ describe("Upstart Goblin, written as an effect record", () => {
 		expect(offered(position({ defs, you: { hand: [card] } }))).not.toContain(`activate ${card}`);
 		expect(offered(position({ defs, you: { hand: [card], deck: ["umi"] } }))).toContain(`activate ${card}`);
 	});
-	it(`${cites("upstart-goblin", "notes-sequence")} the opponent gains LP only if the card was drawn: with the Deck emptied in response, nothing happens`, () => {
+	it(`${cites("upstart-goblin", "notes-sequence")} ${cites("mulcharmy-fuwalos", "notes-cannot-draw")} with the Deck emptied in response, its controller must still draw: they lose the Duel, and the opponent gains no LP`, () => {
 		const start = position({ defs, options, you: { hand: [card], deck: ["umi"] }, rival: { set: ["mill-your-top"] } });
 		const done = play(start, `activate ${card}`, "activate mill-your-top", "pass", "pass");
-		expect(done.chain).toEqual([]);
-		expect(codes(done, "you", "graveyard").sort()).toEqual([card, "umi"].sort());
+		expect(done.winner).toBe("rival");
+		expect(done.lp.rival).toBe(8000);
+		expect(codes(done, "you", "hand")).toEqual([]);
+		expect(legalActions(done)).toEqual([]);
+	});
+	it(`${cites("upstart-goblin", "notes-sequence")} the opponent gains LP only if the card was drawn: while its controller cannot draw by card effects, nothing is drawn, nobody loses and no LP is gained`, () => {
+		const start = position({ defs: { ...defs, ...readinessCards() }, options, you: { hand: [card], deck: ["umi"] }, rival: { set: ["fixture-no-draw-for-opponent"] } });
+		const done = play(start, `activate ${card}`, "activate fixture-no-draw-for-opponent", "pass", "pass");
+		expect(done.winner).toBeNull();
+		expect(codes(done, "you", "deck")).toEqual(["umi"]);
 		expect(done.lp.rival).toBe(8000);
 	});
 	it(`${cites("upstart-goblin", "notes-sequence")} the draw and the LP gain do not happen at the same time: an optional "when" trigger on the draw misses the timing`, () => {

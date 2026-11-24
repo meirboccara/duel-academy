@@ -48,6 +48,11 @@ export type Action =
 	| { readonly type: "pendulum-summon" }
 	/** Step 6b: declare an attack with `card` on `target`, or directly (`target: null`). An action that starts no chain. */
 	| { readonly type: "attack"; readonly card: number; readonly target: number | null }
+	/**
+	 * Apply a delayed effect that is due in this phase (src/delayed.ts): `delayed` is its stamp, `card` the card that left it. Not an
+	 * activation: it starts no chain.
+	 */
+	| { readonly type: "apply"; readonly card: number; readonly delayed: number }
 	/** The card an effect asked for while it resolves (a choice that is not a target). */
 	| { readonly type: "choose"; readonly card: number }
 	/** Step 7: the zone asked for while an effect resolves or a monster goes back to its owner (from the player's left). */
@@ -85,6 +90,7 @@ export function sameAction(a: Action, b: Action): boolean {
 	if (a.card !== other.card) return false;
 	if (a.type === "summon") return a.how === (b as typeof a).how;
 	if (a.type === "attack") return a.target === (b as typeof a).target;
+	if (a.type === "apply") return a.delayed === (b as typeof a).delayed;
 	if (a.type !== "activate") return true;
 	const asked = b as typeof a;
 	return a.effect === asked.effect && a.mode === asked.mode && sameDeclaration(a.declared, asked.declared) && sameIds(a.targets, asked.targets) && sameIds(a.paid ?? [], asked.paid ?? []) && sameIds(a.groups ?? [], asked.groups ?? []);

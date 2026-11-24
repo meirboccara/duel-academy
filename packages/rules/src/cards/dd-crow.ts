@@ -16,7 +16,7 @@ export const DD_CROW: CardDef = {
 			target: (duel, { player }) => duel.piles[other(player)].graveyard,
 			operation: (duel, link) => {
 				const target = targetsOf(duel, link)[0];
-				return target?.zone === "graveyard" ? moveCard(duel, target.id, { zone: "banished" }) : duel;
+				return target?.zone === "graveyard" ? moveCard(duel, target.id, { zone: "banished", effect: link }) : duel;
 			},
 		},
 	],

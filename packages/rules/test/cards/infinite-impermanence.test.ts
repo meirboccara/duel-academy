@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { act, type Action, type CardDef, cites, CARD_DEFS, legalActions, moveCard } from "../../src";
+import { act, type Action, type CardDef, cites, CARD_DEFS, fromTraps, isNegated, legalActions, moveCard } from "../../src";
 import { negationCards } from "../rules/negation-fixtures";
 import { codes, offered, plainCards, play, position } from "../rules/fixtures";
 
@@ -127,6 +127,16 @@ describe("Infinite Impermanence's column (step 7)", () => {
 			],
 		},
 		umi: { code: "umi", kind: "spell", facts: { icon: "field" }, effects: [{ type: "activation", operation: (duel) => (log.push("umi"), duel) }] },
+		// A Continuous Spell "unaffected by Trap effects", with an effect it activates on the field.
+		"trap-proof": {
+			code: "trap-proof",
+			kind: "spell",
+			effects: [
+				{ type: "activation", stays: true, operation: (duel) => duel },
+				{ type: "continuous", modifies: () => [{ kind: "protect", against: "effects", from: fromTraps }] },
+				{ type: "ignition", operation: (duel) => (log.push("trap-proof"), duel) },
+			],
+		},
 	});
 	/** Your "ignition" monster; the rival's Impermanence Set in their Spell & Trap Zone 0 (column 4 as you see it); your Set Traps in your zones 4 and 3. */
 	const board = (log: string[], hand: string[] = []) => {
@@ -179,6 +189,18 @@ describe("Infinite Impermanence's column (step 7)", () => {
 		expect(log).toEqual([]);
 		play(negated, "activate umi", "pass");
 		expect(log).toEqual(["umi"]);
+	});
+	it("the column's negation is Infinite Impermanence's effect: a Spell in the column that is unaffected by Trap effects is not negated (the core's reading of \"unaffected\", no Konami page read for the column)", () => {
+		const log: string[] = [];
+		let start = position({ defs: columnCards(log), you: { monsters: ["ignition"], faceupSpells: ["trap-proof"] }, rival: { set: [card] } });
+		// The rival's Impermanence is in their zone 0 (column 4 as you see it): your Spell goes to your zone 4, the same column.
+		const proof = start.piles.you.spell[0]!;
+		start = moveCard(start, proof, { zone: "spell", slot: 4 });
+		const negated = play(start, "activate ignition", `activate ${card} > ignition`, "pass", "pass");
+		expect(log).toEqual([]);
+		expect(isNegated(negated, proof)).toBe(false);
+		play(negated, "activate trap-proof", "pass");
+		expect(log).toEqual(["trap-proof"]);
 	});
 	it(`${cites("infinite-impermanence", "column-notes")} no column is negated when it was activated from the hand, or when its target's effects were not negated, and the negation of the column ends with the turn`, () => {
 		const log: string[] = [];

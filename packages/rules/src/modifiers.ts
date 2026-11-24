@@ -1,5 +1,5 @@
 import { type CardInstance, changeControl, destroyCard, type Duel, freeSlots, type Side } from "./duel";
-import { askZone, type CardDef, type EffectRecord, inFieldRange, rangeOf } from "./effects";
+import { askZone, type CardDef, type EffectContext, type EffectRecord, inFieldRange, rangeOf } from "./effects";
 import { cardColumn } from "./zones";
 
 /**
@@ -17,10 +17,62 @@ import { cardColumn } from "./zones";
 export type Stat = "atk" | "def" | "level";
 
 /**
- * What a lock stops. `add-to-hand`: adding a card from the Main Deck to the hand (a draw, a search). `summon` (step 8): Summoning
- * a monster, in the `ways` the layer names (default: every way) and for the monsters its `only` accepts (default: every monster).
+ * What a lock stops. A lock is a restriction, never a negation: what is already on the chain still resolves.
+ * - `add-to-hand`: adding a card from the Main Deck to the hand (a draw, a search).
+ * - `summon` (step 8): Summoning a monster, in the `ways` the layer names (default: every way) and for the monsters its `only` accepts
+ *   (default: every monster).
+ * - `activate`: activating a card or an effect that `stops` accepts (by name, kind of card, Attribute, Type, "effects of Special
+ *   Summoned monsters"...; default: every activation). `who`: the player who would activate.
+ * - `draw`: drawing by a card effect (`drawCards`); the draw is not done. `who`: the player who would draw.
+ * - `banish-from-graveyard`: "cannot be banished from the GY": the cards `only` accepts (default: all) in the Graveyard of `who`.
+ * - `attack` / `attack-directly`: the monsters `only` accepts (default: all) controlled by `who` cannot declare an attack / a direct attack.
  */
-export type LockKind = "add-to-hand" | "summon";
+export type LockKind = "add-to-hand" | "summon" | "activate" | "draw" | "banish-from-graveyard" | "attack" | "attack-directly";
+
+/** An activation a lock may stop: who activates, which card (as it is before it is placed), and which of its effects. */
+export interface ActivationAttempt extends EffectContext {
+	readonly def: CardDef;
+	readonly effect: EffectRecord;
+	readonly index: number;
+}
+
+/**
+ * The card effect that does something: the card as it was when activated, the player who activated it and which effect. A resolving
+ * `Link` is one; a delayed effect or a watch gives its own (`source`).
+ */
+export interface EffectSource {
+	readonly card: CardInstance;
+	readonly player: Side;
+	readonly effect?: number;
+}
+
+/**
+ * What a protection is about: being chosen as a target, being destroyed by a card effect, being destroyed by battle, or card effects
+ * altogether ("unaffected by ..."): then an effect is not applied to the card (it is not destroyed, moved, negated, taken or changed
+ * by it), but the card can still be targeted (Konami's Q&A, record `unaffected-targeted-not-applied`).
+ */
+export type Shield = "target" | "effect-destruction" | "battle-destruction" | "effects";
+
+/** The lock layer (see `LockKind`). */
+export type LockLayer = Extract<Layer, { kind: "lock" }>;
+type ProtectLayer = Extract<Layer, { kind: "protect" }>;
+
+/** "For the rest of this Duel": a modifier that no turn ends. It needs no source on the field: lasting modifiers never do. */
+export const FOREVER = Number.POSITIVE_INFINITY;
+
+/**
+ * "Until the end of your next turn" (`player`: "you"), as the number of the turn at whose end it stops: the player's next turn after
+ * the current one. Applied in their own turn 3 it lasts through turn 5; applied in the opponent's turn 3, through turn 4
+ * (YGOProJudge's answer, asked 2026-11-24, no source cited). "This turn" is `duel.turn.number`.
+ */
+export const untilEndOfNextTurnOf = (duel: Duel, player: Side): number => duel.turn.number + (duel.turn.player === player ? 2 : 1);
+
+/** "Your opponent's card effects": the effect was activated by the player who does not control the card. */
+export const fromOpponent = (_duel: Duel, by: EffectSource, target: CardInstance): boolean => by.player !== target.controller;
+/** "Trap effects": the effect of a Trap Card (Counter Traps included). */
+export const fromTraps = (duel: Duel, by: EffectSource): boolean => duel.defs[by.card.code]?.kind === "trap" || duel.defs[by.card.code]?.kind === "counter-trap";
+/** "Other cards' effects": any card but the protected one. */
+export const fromOtherCards = (_duel: Duel, by: EffectSource, target: CardInstance): boolean => by.card.id !== target.id;
 
 /** The ways of Summoning a lock can stop: a Normal Summon (Tribute Summons included), a Flip Summon, a Special Summon of any kind. A Set is not a Summon. */
 export type SummonWay = "normal" | "flip" | "special";
@@ -35,7 +87,13 @@ export type Layer =
 	/** The card's effects are negated: its continuous effects and the effects it activates in the Monster Zone. */
 	| { readonly kind: "negate" }
 	/** "Neither player can ...": a lock on the players it names. */
-	| { readonly kind: "lock"; readonly what: LockKind; readonly who: Side | "both"; readonly ways?: readonly SummonWay[]; readonly only?: (duel: Duel, card: CardInstance) => boolean }
+	| { readonly kind: "lock"; readonly what: LockKind; readonly who: Side | "both"; readonly ways?: readonly SummonWay[]; readonly only?: (duel: Duel, card: CardInstance) => boolean; readonly stops?: (duel: Duel, attempt: ActivationAttempt) => boolean }
+	/**
+	 * A protection of the cards the modifier reaches: `against` what, `from` which effects (default: every effect; `fromOpponent`,
+	 * `fromTraps`, `fromOtherCards`). `firstEachTurn`: "the first time each would be destroyed each turn, it is not destroyed"
+	 * (only for the two destructions): each card is spared once a turn (`Duel.spared`).
+	 */
+	| { readonly kind: "protect"; readonly against: Shield | readonly Shield[]; readonly from?: (duel: Duel, by: EffectSource, target: CardInstance) => boolean; readonly firstEachTurn?: true }
 	/** Bookkeeping for a control change that lasts: the card goes back to its owner when it ends. */
 	| { readonly kind: "control"; readonly to: Side };
 
@@ -49,6 +107,8 @@ export interface Modifier {
 	/** The number of the turn at whose end it stops. */
 	readonly until: number;
 	readonly layer: Layer;
+	/** The effect that left it (pass the resolving link): a card unaffected by that effect is not reached by it. */
+	readonly by?: EffectSource;
 }
 
 /** Adds a lasting modifier, stamped now. */
@@ -98,8 +158,10 @@ function giveBack(duel: Duel, ending: readonly Modifier[], choose: boolean): Due
  * it before ends, record `negated-monster-state`), and goes back when the End Phase of turn number `until` begins (`returnControl`). Control stays a
  * physical move (design D3): piles are kept by controller. The card must be on the field and controlled by the other player.
  */
-export function takeControl(duel: Duel, id: number, side: Side, until: number): Duel {
+export function takeControl(duel: Duel, id: number, side: Side, until: number, by?: EffectSource): Duel {
 	const before = duel.cards[id]!;
+	// A monster unaffected by the effect that would take it stays where it is.
+	if (by && unaffectedBy(duel, id, by)) return duel;
 	const zones = freeSlots(duel, side, "monster");
 	if (before.zone !== "monster" || before.controller === side) return duel;
 	// With no free Main Monster Zone left when it resolves, the monster is destroyed by the game's rules and sent to its owner's
@@ -118,33 +180,43 @@ export function takeControl(duel: Duel, id: number, side: Side, until: number): 
  * Negates the effects of a card on the field until the end of turn number `until` (the current turn: "until the end of this
  * turn"). It is the card as it is now; the card must be face-up in the Monster Zone, or nothing happens.
  */
-export function negateCardEffects(duel: Duel, id: number, until: number): Duel {
+export function negateCardEffects(duel: Duel, id: number, until: number, by?: EffectSource): Duel {
 	const card = duel.cards[id]!;
 	if (card.zone !== "monster" || card.face !== "up") return duel;
-	return addModifier(duel, { affects: { card: id, moves: card.moves }, until, layer: { kind: "negate" } });
+	// `by`: the effect that negates; a monster unaffected by it is not negated.
+	if (by && unaffectedBy(duel, id, by)) return duel;
+	return addModifier(duel, { affects: { card: id, moves: card.moves }, until, layer: { kind: "negate" }, ...(by ? { by } : {}) });
 }
 
 /**
  * Step 7: "for the rest of this turn, all other Spell/Trap effects in this column are negated" (Infinite Impermanence). The column is
  * the one `source` is in now (Konami's notes: where the card is when it applies); every other card in a Spell & Trap Zone of that
  * column, on either side, is negated until the end of turn `until`, those that come there later included. A Spell or Trap effect
- * activated there stays negated if its card leaves as the cost (`negatedWhere`).
+ * activated there stays negated if its card leaves as the cost (`negatedWhere`). `by`: the effect that negates (the resolving link):
+ * a card in the column that is unaffected by it is not negated while it is.
  */
-export function negateColumn(duel: Duel, source: number, until: number): Duel {
+export function negateColumn(duel: Duel, source: number, until: number, by?: EffectSource): Duel {
 	const column = cardColumn(duel.cards[source]!);
 	if (column === null) return duel;
 	const self = duel.cards[source]!;
 	const other = (target: CardInstance) => target.id !== source || target.moves !== self.moves;
-	return addModifier(duel, { affects: (_duel, target) => target.zone === "spell" && other(target) && cardColumn(target) === column, until, layer: { kind: "negate" } });
+	return addModifier(duel, { affects: (_duel, target) => target.zone === "spell" && other(target) && cardColumn(target) === column, until, layer: { kind: "negate" }, ...(by ? { by } : {}) });
 }
 
 /**
  * Step 7: is a card negated where it was, as it was (`card` is a snapshot, as a link holds it): by a lasting negation of a place (a
  * column), even if the card has left since. Konami's Q&A on Wonder Wand and Infinite Impermanence: an effect activated in the column is
- * negated though the card was sent to the Graveyard as its cost.
+ * negated though the card was sent to the Graveyard as its cost. A card still there that is unaffected by the negating effect is not
+ * negated (the core's reading of "unaffected", as `shielded` in src/chain.ts; no Konami page read for a column).
  */
 export function negatedWhere(duel: Duel, card: CardInstance): boolean {
-	return duel.modifiers.some((modifier) => modifier.layer.kind === "negate" && typeof modifier.affects === "function" && modifier.affects(duel, card, null));
+	return duel.modifiers.some((modifier) => modifier.layer.kind === "negate" && typeof modifier.affects === "function" && modifier.affects(duel, card, null) && !(modifier.by && stillUnaffected(duel, card, modifier.by)));
+}
+
+/** The card is still on the field as it was (it has not moved since the snapshot) and is unaffected by the effect `by`. */
+function stillUnaffected(duel: Duel, card: CardInstance, by: EffectSource): boolean {
+	const now = duel.cards[card.id]!;
+	return now.moves === card.moves && now.face === "up" && unaffectedBy(duel, now.id, by);
 }
 
 const printed = (duel: Duel, id: number, stat: Stat): number => duel.defs[duel.cards[id]!.code]?.facts?.[stat] ?? 0;
@@ -154,6 +226,8 @@ interface Entry {
 	readonly stamp: number;
 	readonly layer: Layer;
 	readonly source: CardInstance | null;
+	/** The effect it comes from, when known: the continuous effect's card, or the effect that left a lasting modifier (`Modifier.by`). */
+	readonly by: EffectSource | null;
 }
 
 /** The codes of the cards that have a continuous record, per `defs` (shared by every duel, never changed). */
@@ -180,7 +254,7 @@ const ON_FIELD_PILES = ["monster", "spell", "field"] as const;
  */
 function entriesFor(duel: Duel, target: CardInstance, seen: ReadonlySet<number>): Entry[] {
 	const found: Entry[] = [];
-	for (const modifier of duel.modifiers) if (reaches(duel, modifier.affects, target, null)) found.push({ stamp: modifier.stamp, layer: modifier.layer, source: null });
+	for (const modifier of duel.modifiers) if (modifier.layer.kind !== "lock" && reaches(duel, modifier.affects, target, null)) found.push({ stamp: modifier.stamp, layer: modifier.layer, source: null, by: modifier.by ?? null });
 	const codes = codesWithContinuous(duel.defs);
 	if (codes.size > 0) {
 		for (const side of ["you", "rival"] as const) {
@@ -191,13 +265,133 @@ function entriesFor(duel: Duel, target: CardInstance, seen: ReadonlySet<number>)
 					for (const record of duel.defs[source.code]!.effects!) {
 						if (record.type !== "continuous" || !appliesNow(duel, source, record, seen)) continue;
 						if (record.affects ? !record.affects(duel, target, source) : source.id !== target.id) continue;
-						for (const layer of record.modifies!(duel, source)) found.push({ stamp: source.since, layer, source });
+						for (const layer of record.modifies!(duel, source)) if (layer.kind !== "lock") found.push({ stamp: source.since, layer, source, by: { card: source, player: source.controller } });
 					}
 				}
 			}
 		}
 	}
-	return found.sort((a, b) => a.stamp - b.stamp);
+	return unaffectedDropped(duel, target, found).sort((a, b) => a.stamp - b.stamp);
+}
+
+const covers = (layer: Layer, against: Shield): layer is ProtectLayer => layer.kind === "protect" && (typeof layer.against === "string" ? layer.against === against : layer.against.includes(against));
+
+/**
+ * "Unaffected by ... effects": what reaches the card from an effect it is unaffected by does not apply to it (an ATK change, a
+ * negation). Only modifiers whose effect is known are dropped (`Modifier.by`, or a continuous effect's own card); the protections
+ * themselves stay.
+ *
+ * One ordering is read (`appliedFirst`): a continuous negation that was already applying when the card's own "unaffected" effect began
+ * (Skill Drain face-up before the monster came face-up) is not dropped by that effect: it negates the card, its "unaffected" effect
+ * included, until the negation stops applying. In the other order the card is unaffected by it. Konami's Japanese Q&A fid 23897 (OCG
+ * only; records `skill-drain-first-negates-own-immunity`, `own-immunity-first-skill-drain-not-applied`); YGOProJudge answered the same
+ * (asked 2026-11-24). The page is about Skill Drain and a monster's own unconditional effect: the core applies it to any continuous
+ * negation read from a card on the field (an inference for cards other than Skill Drain), and to nothing else. It is not a general
+ * rule of order between protections and effects: a protection given by another card, a lasting protection, and anything that is not
+ * a negation are read as before.
+ */
+function unaffectedDropped(duel: Duel, target: CardInstance, entries: Entry[]): Entry[] {
+	const shields = entries.filter((entry) => covers(entry.layer, "effects"));
+	if (shields.length === 0) return entries;
+	const immuneTo = (entry: Entry) =>
+		shields.some((shield) => {
+			if (appliedFirst(entry, shield, target)) return false;
+			const from = (shield.layer as ProtectLayer).from;
+			return from === undefined || from(duel, entry.by!, target);
+		});
+	return entries.filter((entry) => entry.layer.kind === "protect" || entry.by === null || !immuneTo(entry));
+}
+
+/**
+ * Was this continuous negation (of a card on the field, `source`) applying before the card's own continuous "unaffected" effect
+ * (`shield`, whose source is the card itself) began? Both stamps are the moment their card came face-up on the field. A conditional
+ * "unaffected" effect counts from then too, not from the moment its condition began to hold (no page read for that case).
+ */
+const appliedFirst = (negation: Entry, shield: Entry, target: CardInstance): boolean => negation.layer.kind === "negate" && negation.source !== null && shield.source?.id === target.id && negation.stamp < shield.stamp;
+
+const shieldCache = new WeakMap<Duel, boolean>();
+
+/**
+ * Could any protection apply in this Duel now: a lasting one, or a continuous record of a face-up card on the field that gives one?
+ * Read once per Duel value; when there is none, no protection query looks any further (the listing asks for every target candidate).
+ */
+export function anyShield(duel: Duel): boolean {
+	if (quiet(duel)) return false;
+	const cached = shieldCache.get(duel);
+	if (cached !== undefined) return cached;
+	let found = duel.modifiers.some((modifier) => modifier.layer.kind === "protect");
+	const codes = codesWithContinuous(duel.defs);
+	if (!found && codes.size > 0) {
+		scan: for (const side of ["you", "rival"] as const) {
+			for (const zone of ON_FIELD_PILES) {
+				for (const id of duel.piles[side][zone]) {
+					const source = duel.cards[id]!;
+					if (source.face !== "up" || !codes.has(source.code)) continue;
+					for (const record of duel.defs[source.code]!.effects!) {
+						if (record.type === "continuous" && record.modifies!(duel, source).some((layer) => layer.kind === "protect")) {
+							found = true;
+							break scan;
+						}
+					}
+				}
+			}
+		}
+	}
+	shieldCache.set(duel, found);
+	return found;
+}
+
+const NO_ENTRIES: Entry[] = [];
+
+/** The protections of this kind that reach the card now and hold against the effect `by` (`null`: battle, which no `from` filters). */
+function shieldsOf(duel: Duel, target: CardInstance, against: Shield, by: EffectSource | null): Entry[] {
+	if (!anyShield(duel)) return NO_ENTRIES;
+	return entriesFor(duel, target, NOBODY).filter((entry) => {
+		if (!covers(entry.layer, against)) return false;
+		return by === null || entry.layer.from === undefined || entry.layer.from(duel, by, target);
+	});
+}
+
+/**
+ * Is the card unaffected by this effect ("unaffected by Trap effects", "by other cards' effects")? Read when the effect would be
+ * applied to it. Destruction, moves attributed to an effect (`moveCard`'s `effect`), control changes, the negation of its effects
+ * and of its activations all ask it; a cost, a Summon procedure and battle do not (Konami's Q&A, record `unaffected-sent-as-cost`).
+ */
+export function unaffectedBy(duel: Duel, id: number, by: EffectSource): boolean {
+	if (quiet(duel)) return false;
+	return shieldsOf(duel, duel.cards[id]!, "effects", by).length > 0;
+}
+
+/**
+ * Can the effect `by` choose the card as a target? "Cannot be targeted by your opponent's card effects" is applied to the player who
+ * would target, not to the card (Konami's Q&A, record `cannot-be-targeted-restricts-the-player`): it is asked when the targets are
+ * listed and checked at activation (src/activation.ts), and an effect that does not target is not stopped by it.
+ */
+export function canBeTargetedBy(duel: Duel, id: number, by: EffectSource): boolean {
+	if (quiet(duel)) return true;
+	return shieldsOf(duel, duel.cards[id]!, "target", by).length === 0;
+}
+
+/**
+ * The card would be destroyed, by the card effect `by` or by battle (`by` `null`): the Duel when it is NOT destroyed (with the use of
+ * a "first time each turn" protection recorded), or `null` when nothing protects it and it is destroyed. "Cannot be destroyed by card
+ * effects" and "unaffected" stop an effect's destruction, "cannot be destroyed by battle" battle's; none stops a card being sent to
+ * the Graveyard, banished or Tributed otherwise (YGOProJudge's answer, asked 2026-11-24, no source cited). A "first time" protection
+ * is used only when nothing else protects the card, once per card and turn, battle and effects alike; a card that moved is a new card
+ * with a first time of its own (YGOProJudge again).
+ */
+export function spareDestruction(duel: Duel, id: number, how: "effect" | "battle", by: EffectSource | null): Duel | null {
+	if (quiet(duel)) return null;
+	const target = duel.cards[id]!;
+	if (how === "effect" && by && shieldsOf(duel, target, "effects", by).length > 0) return duel;
+	const shields = shieldsOf(duel, target, how === "effect" ? "effect-destruction" : "battle-destruction", by);
+	if (shields.length === 0) return null;
+	if (shields.some((entry) => !(entry.layer as ProtectLayer).firstEachTurn)) return duel;
+	for (const entry of shields) {
+		const key = `${entry.stamp}:${entry.source?.id ?? "lasting"}:${target.id}.${target.moves}`;
+		if (!duel.spared.includes(key)) return { ...duel, spared: [...duel.spared, key] };
+	}
+	return null;
 }
 
 /** Does a continuous record of a face-up card apply now: the condition holds and the card's effects are not negated. */
@@ -222,7 +416,8 @@ function negatedBy(duel: Duel, card: CardInstance, seen: ReadonlySet<number>): b
 export function isNegatedLasting(duel: Duel, id: number): boolean {
 	if (duel.modifiers.length === 0) return false;
 	const card = duel.cards[id]!;
-	return duel.modifiers.some((modifier) => modifier.layer.kind === "negate" && reaches(duel, modifier.affects, card, null));
+	// A negation left by an effect the card is unaffected by does not reach it (as in every other query: `unaffectedDropped`).
+	return duel.modifiers.some((modifier) => modifier.layer.kind === "negate" && reaches(duel, modifier.affects, card, null) && !(modifier.by && unaffectedBy(duel, id, modifier.by)));
 }
 
 /** Are the effects of this card on the field negated: by a lasting negation of the card as it is now, or by a continuous effect. A new card (it moved since) is not. */
@@ -282,30 +477,88 @@ export function level(duel: Duel, id: number): number {
 	return value;
 }
 
-/**
- * Does a lock of this kind apply now: a lasting lock, or a continuous one of a card that is face-up on the field and not negated?
- * `who` is the player whose card or effect is stopped (a lock "for both players" stops anyone).
- */
-export function locked(duel: Duel, what: LockKind, who?: Side, also?: (layer: Extract<Layer, { kind: "lock" }>) => boolean): boolean {
-	if (quiet(duel)) return false;
-	const stops = (layer: Layer) => layer.kind === "lock" && layer.what === what && (layer.who === "both" || who === undefined || layer.who === who) && (!also || also(layer));
-	if (duel.modifiers.some((modifier) => stops(modifier.layer))) return true;
+/** A lock that applies now, with the card whose continuous effect it is (`null` for a lasting one). */
+interface LockEntry {
+	readonly layer: LockLayer;
+	readonly source: CardInstance | null;
+}
+
+const NO_LOCKS: readonly LockEntry[] = Object.freeze([]);
+/** The locks of a Duel, read once per Duel value (a Duel never changes): every listing asks about them for each effect it offers. */
+const lockCache = new WeakMap<Duel, readonly LockEntry[]>();
+
+/** Every lock that applies now: the lasting ones, and the continuous ones of cards face-up on the field that are not negated. */
+function locksNow(duel: Duel): readonly LockEntry[] {
+	if (quiet(duel)) return NO_LOCKS;
+	const cached = lockCache.get(duel);
+	if (cached) return cached;
+	const found: LockEntry[] = [];
+	for (const modifier of duel.modifiers) if (modifier.layer.kind === "lock") found.push({ layer: modifier.layer, source: null });
 	const codes = codesWithContinuous(duel.defs);
-	if (codes.size === 0) return false;
-	for (const side of ["you", "rival"] as const) {
-		for (const zone of ON_FIELD_PILES) {
-			for (const id of duel.piles[side][zone]) {
-				const source = duel.cards[id]!;
-				if (source.face !== "up" || !codes.has(source.code)) continue;
-				for (const record of duel.defs[source.code]!.effects!) {
-					// The layers are read first: whether the source applies (is it negated?) is the costly question, asked only of a record that locks.
-					if (record.type === "continuous" && record.modifies!(duel, source).some(stops) && appliesNow(duel, source, record, NOBODY)) return true;
+	if (codes.size > 0) {
+		for (const side of ["you", "rival"] as const) {
+			for (const zone of ON_FIELD_PILES) {
+				for (const id of duel.piles[side][zone]) {
+					const source = duel.cards[id]!;
+					if (source.face !== "up" || !codes.has(source.code)) continue;
+					for (const record of duel.defs[source.code]!.effects!) {
+						if (record.type !== "continuous") continue;
+						// The layers are read first: whether the source applies (is it negated?) is the costly question, asked only of a record that locks.
+						const locks = record.modifies!(duel, source).filter((layer): layer is LockLayer => layer.kind === "lock");
+						if (locks.length > 0 && appliesNow(duel, source, record, NOBODY)) for (const layer of locks) found.push({ layer, source });
+					}
 				}
 			}
 		}
 	}
-	return false;
+	const result = found.length === 0 ? NO_LOCKS : found;
+	lockCache.set(duel, result);
+	return result;
 }
+
+/**
+ * Does a lock of this kind apply now: a lasting lock, or a continuous one of a card that is face-up on the field and not negated?
+ * `who` is the player whose card or effect is stopped (a lock "for both players" stops anyone).
+ */
+export function locked(duel: Duel, what: LockKind, who?: Side, also?: (layer: LockLayer) => boolean): boolean {
+	const locks = locksNow(duel);
+	if (locks.length === 0) return false;
+	return locks.some(({ layer }) => layer.what === what && (layer.who === "both" || who === undefined || layer.who === who) && (!also || also(layer)));
+}
+
+/**
+ * Is `ctx.player` stopped from activating this card or effect now ("your opponent cannot activate monster effects", "neither player
+ * can activate cards or effects with that name")? Asked by the listing and by trigger effects alike (`activationWays`).
+ */
+export function activationLocked(duel: Duel, ctx: EffectContext, index: number, effect: EffectRecord): boolean {
+	if (locksNow(duel).length === 0) return false;
+	const def = duel.defs[ctx.card.code];
+	if (!def) return false;
+	const attempt: ActivationAttempt = { player: ctx.player, card: ctx.card, def, effect, index };
+	return locked(duel, "activate", ctx.player, (layer) => layer.stops === undefined || layer.stops(duel, attempt));
+}
+
+/** Is this monster stopped from declaring an attack ("cannot attack"), or with `directly` a direct attack ("cannot attack directly")? */
+export function attackLocked(duel: Duel, card: CardInstance, directly = false): boolean {
+	if (locksNow(duel).length === 0) return false;
+	const on = (layer: LockLayer) => layer.only === undefined || layer.only(duel, card);
+	return locked(duel, "attack", card.controller, on) || (directly && locked(duel, "attack-directly", card.controller, on));
+}
+
+/** Is this card of a Graveyard stopped from being banished ("cannot be banished from the GY")? */
+export function banishLocked(duel: Duel, card: CardInstance): boolean {
+	if (locksNow(duel).length === 0) return false;
+	return locked(duel, "banish-from-graveyard", card.owner, (layer) => layer.only === undefined || layer.only(duel, card));
+}
+
+/**
+ * Can the card be banished from where it is? What a cost that banishes asks before it is paid (a move that a lock stops is simply not
+ * done, which would leave a cost unpaid). Only a card in a Graveyard can be stopped today.
+ */
+export const canBeBanished = (duel: Duel, id: number): boolean => !(duel.cards[id]!.zone === "graveyard" && banishLocked(duel, duel.cards[id]!));
+
+/** Is `who` stopped from drawing by a card effect ("cannot draw cards by card effects"), or from adding from the Deck at all? */
+export const drawLocked = (duel: Duel, who: Side): boolean => locked(duel, "draw", who) || locked(duel, "add-to-hand", who);
 
 /**
  * Step 8: is `who` stopped from Summoning `card` this way ("you cannot Special Summon monsters, except DARK monsters")? A lock stops

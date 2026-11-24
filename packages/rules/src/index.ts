@@ -3,6 +3,7 @@ export * from "./action";
 export * from "./chain";
 export * from "./choices";
 export * from "./deck";
+export * from "./delayed";
 export * from "./coverage";
 export * from "./duel";
 export * from "./effects";

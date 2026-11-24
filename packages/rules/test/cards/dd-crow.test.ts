@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cardsIn, cites } from "../../src";
 import { codes, offered, play, position, REAL_CARDS as defs, recordCards } from "../rules/fixtures";
+import { readinessCards } from "../rules/readiness-fixtures";
 
 const options = { everyWindow: true };
 const card = "dd-crow";
@@ -31,5 +32,18 @@ describe("D.D. Crow, written as an effect record", () => {
 		const done = play(start, `activate ${card} > terraforming`, "activate recycle-graveyard", "pass", "pass");
 		expect(codes(done, "rival", "banished")).toEqual([]);
 		expect(codes(done, "rival", "graveyard").sort()).toEqual(["recycle-graveyard", "terraforming"]);
+	});
+	it(`${cites("rules", "unaffected-targeted-not-applied")} ${cites("rules", "unaffected-sent-as-cost")} a card unaffected by the opponent's card effects can be targeted and is not banished by the effect; a cost still banishes it`, () => {
+		const log: string[] = [];
+		const start = position({ defs: { ...defs, ...readinessCards(log) }, options, you: { hand: [card, "fixture-banish-cost"] }, rival: { faceupSpells: ["fixture-gy-immune"], graveyard: ["terraforming"] } });
+		// The discard is paid and the card is targeted, but the banishment is not applied to it.
+		const done = play(start, `activate ${card} > terraforming`, "pass", "pass");
+		expect(codes(done, "you", "graveyard")).toEqual([card]);
+		expect(codes(done, "rival", "graveyard")).toEqual(["terraforming"]);
+		expect(codes(done, "rival", "banished")).toEqual([]);
+		// A cost is not an effect: the same card is banished to pay one.
+		const paid = play(done, "activate fixture-banish-cost ~ terraforming", "pass", "pass");
+		expect(codes(paid, "rival", "banished")).toEqual(["terraforming"]);
+		expect(log).toEqual(["fixture-banish-cost"]);
 	});
 });

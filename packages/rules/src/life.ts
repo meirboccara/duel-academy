@@ -23,4 +23,7 @@ export function loseLp(duel: Duel, side: Side, amount: number): Duel {
 	return { ...duel, lp, winner: duel.winner ?? winnerOf(lp) };
 }
 
+/** The player loses the Duel by a rule of the game (a draw from an empty Deck). `winner` is set once and never changed afterwards. */
+export const lose = (duel: Duel, side: Side): Duel => (duel.winner ? duel : { ...duel, winner: side === "you" ? "rival" : "you" });
+
 const winnerOf = (lp: Duel["lp"]): Duel["winner"] => (lp.you === 0 && lp.rival === 0 ? "draw" : lp.you === 0 ? "rival" : lp.rival === 0 ? "you" : null);

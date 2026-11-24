@@ -142,6 +142,7 @@ export function label(duel: Duel, action: Action): string {
 	if (action.type === "set") return `set ${code}`;
 	if (action.type === "summon") return `${action.how === "special" ? "special-summon" : "summon"} ${code}`;
 	if (action.type === "choose") return `choose ${code}`;
+	if (action.type === "apply") return `apply ${code}`;
 	if (action.type === "flip-summon" || action.type === "change-position") return `${action.type} ${code}`;
 	if (action.type === "attack") return `attack ${code} ${action.target === null ? "directly" : `> ${duel.cards[action.target]!.code}`}`;
 	const mode = action.mode === undefined ? "" : ` :${action.mode}`;

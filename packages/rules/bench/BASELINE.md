@@ -320,3 +320,30 @@ allocation; facets of a record with modes are cached per record). `npx vitest be
 | crowdedHand | 0.0023 ms | 0.0536 ms | 1.207 ms | **22.5×** |
 
 crowdedHand list + `act` stays above the 10× floor, in line with step 9's 21.5× (0.0498 ms against 1.070 ms).
+
+## Real-deck readiness: delayed effects, restrictions, protections (2026-11-24)
+
+Every listing now asks whether an activation is locked (`activationLocked`) and whether a target is protected (`canBeTargetedBy`). Both
+answer from one read per Duel value (`locksNow` and `anyShield`, cached in a `WeakMap`; nothing is read when the Duel has no modifier
+and no card with a continuous record), and delayed effects, watches and the destruction check are skipped on an empty list.
+`npx vitest bench --run bench/legal-moves.bench.ts`, the last of four runs, means:
+
+| Position | `legalActions` | list + `act` | today's engine | list + `act` speed-up |
+|---|---:|---:|---:|---:|
+| opening | 0.0008 ms | 0.0163 ms | 0.794 ms | 49× |
+| midgame | 0.0024 ms | 0.0460 ms | 4.691 ms | 102× |
+| crowdedHand | 0.0024 ms | 0.0568 ms | 1.142 ms | **20.1×** |
+
+crowdedHand list + `act` stays above the 10× floor. Over the four runs it took 0.0567, 0.0617, 0.0568 and 0.0568 ms, against 0.0536 ms
+in the previous slice: about 6% more (each activation is now noted in `Duel.activations`, and each listing asks the two caches and
+whether a delayed effect is owed). The listing alone is where it was (0.0022 to 0.0023 ms before on midgame and crowdedHand; the runs
+vary more than that, the first one giving 0.0029 and 0.0030 ms on a busier machine).
+
+## Real-deck readiness: review fixes (2026-11-24)
+
+After the review fixes (cards moved together judged as a group in `moveCards`, a Summon's events raised once its group is placed, the
+`requiresDraw` gate, the Skill Drain ordering, a chain that stops when the Duel is decided). `npx vitest bench --run
+bench/legal-moves.bench.ts`, four runs on a machine that was busy for the first, crowdedHand list + `act` against today's engine:
+0.0692 / 1.173 ms (17.0×), 0.0550 / 1.069 ms (19.4×), 0.0567 / 1.084 ms (19.1×), 0.0583 / 1.090 ms (18.7×). The listing alone took
+0.0023 to 0.0032 ms on crowdedHand. list + `act` is where the previous table had it (0.0568 ms); the ratio moves with today's
+engine's own time, and stays above the 10× floor.

@@ -30,7 +30,7 @@ export const EFFECT_VEILER: CardDef = {
 				// "that face-up monster your opponent controls": `targetsOf` drops a target that was turned face-down, left the field or changed
 				// control (each makes it a new card); `negateCardEffects` wants it face-up in the Monster Zone.
 				if (!target) return duel;
-				return negateCardEffects(duel, target.id, duel.turn.number);
+				return negateCardEffects(duel, target.id, duel.turn.number, link);
 			},
 		},
 	],

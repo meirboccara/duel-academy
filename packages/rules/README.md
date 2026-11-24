@@ -140,8 +140,8 @@ Known limits of step 4 (what the tests do not prove):
 - Zones: see step 7 below (Link Spider's pointed zone, the Field Zone).
 - Droll & Lock Bird is not a card of the core yet: its lock "for the rest of this turn" is a continuous effect (step 6), so
   it would not play as printed. It waits for step 6 (its event, Draw Phase exception and cost are easy to write as a record).
-- Ash Blossom & Joyous Spring answers `search`, `summon-from-deck` and `send-from-deck` only: the printed list. Drawing is
-  not on it. Academy's old engine also lets Ash answer a draw; that is a difference of data, not settled here.
+- Ash Blossom & Joyous Spring answers `search`, `draw`, `summon-from-deck` and `send-from-deck`. A draw is "add a card from the
+  Deck to the hand": settled on 2026-11-24 with Konami's Japanese Q&A fid 21685 (OCG only; see the last section).
 - Pot of Greed needs 2 cards in the Deck, and Link Spider a Level 4 or lower Normal Monster in the hand (and a free zone it
   points to), to be activated: no Konami page read; YGOProJudge's chat agrees (asked 2026-11-23, no source cited) on both.
 - Mystical Space Typhoon cannot target itself and "destroys" with `destroyCard` (the `moved` event carries `reason: "destroyed"`). The
@@ -482,7 +482,7 @@ Known limits of step 9 (what the tests do not prove):
 Exact-list readiness foundation (2026-11-24; checklist in `docs/rules-core-spec.md`, card inventory in `docs/card-plan.md`):
 - `READINESS_DECKS` / `deckReadiness` (`src/deck-manifests.ts`): exact Blue-Eyes 746021 and Sky Striker 745443 inventories with
   separate Side inventories. It reports registration only; `ready` is always `false`. Names without a code are unsupported, not
-  substituted. 54 of the 60 distinct Main/Extra names are absent.
+  substituted. 49 of the 60 distinct Main/Extra names are absent (11 registered since the Mulcharmy slice).
 - `Facts` now has typed printed `name`, `attribute`, `monsterType`, `archetypes` and exact `mentions`. Use `printedFacts`,
   `hasPrintedName`, `belongsTo` and `mentionsCard`; they never infer from `code` or text fragments. Effective Level/ATK/DEF stay
   in `level`/`atk`/`def`; effective name, Attribute, Type and archetype changes are not modelled.
@@ -565,3 +565,126 @@ Known limits of this slice (what the tests do not prove):
 - `gainLp`'s event has no answering card yet; Konami's Q&A on a card that answers Upstart Goblin's LP gain (fid 23121, Performapal Life
   Swordsman) was not opened. The `fusionSummon({ to: "deck" })` shuffle has no test of its own (the contact Fusion one is tested).
 - Raigeki's and Upstart Goblin's other Q&A entries concern cards the core does not have (titles read only).
+
+Delayed effects, lingering operations, restrictions, protections; Ash Blossom vs draws; Mulcharmy Fuwalos and Purulia (2026-11-24;
+tests in `test/rules/{restrictions,protections,delayed,watches}.test.ts` with the made-up cards of `test/rules/readiness-fixtures.ts`
+(every code starts with `fixture-`), and `test/cards/{mulcharmy-fuwalos,mulcharmy-purulia,ash-blossom-joyous-spring}.test.ts`):
+- **Delayed effects** (`src/delayed.ts`: `delay(duel, link, { due, card?, mandatory, condition?, apply })`, `Duel.delayed`, `Delayed`,
+  `nextPhaseTurn(duel, phase, whose?)`, `delayedDestruction(self)`): "during the End Phase of this turn ...", "during your opponent's
+  next End Phase ...", "at the start of the next Standby Phase ...". They live in the Duel, so they survive their source leaving the
+  field; `card` ties one to a card as it was (a card that moved is a new card: nothing is applied). Several resolved copies leave one
+  each. Nothing is done because the phase began: in its phase, with the game state open, the player whose effect it is applies it with
+  the new `apply` action (`{ type: "apply", card, delayed }`, bot name `apply <code>`), which starts no chain and is followed by a
+  trigger point and the turn player's priority. The turn player holds priority first; the other player gets theirs when the turn
+  player passes. While a player holds a mandatory one that is due, `pass` is not offered to them in an open game state, so the phase
+  cannot end before it is applied; an optional one is gone when the phase ends. `condition` is read when it would be applied ("if the
+  number of cards in your hand is more than ..."): while it fails nothing is offered or owed. `apply` may ask its player for choices.
+- **Lingering operations** (`watch(duel, link, { until, event, apply })`, `Duel.watches`): "for the rest of this turn, each time your
+  opponent Special Summons ..., immediately draw 1 card". Applied inside `raiseEvent`, so at once, also while a chain resolves, with no
+  Chain Link; events of one batch count once (a `summoned` event now carries `player` (who Summoned), `from` and `batch`; every Summon
+  the core performs gives the three); each resolved copy applies on its own. Konami's notes on Mulcharmy Fuwalos (OCG only).
+- **Drawing by an effect**: `drawCards(duel, side, n)` (one batch; nothing while `drawLocked`; a player who must draw more than the
+  Deck holds loses, `lose` in `src/life.ts`). Pot of Greed and Upstart Goblin now draw through it; Upstart Goblin attempts its draw
+  even when the Deck was emptied in response (its controller loses, and the opponent gains nothing). `EffectRecord.requiresDraw`: a
+  card that only draws at once (Pot of Greed, Upstart Goblin) is not offered while `drawLocked` (a `draw` lock or an `add-to-hand`
+  lock); a search (`requiresAddToHand`) is not stopped by a `draw` lock, and the Mulcharmy monsters set neither (YGOProJudge only).
+- **A Duel decided while a chain resolves ends there** (`resolveChain`, `answer` in `src/chain.ts`): once `winner` is set by a link
+  (or by the answer to a choice it asked), nothing more is asked, the links below are not resolved and no card is swept;
+  `legalActions` is empty and `act` refuses everything.
+- **Restrictions** are locks, in the one model of `src/modifiers.ts` (`LockKind` gains `activate`, `draw`, `banish-from-graveyard`,
+  `attack`, `attack-directly`; the layer gains `stops(duel, attempt)` for `activate`): `activationLocked` is asked by `activationWays`
+  (the listing and trigger effects alike), `attackLocked` by the attack listing, `banishLocked` by every move from a Graveyard to
+  banishment (`canBeBanished` for a cost to ask first), `drawLocked` by `drawCards`. A lock is not a negation: what is on the chain
+  still resolves. Durations: `duel.turn.number` ("this turn"), `untilEndOfNextTurnOf(duel, player)`, `FOREVER` ("for the rest of this
+  Duel"; a lasting modifier never needs its source). `CardInstance.specialSummoned` tells "Special Summoned monsters" (set by every
+  Special Summon the core performs, kept while the card stays on the field). `Duel.activations` lists the turn's activations, negated
+  ones included ("the turn you activate this effect, ..."). The locks of a Duel are read once per Duel value (`WeakMap`), so the
+  listing does not scan the field for every effect it offers.
+- **Protections** are a `protect` layer of the same model: `against` `target`, `effect-destruction`, `battle-destruction` or `effects`
+  ("unaffected"), `from` which effects (`fromOpponent`, `fromTraps`, `fromOtherCards`; default all), `firstEachTurn` ("the first time
+  each would be destroyed each turn", `Duel.spared`). Who asks: targets are filtered in `activationWays` and checked again at
+  activation (`canBeTargetedBy`); every destruction by an effect (`destroyCard`, `moveCards` with `effectDestruction`) and the battle's
+  damage calculation ask `spareDestruction`; a move done by an effect passes `effect: link` to `moveCard` / `moveCards` and is not done
+  to a card that is `unaffectedBy` it; `takeControl` and `negateCardEffects` take the effect as their last argument; `negateActivation`
+  and `negateEffect` do not reach a link whose card is still face-up on the field and unaffected by the negating effect; stat and
+  negation modifiers from an effect the card is unaffected by are dropped from every query (`Modifier.by`, or a continuous effect's
+  own card). Costs, Summon procedures, Tributes and battle pass no effect and are never stopped. `anyShield(duel)` (cached per Duel)
+  keeps every one of these questions at one lookup when no protection is in play.
+- **Cards moved at the same time are judged together** (`moveCards`): locks and protections are read for the whole group on the board
+  before any of its cards has moved, then the others move in order. Raigeki destroys the monster that protects the others and not
+  the monsters it protects, wherever it stands; a "first time each turn" protection is used once per card it spared (the core's
+  reading of "at the same time"; YGOProJudge agrees, no source cited).
+- **The monsters of one Summon arrive together** (`landSummon`): all are placed and marked, then each one's `moved` and `summoned`
+  events are raised, so a watch ("immediately draw 1 card") and trigger conditions read the board with the whole group on it.
+- **Skill Drain and a monster's own "unaffected" effect** (`appliedFirst` in `src/modifiers.ts`): whichever began to apply first
+  wins. Skill Drain already face-up when the monster comes face-up negates it, its "unaffected" effect included, until Skill Drain
+  stops applying; a monster face-up first is unaffected by a Skill Drain activated later. Konami's Japanese Q&A fid 23897 (OCG only),
+  and YGOProJudge's answer. Applied to any continuous negation read from a card on the field (an inference beyond Skill Drain); not a
+  general rule of order for protections.
+- **Attribution audit of the registered cards** (which effect moves or changes a card, so "unaffected" can be asked): Shrink
+  (`by: link`, and nothing is applied to an unaffected target), D.D. Crow's banishment (`effect: link`) and Infinite Impermanence's
+  column (`negateColumn(..., link)`: a card still in the column that is unaffected by it is not negated; `isNegatedLasting` and
+  `negatedWhere` read it) are now attributed, like the destructions (Raigeki, Lightning Storm, Mystical Space Typhoon, Ghost Ogre,
+  the Solemn cards) and the negations (Effect Veiler, Infinite Impermanence, Ash Blossom) before. Not attributed: the cards a player
+  adds or returns from their own Deck or hand (Terraforming's search, the draws of `drawCards`, Mulcharmy's End Phase shuffle) and
+  Droll & Lock Bird's lock (a lock applies to players, not to cards).
+- Sources (Konami's Japanese Q&A, OCG only, `src/readiness-sources.ts`): "cannot be targeted" is applied to the player who targets
+  (fid 14200); an unaffected monster stays a target and the effect is not applied (fid 13714); an unaffected monster can be sent to
+  the GY as a cost (fid 24398); a Counter Trap does not negate the activation of a monster on the field that is unaffected by it, and
+  does once the monster left as its own cost (fid 12428); Skill Drain against a monster's own "unaffected" effect, in both orders
+  (fid 23897).
+- **Ash Blossom & Joyous Spring answers draws** (`ASH_BLOSSOM_ANSWERS` now has `draw`): Konami's Q&A fid 21685 (page dated 2026-09-25)
+  lets Ash be chained to Knightmare Phoenix only when it was co-linked at activation, the only case in which its effect includes
+  "draw 1 card". Its notes (the whole Chain Link is negated) are cited too. Pot of Greed, Upstart Goblin and the Mulcharmy monsters
+  are answered.
+- **Mulcharmy Fuwalos** (cid 20500) and **Mulcharmy Purulia** (cid 20206), `src/cards/mulcharmy*.ts`: Quick Effect in the hand while
+  their player controls no cards (cost: discard), a watch for the draws (Fuwalos: the opponent's Special Summons from the Deck or Extra
+  Deck; Purulia: their Normal or Special Summons from the hand, never a Set), a mandatory delayed effect for the End Phase hand limit
+  (random cards by the Duel's RNG, then the Deck is shuffled), and the "1 other Mulcharmy monster effect" sentence as part of the
+  activation condition, counted on `Duel.activations`. Each has Konami's EN and FR text (read once each), its Japanese notes and
+  Q&A fid 7813 (a negated activation counts), Fuwalos also fid 24217 (the opponent Summons from the Fuwalos player's own Deck).
+
+Known limits of this slice (what the tests do not prove):
+- Only YGOProJudge backs (asked 2026-11-24, no source cited; no Konami page found): that delayed effects start no chain in general
+  (Konami's notes say so for Mulcharmy only), that a delayed effect is not applied to a card that moved, the End Phase order (turn
+  player first, each player ordering their own), "until the end of your next turn" as a turn count, "cannot be destroyed by card
+  effects" not stopping a send to the GY or a banishment, the "first time each turn" protection being per card, shared by battle and
+  effects, and new for a card that moved, a non-targeting effect reaching a card that cannot be targeted, and Ash Blossom answering
+  a Mulcharmy activation (Konami's Q&A covers draw effects in general, not this card).
+- **YGOProJudge disagrees with the Konami page followed here**: it answered that an activation of an unaffected monster on the field
+  is negated by a Counter Trap (the monster only escaping the destruction); Konami's Japanese Q&A fid 12428 says the activation is
+  not negated. The core follows Konami's page (OCG); if TCG practice differs, `shielded` in `src/chain.ts` is the one place to change.
+- End Phase ordering is simpler than a real End Phase: a player cannot pass in an open game state while they owe a mandatory delayed
+  effect, so the turn player cannot let the opponent apply theirs first; control taken "until the End Phase" still goes back when the
+  phase begins (step 6), before anything else. "At the start of the Standby Phase" is "during" it. A delayed effect about a card that
+  is face-down, or protected when it is applied, is simply spent.
+- A watch's `apply` must not ask for a choice. For a Summon it is applied once the whole group is on the field (`landSummon`); for
+  cards moved together by `moveCards` (a draw of several cards, "destroy all") the events are still raised card by card as each one
+  moves, so a watch on `moved` or `added-to-hand` is applied between the cards of the batch. "Immediately" inside an operation means
+  at the `raiseEvent` call.
+- "Unaffected" is asked when an effect would be applied. Moves are only stopped when the script passes `effect: link` (see the
+  attribution audit above for the registered cards; the older fixtures do not). A lasting modifier added without `by` still reaches an
+  unaffected card. A card that becomes unaffected keeps what was applied to it before only if that modifier has no `by`: this also
+  holds for a lasting negation applied while Skill Drain was negating the monster's own "unaffected" effect, which stops reaching the
+  monster once Skill Drain is gone (no page read; arguably that negation should keep negating the immunity). "Unaffected by activated
+  effects" (as opposed to all effects) is not told apart. A protection never looks at the face or zone of the card by itself: the
+  card's `affects` says which cards it reaches.
+- The Skill Drain ordering compares the moments the two cards came face-up on the field: a conditional "unaffected" effect counts
+  from then, not from when its condition began to hold, and a Skill Drain is taken to apply from the moment it is face-up (its
+  activation has not resolved yet during its own chain). Other orderings between continuous effects are not modelled.
+- Simultaneous destruction by a script that loops over `destroyCard` (the made-up `fixture-destroy-all`) is still sequential: only
+  `moveCards` judges the group together. The registered cards that destroy several cards use `moveCards`.
+- A Duel decided outside a resolving chain (a watch's draw when a Summon succeeds, a delayed effect) still runs the step that
+  follows (the trigger point); nothing is offered afterwards (`legalActions` is empty), but `building` or `waiting` may be set.
+- `banish-from-graveyard` stops the move silently: a cost that banishes must ask `canBeBanished` first (no real card does yet).
+  That a card that only draws cannot be activated under a `draw` lock (`requiresDraw`) rests on YGOProJudge only (asked 2026-11-24,
+  no source cited).
+- `specialSummoned` is set by the core's Summons only; a fixture that moves a monster to the field and raises `summoned` by hand
+  leaves it `false`, and its event has no `player`, `from` or `batch`.
+- The "1 other Mulcharmy" sentence is read as "at most 2 Mulcharmy monster effects per player and turn", which is the same thing while
+  every Mulcharmy monster carries the sentence. The other entries of both cards' Q&A lists (Maxx "C" with other cards, Magical Hats,
+  PSY-Framegear Gamma, a discard cost while cards are banished instead of sent to the GY) were not opened: their cards are not in the core.
+- The Mulcharmy draw in the middle of a Summon negation window is not a question: nothing is drawn before the Summon succeeds
+  (the `summoned` event), which is also what makes a negated Summon draw nothing (YGOProJudge's lead; follows from the event model).
+- Bot: `viewFor` keeps `delayed`, `watches`, `spared` and `activations` as they are (their sources were activated, so both players
+  know them); a re-dealt world keeps them and plays on. The evaluation does not value a pending delayed effect or a watch.

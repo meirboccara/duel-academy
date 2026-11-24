@@ -79,7 +79,7 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | Complete | Exact Main/Extra name | New-core state |
 |---|---|---|
 | [ ] | Ancient Fairy Life Dragon | Missing |
-| [ ] | Ash Blossom & Joyous Spring | Registered; completeness pending |
+| [ ] | Ash Blossom & Joyous Spring | Registered; answers draw effects since 2026-11-24 (Konami Q&A fid 21685); printed facts incomplete, completeness pending |
 | [ ] | Bingo Machine, Go!!! | Missing |
 | [ ] | Blue-Eyes Spirit Dragon | Missing |
 | [ ] | Blue-Eyes Tyrant Dragon | Missing |
@@ -101,8 +101,8 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [ ] | Maiden of White | Missing |
 | [ ] | Majesty of the White Dragons | Missing |
 | [ ] | Mausoleum of White | Missing |
-| [ ] | Mulcharmy Fuwalos | Missing |
-| [ ] | Mulcharmy Purulia | Missing |
+| [x] | Mulcharmy Fuwalos | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
+| [x] | Mulcharmy Purulia | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
 | [ ] | Mystical Space Typhoon | Registered; completeness pending |
 | [ ] | Neo Blue-Eyes Ultimate Dragon | Missing |
 | [ ] | Pot of Prosperity | Missing |

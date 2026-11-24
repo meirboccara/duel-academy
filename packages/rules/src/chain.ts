@@ -7,13 +7,14 @@ import { PENDULUM_SLOTS } from "./zones";
 const FIELD_ZONE: readonly number[] = Object.freeze([0]);
 import { breakEffect, type GameEvent, raiseEvent } from "./events";
 import { type CardDef, type EffectRecord, effectOf, inFieldRange, rangeOf, sameDeclaration, speedOf } from "./effects";
-import { returnControl, summonLocked, withoutEnded } from "./modifiers";
+import { returnControl, summonLocked, unaffectedBy, withoutEnded } from "./modifiers";
 import { cardNegated, immune } from "./negation";
 import { endChain, newTurn, refund } from "./once";
 import { beginSummon, finishSummon, openPendingSummon } from "./summon";
 import { beginFlipSummon, canBeNormalSummoned, canChangePosition, canFlipSummon, canPendulumSummon, canStartProcedure, canTribute, changePositionByHand, setMonster, startPendulumSummon, startProcedure, startTribute, summonPositions, tributesNeeded } from "./procedures";
 import { advanceBattle, attackActions, damageStepAllows, declareAttack } from "./battle";
 import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./triggers";
+import { applyDelayed, delayedActions, expireDelayed, mustApply } from "./delayed";
 
 /**
  * Step 2 of docs/rules-core-spec.md: one chain and the priority loop, after Konami's Fast Effect Timing chart.
@@ -54,6 +55,9 @@ import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./
  *   cards chosen are enough), then the zone (`place`). An effect that performs a Summon as Chain Link 1 opens the Summon's window
  *   once the chain has resolved.
  *
+ * - Delayed effects (src/delayed.ts): in their phase, with the game state open, the holder of priority may apply theirs (`apply`, an
+ *   action that starts no chain); while a mandatory one of theirs is due, `pass` is not offered to them.
+ *
  * Not here yet: the normal draw. Known limit: a Spell or Trap whose control changed while on the chain is not swept
  * to the Graveyard (the sweep matches the card as activated, move count included).
  */
@@ -73,7 +77,8 @@ export function legalActions(duel: Duel): Action[] {
 		return done ? [PASS, ...picks] : picks;
 	}
 	if (duel.building) return triggerActions(duel);
-	const actions: Action[] = [PASS];
+	// A mandatory delayed effect that is due must be applied before its player passes (src/delayed.ts).
+	const actions: Action[] = mustApply(duel) ? [] : [PASS];
 	collect(duel, actions);
 	return actions;
 }
@@ -218,6 +223,11 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 		if (!out) return true;
 		found = true;
 	}
+	// The delayed effects of the player that are due in this phase.
+	if (duel.delayed.length > 0 && delayedActions(duel, out, only)) {
+		if (!out) return true;
+		found = true;
+	}
 	return found;
 }
 
@@ -243,8 +253,8 @@ function legalMatch(duel: Duel, action: Action): Action | null {
 	if (duel.winner) return null;
 	if (duel.asking) return legalActions(duel).find((legal) => takes(legal, action)) ?? null;
 	if (duel.building) return legalActions(duel).find((legal) => sameAction(legal, action)) ?? null;
-	// Passing is always open to the player who holds priority.
-	if (action.type === "pass") return PASS;
+	// Passing is open to the player who holds priority, unless a mandatory delayed effect of theirs is due.
+	if (action.type === "pass") return mustApply(duel) ? null : PASS;
 	if (action.type === "attack") {
 		const attacks: Action[] = [];
 		attackActions(duel, attacks);
@@ -295,6 +305,9 @@ function apply(duel: Duel, action: Action): Duel {
 			return declareAttack(duel, action.card, action.target);
 		case "activate":
 			return activate(duel, action);
+		case "apply":
+			// Not an activation: something happens (what came before is no longer the last thing), then the triggers, then the turn player first.
+			return resumeAfter(applyDelayed(breakEffect(duel), action.delayed), (applied) => triggerPoint(applied, closedPriority(applied.turn.player)));
 		default:
 			throw new Error(`nothing asks for ${JSON.stringify(action)}`);
 	}
@@ -344,6 +357,7 @@ function pass(duel: Duel): Duel {
  * on the field goes to the Graveyard, negated or not, "once per Chain" limits are lifted, and the triggers go on a chain.
  * (When: after the whole chain, not after its own link. Konami's Japanese Q&A says so for Quick-Play Spells and Traps
  * chained to an effect: rule record `chained-card-after-chain`; the core applies it to every Spell and Trap Card.)
+ * A link that decides the Duel (`Duel.winner`) ends the resolution at once: see `ended`.
  */
 function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | null, before: readonly GameEvent[] = []): Duel {
 	// The links as they stand once each has come up for resolution: a lower link carries the negation a higher one gave it.
@@ -361,6 +375,9 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 			all[index] = link;
 			result = link.activationNegated || link.effectNegated || cardNegated(next, link) ? next : operationOf(effectOf(next, link), link)(next, link, index);
 		}
+		// The Duel was decided while this link resolved (a draw from an empty Deck): it ends here. Nothing more is asked, the links
+		// below are not resolved and no card is swept: the Duel stays as it stood when it was lost.
+		if (result.winner) return ended(result);
 		const asking = result.asking;
 		if (asking) {
 			const settled = settle(result);
@@ -410,8 +427,13 @@ function answer(duel: Duel, action: Action): Duel {
 				: action.type === "declare"
 					? then(board, declarations!.findIndex((declaration) => sameDeclaration(declaration, action.declaration)))
 					: then(board, (action as Extract<Action, { type: "choose" }>).card);
+	// What the answer set off decided the Duel: nothing goes on, in a chain or outside one.
+	if (result.winner) return ended(result);
 	return resume ? resumeAfter(result, resume) : resolveChain(board, links, result, carried);
 }
+
+/** The Duel is over (`winner` is set): it stays as it stands, with no question left open. `legalActions` then lists nothing and `act` refuses everything. */
+const ended = (duel: Duel): Duel => (duel.asking ? { ...duel, asking: null } : duel);
 
 /**
  * A question nobody has to be asked: with nothing to choose from, the effect does nothing more (or, when the player may stop, it
@@ -450,20 +472,39 @@ function nextPhase(duel: Duel): Duel {
 		const turn = { ...moved.turn, phase };
 		// Control taken "until the End Phase" goes back as it begins (its owner choosing the zone), before its triggers are put on a chain.
 		const begin = (entered: Duel) => triggerPoint(raiseEvent(entered, { type: "phase", phase, player: turn.player }), { holder: turn.player, passed: [], open: true });
-		return phase === "end" ? resumeAfter(returnControl({ ...moved, turn }, turn.number), begin) : begin({ ...moved, turn });
+		// The delayed effects of the phase that is over are gone (an optional one that was not applied).
+		const entering = expireDelayed({ ...moved, turn });
+		return phase === "end" ? resumeAfter(returnControl(entering, turn.number), begin) : begin(entering);
 	}
 	const player: Side = other(duel.turn.player);
 	const turn = { player, number: duel.turn.number + 1, phase: PHASES[0]! };
-	return triggerPoint(raiseEvent(newTurn(withoutEnded({ ...moved, turn, setThisTurn: [], normalSummoned: false, attacked: [], replay: null, repositioned: [], pendulumSummoned: false }, duel.turn.number)), { type: "phase", phase: turn.phase, player }), { holder: player, passed: [], open: true });
+	const fresh = expireDelayed({ ...moved, turn, setThisTurn: [], normalSummoned: false, attacked: [], replay: null, repositioned: [], pendulumSummoned: false, spared: moved.spared.length === 0 ? moved.spared : [], activations: moved.activations.length === 0 ? moved.activations : [] });
+	return triggerPoint(raiseEvent(newTurn(withoutEnded(fresh, duel.turn.number)), { type: "phase", phase: turn.phase, player }), { holder: player, passed: [], open: true });
 }
 
 const flag = (duel: Duel, index: number, change: Partial<Link>): Duel => (duel.chain[index] ? { ...duel, chain: duel.chain.map((link, i) => (i === index ? { ...link, ...change } : link)) } : duel);
+
+/**
+ * Is the link out of reach of the effect that would negate it (the link resolving now, on top of the chain)? Its card is still on the
+ * field, face-up, as it was when it activated, and is unaffected by the negating effect: the negation is not applied. A card that left
+ * the field (as its own cost) is no longer protected. Konami's Japanese Q&A fid 12428 (OCG only, record
+ * `unaffected-activation-not-negated-on-field`); YGOProJudge answered the opposite for the activation (negated, the monster not
+ * destroyed; asked 2026-11-24, no source cited): Konami's page wins.
+ */
+function shielded(duel: Duel, link: Link): boolean {
+	const by = duel.chain[duel.chain.length - 1];
+	if (!by || by === link) return false;
+	const now = duel.cards[link.card.id]!;
+	return isOnFieldFaceUp(now) && now.moves === link.card.moves && unaffectedBy(duel, now.id, by);
+}
+
+const isOnFieldFaceUp = (card: CardInstance): boolean => card.face === "up" && (card.zone === "monster" || card.zone === "spell" || card.zone === "field");
 
 /** Negates the activation of the link at `index`: it will apply nothing, and its card was never activated. */
 export function negateActivation(duel: Duel, index: number): Duel {
 	const link = duel.chain[index];
 	// "Cannot be negated" is read now, when the negating effect resolves (record `cannot-be-negated-checked-at-resolution`).
-	if (link && immune(duel, link, "activation")) return duel;
+	if (link && (immune(duel, link, "activation") || shielded(duel, link))) return duel;
 	const flagged = flag(duel, index, { activationNegated: true });
 	return link ? refund(flagged, link, effectOf(duel, link)) : flagged;
 }
@@ -471,7 +512,7 @@ export function negateActivation(duel: Duel, index: number): Duel {
 /** Negates the effect of the link at `index`: the activation stands, the effect is not applied. */
 export const negateEffect = (duel: Duel, index: number): Duel => {
 	const link = duel.chain[index];
-	return link && immune(duel, link, "effect") ? duel : flag(duel, index, { effectNegated: true });
+	return link && (immune(duel, link, "effect") || shielded(duel, link)) ? duel : flag(duel, index, { effectNegated: true });
 };
 
 /** Did the activation of the link at `index` get negated? An operation that says "and if you do" reads this after negating. */

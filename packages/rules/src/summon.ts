@@ -1,5 +1,5 @@
-import { type CardInstance, closedPriority, destroyCard, type Destruction, type Duel, moveCard, occupant, type Position, type Side, type Summoning, type SummonKind } from "./duel";
-import { breakEffect, dropWhen, raiseEvent } from "./events";
+import { type CardInstance, closedPriority, destroyCard, type Destruction, type Duel, moveCardHeld, occupant, type Position, type Side, type Summoning, type SummonKind } from "./duel";
+import { breakEffect, dropWhen, type GameEvent, raiseEvent } from "./events";
 import { triggerPoint } from "./triggers";
 import { summonZones } from "./zones";
 
@@ -57,17 +57,27 @@ const mark = (duel: Duel, id: number, change: Partial<CardInstance>): Duel => ({
  * The Summon succeeds: each monster is put face-up on the field in its zone and position, becomes properly Summoned if this was its
  * own procedure, and `summoned` is raised (`by`: an effect put it there). A Flip Summon turns the monster face-up in Attack Position where it is, and raises
  * `flipped` first (RB10: a Flip Effect is activated when the card is Flip Summoned).
+ *
+ * The monsters of one Summon arrive at the same time (a Pendulum Summon): all of them are placed and marked first, and only then
+ * are their events raised, each monster's in turn (its `moved`, then its `summoned`). So a lingering operation applied at once ("each
+ * time ..., immediately draw 1 card") and every trigger's condition read the board with the whole group on it, whatever the order
+ * of the monsters in the group. Konami's notes on the Mulcharmy monsters say the group counts once; that the other monsters are
+ * already on the field then is the core's reading of "at the same time" (no page read).
  */
 export function landSummon(duel: Duel, summoning: Summoning, by?: "effect"): Duel {
-	let next = duel;
+	// Their `summoned` events share a batch (an "each time" operation counts them once).
+	const batch = duel.batches + 1;
+	let next: Duel = { ...duel, batches: batch };
+	/** What each monster's arrival raises once all are in place: the events of its move, then (`summoned`) its Summon, with the card as it is then. */
+	const arrivals: Arrival[] = [];
 	for (const [i, id] of summoning.cards.entries()) {
-		const kind = { ...(summoning.kind === undefined ? {} : { kind: summoning.kind }), ...(by ? { by } : {}) };
+		const kind = { ...(summoning.kind === undefined ? {} : { kind: summoning.kind }), ...(by ? { by } : {}), player: summoning.player, from: next.cards[id]!.zone, batch };
 		if (summoning.how === "flip") {
 			// A monster that left, or was turned face-up, during the window is no longer Flip Summoned.
 			if (next.cards[id]!.zone !== "monster" || next.cards[id]!.face !== "down") continue;
-			next = moveCard(next, id, { zone: "monster", face: "up", position: "attack" });
-			next = raiseEvent(next, { type: "flipped", card: next.cards[id]! });
-			next = raiseEvent(next, { type: "summoned", card: next.cards[id]!, how: "flip" });
+			const turned = moveCardHeld(next, id, { zone: "monster", face: "up", position: "attack" });
+			next = turned.duel;
+			arrivals.push({ id, moved: turned.events, flipped: true, summoned: { type: "summoned", how: "flip", player: summoning.player, from: "monster", batch } });
 			continue;
 		}
 		// The zone chosen when the Summon was attempted; if something took it in the Summon's window, the first one the monster may still go to (the core's reading).
@@ -77,14 +87,32 @@ export function landSummon(duel: Duel, summoning: Summoning, by?: "effect"): Due
 		// No zone left at all: the Summon cannot be made. The monster is sent to the Graveyard without reaching the field, and the Xyz
 		// Materials stacked under it go there with it (the core's reading, no page read).
 		if (slot === undefined) {
-			next = moveCard(next, id, { zone: "graveyard", negated: true });
+			const sent = moveCardHeld(next, id, { zone: "graveyard", negated: true });
+			next = sent.duel;
+			arrivals.push({ id, moved: sent.events });
 			continue;
 		}
-		next = moveCard(next, id, { zone: "monster", face: "up", controller: summoning.player, slot, position: summoning.positions?.[i] ?? "attack" });
-		next = mark(next, id, { proper: next.cards[id]!.proper || summoning.proper === true, summonedBy: summoning.kind ?? null });
-		next = raiseEvent(next, { type: "summoned", card: next.cards[id]!, how: summoning.how, ...kind });
+		const placed = moveCardHeld(next, id, { zone: "monster", face: "up", controller: summoning.player, slot, position: summoning.positions?.[i] ?? "attack" });
+		next = mark(placed.duel, id, { proper: placed.duel.cards[id]!.proper || summoning.proper === true, summonedBy: summoning.kind ?? null, specialSummoned: summoning.how === "special" });
+		arrivals.push({ id, moved: placed.events, summoned: { type: "summoned", how: summoning.how, ...kind } });
+	}
+	// Every monster is in place: now each one's events, in the order of the group.
+	for (const arrival of arrivals) {
+		for (const event of arrival.moved) next = raiseEvent(next, event);
+		if (!arrival.summoned) continue;
+		if (arrival.flipped) next = raiseEvent(next, { type: "flipped", card: next.cards[arrival.id]! });
+		next = raiseEvent(next, { ...arrival.summoned, card: next.cards[arrival.id]! });
 	}
 	return next;
+}
+
+/** One monster of a Summon, placed: what is raised for it once the whole group is on the field (`landSummon`). */
+interface Arrival {
+	readonly id: number;
+	readonly moved: readonly GameEvent[];
+	readonly flipped?: true;
+	/** Its `summoned` event, without the card: read when the event is raised. Absent for a monster that could not be placed. */
+	readonly summoned?: Omit<Extract<GameEvent, { type: "summoned" }>, "card">;
 }
 
 /**

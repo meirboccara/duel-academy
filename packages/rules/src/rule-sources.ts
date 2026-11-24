@@ -3,6 +3,7 @@ import { CONTINUOUS_SOURCES } from "./continuous-sources";
 import { ZONE_SOURCES } from "./zone-sources";
 import { NEGATION_SOURCES } from "./negation-sources";
 import { SUMMON_SOURCES } from "./summon-sources";
+import { READINESS_SOURCES } from "./readiness-sources";
 import { konamiCardUrl, type SourceRecord } from "./sources";
 
 /**
@@ -291,4 +292,5 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 	...BATTLE_SOURCES,
 	...ZONE_SOURCES,
 	...SUMMON_SOURCES,
+	...READINESS_SOURCES,
 ];

@@ -19,7 +19,7 @@ describe("createDuel: every physical card is its own instance", () => {
 			{ owner: "you", controller: "you", zone: "deck", face: "down", moves: 0 },
 			{ owner: "you", controller: "you", zone: "deck", face: "down", moves: 0 },
 		]);
-		expect(card(duel, 5)).toEqual({ id: 5, code: "thousand-dragon", owner: "you", controller: "you", zone: "extra", face: "down", moves: 0, extraDeck: true, since: 0, position: "attack", slot: null, equippedTo: null, attachedTo: null, arrived: 0, fieldEntries: 0, proper: false, summonedBy: null });
+		expect(card(duel, 5)).toEqual({ id: 5, code: "thousand-dragon", owner: "you", controller: "you", zone: "extra", face: "down", moves: 0, extraDeck: true, since: 0, position: "attack", slot: null, equippedTo: null, attachedTo: null, arrived: 0, fieldEntries: 0, proper: false, summonedBy: null, specialSummoned: false });
 		expect(card(duel, 6)).toMatchObject({ code: "summoned-skull", owner: "rival", zone: "deck" });
 	});
 	it("shuffles each Deck by the seed: the same seed gives the same order, and the Extra Deck is not shuffled", () => {

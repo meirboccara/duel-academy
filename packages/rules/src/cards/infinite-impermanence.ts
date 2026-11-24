@@ -30,12 +30,12 @@ export const INFINITE_IMPERMANENCE: CardDef = {
 				const target = targetsOf(duel, link)[0];
 				// "that target": still face-up in the Monster Zone when this resolves.
 				if (!target || target.zone !== "monster" || target.face !== "up") return duel;
-				const negated = negateCardEffects(duel, target.id, duel.turn.number);
+				const negated = negateCardEffects(duel, target.id, duel.turn.number, link);
 				// "then": the column only if the negation was applied.
 				if (negated === duel) return duel;
 				const self = negated.cards[link.card.id]!;
 				const inPlace = self.zone === "spell" && self.moves === link.card.moves;
-				return link.wasSet && inPlace ? negateColumn(negated, self.id, duel.turn.number) : negated;
+				return link.wasSet && inPlace ? negateColumn(negated, self.id, duel.turn.number, link) : negated;
 			},
 		},
 	],

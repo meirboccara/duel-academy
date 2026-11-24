@@ -6,7 +6,7 @@ import { type CardInstance, type Duel, type Link, moveCard, type Side } from "./
 import { type Action, sameIds } from "./action";
 import { dropWhen } from "./events";
 import { type CardDef, type Cost, type CostSpec, type Declaration, type EffectContext, type EffectMode, type EffectRecord, effectOf, type Operation, sameDeclaration, speedOf, type TargetGroup } from "./effects";
-import { isNegatedLasting, locked } from "./modifiers";
+import { activationLocked, anyShield, canBeTargetedBy, drawLocked, isNegatedLasting, locked } from "./modifiers";
 import { hitByCardNegation } from "./negation";
 import { isSpent, keyOf, spend } from "./once";
 
@@ -112,6 +112,10 @@ const asIs = (effect: EffectRecord): boolean => !effect.cost && !effect.target &
 export function activationWays(duel: Duel, ctx: EffectContext, index: number, effect: EffectRecord, firstOnly = false): readonly Way[] {
 	checkDefinition(ctx.card, effect);
 	if (effect.requiresAddToHand && locked(duel, "add-to-hand", ctx.player)) return NO_WAYS;
+	// A card that only draws at once needs the draw to be possible now (`EffectRecord.requiresDraw`).
+	if (effect.requiresDraw && drawLocked(duel, ctx.player)) return NO_WAYS;
+	// A prohibition ("cannot activate monster effects", "... cards or effects with that name"): the activation is not offered at all.
+	if (activationLocked(duel, ctx, index, effect)) return NO_WAYS;
 	if (effect.condition && !effect.condition(duel, ctx)) return NO_WAYS;
 	if (isSpent(duel, effect, keyOf(effect, ctx.player, ctx.card, index))) return NO_WAYS;
 	if (asIs(effect)) return ACTIVATE_AS_IS;
@@ -132,9 +136,9 @@ export function activationWays(duel: Duel, ctx: EffectContext, index: number, ef
 			const room = firstOnly ? 1 : Infinity;
 			const at = { player: ctx.player, card: after.cards[ctx.card.id]! };
 			const targetChoices: readonly { readonly targets: readonly number[]; readonly sizes?: readonly number[] }[] = facet.target
-				? combinations(facet.target(after, at), facet.targetCount ?? EXACTLY_ONE_TARGET, room).map((targets) => ({ targets }))
+				? combinations(targetable(after, at, facet.target(after, at)), facet.targetCount ?? EXACTLY_ONE_TARGET, room).map((targets) => ({ targets }))
 				: facet.targetGroups
-					? groupCombinations(facet.targetGroups(after, at), facet.sameCount === true, room)
+					? groupCombinations(targetableGroups(after, at, facet.targetGroups(after, at)), facet.sameCount === true, room)
 					: NO_TARGET_CHOICE.map((targets) => ({ targets }));
 			for (const declared of declarations[f]!) {
 				for (const choice of targetChoices) ways.push(wayOf(paid, choice.targets, facet.mode, declared, choice.sizes));
@@ -144,6 +148,19 @@ export function activationWays(duel: Duel, ctx: EffectContext, index: number, ef
 	}
 	return ways;
 }
+
+/**
+ * The candidates the effect may really target: a card that "cannot be targeted" by this effect is left out (the protection layer,
+ * src/modifiers.ts). Asked for every effect that targets, in the listing and again at activation; with no modifier and no continuous
+ * card in the Duel, the list comes back as it is.
+ */
+function targetable(duel: Duel, ctx: EffectContext, candidates: readonly number[]): readonly number[] {
+	if (candidates.length === 0 || !anyShield(duel)) return candidates;
+	const kept = candidates.filter((id) => canBeTargetedBy(duel, id, ctx));
+	return kept.length === candidates.length ? candidates : kept;
+}
+
+const targetableGroups = (duel: Duel, ctx: EffectContext, groups: readonly TargetGroup[]): readonly TargetGroup[] => groups.map((group) => { const from = targetable(duel, ctx, group.from); return from === group.from ? group : { ...group, from }; });
 
 /** A facet with nothing to declare: one way, with no declaration. */
 const NO_DECLARATION: readonly (Declaration | undefined)[] = Object.freeze([undefined]);
@@ -235,13 +252,13 @@ export function activateEffect(duel: Duel, player: Side, card: CardInstance, ind
 		next = after;
 	}
 	if (facet.target) {
-		const candidates = facet.target(next, { player, card: next.cards[card.id]! });
+		const candidates = targetable(next, { player, card: next.cards[card.id]! }, facet.target(next, { player, card: next.cards[card.id]! }));
 		const { min, max } = facet.targetCount ?? EXACTLY_ONE_TARGET;
 		if (targets.length < min || targets.length > max || new Set(targets).size !== targets.length || !targets.every((target) => candidates.includes(target))) throw new Error(`${JSON.stringify(targets)} is not a legal choice of targets for ${card.code} once its cost is paid`);
 	}
 	let sizes: readonly number[] | undefined;
 	if (facet.targetGroups) {
-		const matching = groupCombinations(facet.targetGroups(next, { player, card: next.cards[card.id]! }), facet.sameCount === true, Infinity).filter((choice) => sameIds(choice.targets, targets) && (groups === undefined || sameIds(choice.sizes, groups)));
+		const matching = groupCombinations(targetableGroups(next, { player, card: next.cards[card.id]! }, facet.targetGroups(next, { player, card: next.cards[card.id]! })), facet.sameCount === true, Infinity).filter((choice) => sameIds(choice.targets, targets) && (groups === undefined || sameIds(choice.sizes, groups)));
 		// A split the action does not name must be the only one possible: two splits of the same cards are two different choices.
 		sizes = groups !== undefined || matching.length === 1 ? matching[0]?.sizes : undefined;
 		if (!sizes) throw new Error(`${JSON.stringify(targets)} is not a legal choice of targets for ${card.code} once its cost is paid`);
@@ -252,7 +269,8 @@ export function activateEffect(duel: Duel, player: Side, card: CardInstance, ind
 	const key = keyOf(effect, player, card, index);
 	const wasSet = effect.type === "activation" && card.face === "down" && (card.zone === "spell" || card.zone === "field");
 	const link = { ...newLink(next, player, activated, index, facet, targets, key, answering), effectNegated: negatedCard, wasSet, ...(declared === undefined ? {} : { declared }), ...(sizes === undefined ? {} : { targetGroups: sizes }) };
-	return { ...spend(next, effect, key), chain: [...next.chain, link] };
+	// The activation is noted for the turn ("the turn you activate this effect, ..."): it stays noted if it is negated.
+	return { ...spend(next, effect, key), chain: [...next.chain, link], activations: [...next.activations, { player, card: activated, effect: index }] };
 }
 
 /** A link for an activation, holding the card as it was when activated, the mode, and what the effect declared it would do, frozen. */

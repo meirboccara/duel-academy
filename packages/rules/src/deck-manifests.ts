@@ -162,11 +162,13 @@ const DECKS: readonly DeckManifest[] = [
     "side": [
       {
         "name": "Mulcharmy Fuwalos",
-        "count": 3
+        "count": 3,
+        "code": "mulcharmy-fuwalos"
       },
       {
         "name": "Mulcharmy Purulia",
-        "count": 3
+        "count": 3,
+        "code": "mulcharmy-purulia"
       },
       {
         "name": "PSY-Frame Driver",
@@ -210,11 +212,13 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Mulcharmy Fuwalos",
-        "count": 3
+        "count": 3,
+        "code": "mulcharmy-fuwalos"
       },
       {
         "name": "Mulcharmy Purulia",
-        "count": 3
+        "count": 3,
+        "code": "mulcharmy-purulia"
       },
       {
         "name": "Mystical Space Typhoon",

@@ -1,6 +1,6 @@
 import type { CardSources } from "../coverage";
-import { gainLp } from "../deck";
-import { moveCard, other } from "../duel";
+import { drawCards, gainLp } from "../deck";
+import { other } from "../duel";
 import type { CardDef } from "../effects";
 import { breakEffect } from "../events";
 import { konamiCardUrl } from "../sources";
@@ -8,8 +8,10 @@ import { konamiCardUrl } from "../sources";
 /**
  * "Draw 1 card, then your opponent gains 1000 LP." A Normal Spell with no once-per-turn limit on its text. Konami's notes (OCG): it can
  * be activated only while its controller has a card in the Deck; the opponent gains LP only if the card was drawn, and the two do not
- * happen at the same time ("then": `breakEffect` between them). It cannot be activated while Droll & Lock Bird's lock applies
- * (`requiresAddToHand`): YGOProJudge's answer only (asked 2026-11-24, no source cited), as for Pot of Greed.
+ * happen at the same time ("then": `breakEffect` between them). If the Deck is empty when it resolves, its controller still has to draw
+ * and loses the Duel (`drawCards`; Konami's notes on Mulcharmy Fuwalos, record `notes-cannot-draw`, OCG only). It cannot be activated
+ * while Droll & Lock Bird's lock applies, or while its player cannot draw by card effects (`requiresDraw`): YGOProJudge's answers only
+ * (asked 2026-11-24, no source cited), as for Pot of Greed.
  */
 export const UPSTART_GOBLIN: CardDef = {
 	code: "upstart-goblin",
@@ -19,13 +21,13 @@ export const UPSTART_GOBLIN: CardDef = {
 		{
 			type: "activation",
 			categories: ["draw"],
-			requiresAddToHand: true,
+			requiresDraw: true,
 			condition: (duel, { player }) => duel.piles[player].deck.length > 0,
 			operation: (duel, link) => {
+				// The draw is attempted whatever the Deck holds: with no card left (the Deck was emptied in response), its player loses.
 				const top = duel.piles[link.player].deck[0];
-				if (top === undefined) return duel;
-				const drawn = moveCard(duel, top, { zone: "hand" });
-				if (drawn.cards[top]!.zone !== "hand") return drawn;
+				const drawn = drawCards(duel, link.player, 1);
+				if (top === undefined || drawn.cards[top]!.zone !== "hand") return drawn;
 				return gainLp(breakEffect(drawn), other(link.player), 1000);
 			},
 		},

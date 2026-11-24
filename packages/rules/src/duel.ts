@@ -1,7 +1,8 @@
 import type { CardDef, Declaration, SpellSpeed } from "./effects";
 import { type GameEvent, raiseEvent, type Waiting } from "./events";
 import { NOTHING_USED, type Used } from "./once";
-import { locked, type Modifier } from "./modifiers";
+import { banishLocked, type EffectSource, locked, type Modifier, spareDestruction, unaffectedBy } from "./modifiers";
+import type { Delayed, Watch } from "./delayed";
 import type { Building } from "./triggers";
 import { createRng } from "./rng";
 import type { Revealed } from "./deck";
@@ -66,6 +67,8 @@ export interface CardInstance {
 	readonly proper: boolean;
 	/** Step 8: how it was last Summoned by a procedure ("if this card was Synchro Summoned"); kept and lost as `proper`. */
 	readonly summonedBy: SummonKind | null;
+	/** It is on the field by a Special Summon ("Special Summoned monsters"); kept while it stays on the field, `false` elsewhere. */
+	readonly specialSummoned: boolean;
 }
 
 export type Position = "attack" | "defense";
@@ -192,10 +195,25 @@ export interface Duel {
 	readonly winner: Side | "draw" | null;
 	/** Cards shown to both players (`revealCards`, `excavate`): known while they stay where they were revealed (src/deck.ts). */
 	readonly revealed: readonly Revealed[];
+	/** Delayed effects: what resolved effects left to be applied in a later phase (src/delayed.ts). */
+	readonly delayed: readonly Delayed[];
+	/** Lingering operations applied each time something happens, for a while (src/delayed.ts). */
+	readonly watches: readonly Watch[];
+	/** "The first time each would be destroyed each turn": the protections already used this turn, per protection and card (src/modifiers.ts). */
+	readonly spared: readonly string[];
+	/** The cards and effects activated this turn, negated or not, in order ("the turn you activate this effect, ..."). */
+	readonly activations: readonly Activation[];
 	/** How many groups of simultaneous moves (`moveCards`) have happened: the last one's number tags its events. */
 	readonly batches: number;
 	/** What each card code does, as effect records (src/effects.ts): shared by reference, never copied, never changed. */
 	readonly defs: Readonly<Record<string, CardDef>>;
+}
+
+/** One activation of this turn: who, the card as it was when activated, and which of its effects. A negated activation stays in the list. */
+export interface Activation {
+	readonly player: Side;
+	readonly card: CardInstance;
+	readonly effect: number;
 }
 
 /** A card as it was: its id and its `moves` then. It is still that card while its `moves` has not changed. */
@@ -341,7 +359,7 @@ export function createDuel(setup: DuelSetup): Duel {
 		for (const zone of ["deck", "extra"] as const) {
 			for (const code of setup[side][zone] ?? []) {
 				const id = nextId++;
-				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0, position: "attack", slot: null, equippedTo: null, attachedTo: null, arrived: 0, fieldEntries: 0, proper: false, summonedBy: null };
+				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0, position: "attack", slot: null, equippedTo: null, attachedTo: null, arrived: 0, fieldEntries: 0, proper: false, summonedBy: null, specialSummoned: false };
 				piles[side][zone].push(id);
 			}
 		}
@@ -383,6 +401,10 @@ export function createDuel(setup: DuelSetup): Duel {
 		replay: null,
 		winner: null,
 		revealed: [],
+		delayed: [],
+		watches: [],
+		spared: [],
+		activations: [],
 		batches: 0,
 		defs: setup.defs ?? {},
 	};
@@ -436,7 +458,11 @@ export const effectDestruction = (link: Link): Destruction => ({ cause: "effect"
 export const costDestruction = (ctx: { readonly card: CardInstance; readonly player: Side }): Destruction => ({ cause: "cost", source: ctx.card, player: ctx.player });
 
 export type MoveReason = "destroyed" | "tributed" | "material";
-type MoveTo = { destruction?: Destruction; zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: MoveReason; usedFor?: SummonKind; by?: "battle"; position?: Position; slot?: number; attachedTo?: number };
+/**
+ * `effect`: the move is done by this card effect (pass the resolving link): a card that is unaffected by it does not move (src/modifiers.ts).
+ * A cost, a Summon procedure or a rule of the game passes none, and is never stopped by a protection.
+ */
+type MoveTo = { destruction?: Destruction; effect?: EffectSource; zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: MoveReason; usedFor?: SummonKind; by?: "battle"; position?: Position; slot?: number; attachedTo?: number };
 
 /**
  * Destroys a card: it goes to the Graveyard and the move says it was destroyed (`moved.reason`), which "when destroyed" triggers
@@ -450,19 +476,67 @@ export function destroyCard(duel: Duel, id: number, options: { readonly destruct
 /**
  * Moves several cards at the same time, as one effect does ("send all monsters ... to the Graveyard"). Each moves like
  * `moveCard` and raises its own `moved` event, all sharing one `batch`, so an "each time" trigger counts them once.
+ *
+ * Which of them move is decided for all on the board as it is before any has moved (`stays`): a card protected by another card of
+ * the group is still protected, wherever the two stand in `ids` ("destroy all monsters" destroys the monster that protects the
+ * others and not those). A "first time each turn" protection is used once for each card it spared. Then the others move, in the
+ * order given. The core's reading of "at the same time"; YGOProJudge agrees (asked 2026-11-24, no source cited), no Konami page read.
  */
 export function moveCards(duel: Duel, ids: readonly number[], to: MoveTo): Duel {
 	if (ids.length === 0) return duel;
+	checkAttribution(to);
 	const batch = duel.batches + 1;
-	return ids.reduce((next, id) => move(next, id, to, batch), { ...duel, batches: batch });
+	// The board the group is judged on: nothing has moved; only the uses of "first time each turn" protections are noted as they are spent.
+	let judged: Duel = { ...duel, batches: batch };
+	const moving: number[] = [];
+	for (const id of ids) {
+		const kept = stays(judged, id, to);
+		if (kept) judged = kept;
+		else moving.push(id);
+	}
+	return moving.reduce((next, id) => relocate(next, id, to, batch), judged);
 }
 
-function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Duel {
-	// Every destruction says what destroyed it (an effect, a cost, battle, the game's rules), and only a destruction carries that.
+/** Every destruction says what destroyed it (an effect, a cost, battle, the game's rules), and only a destruction carries that. */
+function checkAttribution(to: MoveTo): void {
 	if (to.reason === "destroyed" && !to.destruction) throw new Error("a destruction needs its attribution (destruction)");
 	if (to.destruction && to.reason !== "destroyed") throw new Error("an attribution (destruction) is only for a move with reason \"destroyed\"");
+}
+
+function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined, held?: GameEvent[]): Duel {
+	checkAttribution(to);
+	return stays(duel, id, to) ?? relocate(duel, id, to, batch, held);
+}
+
+/**
+ * As `moveCard`, with its events held back instead of raised: the card moves now, and the caller raises `events`, in order, once the
+ * whole group it belongs to is in place (the monsters of one Summon, src/summon.ts), so that what answers them at once (a watch)
+ * reads the board with every card of the group on it.
+ */
+export function moveCardHeld(duel: Duel, id: number, to: MoveTo): { readonly duel: Duel; readonly events: readonly GameEvent[] } {
+	const events: GameEvent[] = [];
+	return { duel: move(duel, id, to, undefined, events), events };
+}
+
+/**
+ * Is the move not done to this card, on the board as it is: a lock, or a protection against the effect that would move or destroy it?
+ * The Duel as it then stands (the same one, or with the use of a "first time each turn" protection noted), or `null`: the card moves.
+ */
+function stays(duel: Duel, id: number, to: MoveTo): Duel | null {
 	const before = instance(duel, id);
 	if (before.zone === "deck" && to.zone === "hand" && locked(duel, "add-to-hand", before.owner)) return duel;
+	// "Cannot be banished from the GY", and a card unaffected by the effect that would move it: the move is not done.
+	if (before.zone === "graveyard" && to.zone === "banished" && banishLocked(duel, before)) return duel;
+	if (to.effect && unaffectedBy(duel, id, to.effect)) return duel;
+	// Destruction by a card effect asks the protection layer; a cost, battle (decided in src/battle.ts) and the game's rules do not.
+	if (to.destruction?.cause === "effect" && !to.negated) return spareDestruction(duel, id, "effect", { card: to.destruction.source, player: to.destruction.player, effect: to.destruction.effect });
+	return null;
+}
+
+/** Moves the card for real (see `moveCard`): nothing stops it any more. `held`: its events are put there instead of being raised. */
+function relocate(duel: Duel, id: number, to: MoveTo, batch: number | undefined, held?: GameEvent[]): Duel {
+	const before = instance(duel, id);
+	const raise = (board: Duel, event: GameEvent): Duel => (held ? (held.push(event), board) : raiseEvent(board, event));
 	if (to.controller !== undefined && !isOnField(to.zone)) throw new Error("a controller can be chosen only on the field");
 	// RB10: a Pendulum Monster Card on the field that would be sent to the Graveyard is placed face-up on its owner's Extra Deck instead.
 	// A card whose activation was negated was never on the field (record `negated-card-not-from-field`): it goes to the Graveyard.
@@ -478,7 +552,7 @@ function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Du
 	const slot = isOnField(zone) ? slotFor(duel, before, zone as "monster" | "spell" | "field", controller, to.slot) : null;
 	// RB10: to use another Field Spell, the previous one is sent to the Graveyard (the core does it when the new one is placed).
 	const previousField = zone === "field" ? occupant(duel, controller, "field", 0) : null;
-	if (previousField && previousField.id !== before.id) duel = move(duel, previousField.id, { zone: "graveyard" }, batch);
+	if (previousField && previousField.id !== before.id) duel = move(duel, previousField.id, { zone: "graveyard" }, batch, held);
 	if ((zone === "material") !== (to.attachedTo !== undefined)) throw new Error("an Xyz Material is attached to its Xyz Monster, and nothing else is");
 	const forgets = forgetsSummon(zone, face);
 	const after: CardInstance = {
@@ -495,6 +569,7 @@ function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Du
 		arrived: !isOnField(zone) ? 0 : isOnField(before.zone) && !(zone === "monster" && before.zone !== "monster") ? before.arrived : duel.turn.number,
 		proper: forgets ? false : before.proper,
 		summonedBy: forgets ? null : before.summonedBy,
+		specialSummoned: isOnField(zone) && isOnField(before.zone) ? before.specialSummoned : false,
 		moves: before.moves + (renewed ? 1 : 0),
 		since: cameUp ? duel.clock + 1 : before.since,
 	};
@@ -502,14 +577,14 @@ function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Du
 	const stamped = cameUp ? { ...placed, clock: placed.clock + 1 } : placed;
 	if (!renewed) return stamped;
 	const moved = flippedDown && zone === before.zone && controller === before.controller ? keptThroughFlip(stamped, before.id, before.moves, after.moves) : stamped;
-	const raised = raiseEvent(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}), ...(to.usedFor ? { usedFor: to.usedFor } : {}), ...(to.by ? { by: to.by } : {}), ...(to.reason === "destroyed" ? { destruction: to.destruction! } : {}) });
-	const added = zone === "hand" && before.zone !== "hand" ? raiseEvent(raised, { type: "added-to-hand", card: after, from: before.zone, ...(batch === undefined ? {} : { batch }) }) : raised;
+	const raised = raise(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}), ...(to.usedFor ? { usedFor: to.usedFor } : {}), ...(to.by ? { by: to.by } : {}), ...(to.reason === "destroyed" ? { destruction: to.destruction! } : {}) });
+	const added = zone === "hand" && before.zone !== "hand" ? raise(raised, { type: "added-to-hand", card: after, from: before.zone, ...(batch === undefined ? {} : { batch }) }) : raised;
 	// RB10: if the equipped monster is destroyed, flipped face-down or removed from the field, its Equip Cards are destroyed.
 	const unequipped = before.zone === "monster" && before.face === "up" && (zone !== "monster" || face === "down");
-	const bare = unequipped ? equipsOf(added, before.id).reduce((next, equipId) => move(next, equipId, { zone: "graveyard", reason: "destroyed", destruction: { cause: "game-mechanic" } }, undefined), added) : added;
+	const bare = unequipped ? equipsOf(added, before.id).reduce((next, equipId) => move(next, equipId, { zone: "graveyard", reason: "destroyed", destruction: { cause: "game-mechanic" } }, undefined, held), added) : added;
 	// RB10: when an Xyz Monster leaves the field, all of its Xyz Materials are sent to the Graveyard (also when its Summon was negated).
 	if (zone === "monster" || bare.piles.you.material.length + bare.piles.rival.material.length === 0) return bare;
-	return materialsOf(bare, before.id).reduce((next, materialId) => move(next, materialId, { zone: "graveyard" }, undefined), bare);
+	return materialsOf(bare, before.id).reduce((next, materialId) => move(next, materialId, { zone: "graveyard" }, undefined, held), bare);
 }
 
 /**

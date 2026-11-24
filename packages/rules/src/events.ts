@@ -1,5 +1,6 @@
 import type { CardInstance, Destruction, DamageStep, Duel, MoveReason, Phase, Position, Side, SummonKind, Zone } from "./duel";
 import { type CardDef, effectOf, inFieldRange, rangeOf } from "./effects";
+import { runWatches } from "./delayed";
 
 /**
  * Step 3 of docs/rules-core-spec.md: typed events. Every move of a card raises `moved`; effects raise the others with
@@ -17,8 +18,10 @@ export type GameEvent =
 	/**
 	 * A Summon succeeded. Step 8: `kind` is the procedure (a Tribute, Fusion, Synchro, Xyz, Link, Ritual or Pendulum Summon); `by:
 	 * "effect"`: a card effect put the monster on the field (Monster Reborn, Polymerization), not an action of the player.
+	 * `player`: who Summoned it (the player who performed the Summon, whoever owns the monster); `from`: where the monster was;
+	 * `batch`: shared by the monsters Summoned at the same time (a Pendulum Summon). The core's Summons always give the three.
 	 */
-	| { readonly type: "summoned"; readonly card: CardInstance; readonly how: "normal" | "flip" | "special"; readonly kind?: SummonKind; readonly by?: "effect" }
+	| { readonly type: "summoned"; readonly card: CardInstance; readonly how: "normal" | "flip" | "special"; readonly kind?: SummonKind; readonly by?: "effect"; readonly player?: Side; readonly from?: Zone; readonly batch?: number }
 	/** Step 8: a face-up monster's battle position was changed, by its controller or by an effect; `from` is the position it had. */
 	| { readonly type: "position-changed"; readonly card: CardInstance; readonly from: Position }
 	/** Step 6b: an attack was declared (`target` `null`: a direct attack). */
@@ -91,6 +94,12 @@ function placedFor(def: CardDef | undefined, card: CardInstance, range: ReturnTy
  * thing that happened, which effects that answer an event (`event`) can respond to.
  */
 export function raiseEvent(duel: Duel, event: GameEvent): Duel {
+	const noted = noteEvent(duel, event);
+	// Lingering operations ("each time ..., immediately ...") are applied at once, with no Chain Link (src/delayed.ts).
+	return noted.watches.length === 0 ? noted : runWatches(noted, event);
+}
+
+function noteEvent(duel: Duel, event: GameEvent): Duel {
 	const { triggers, listensToEvents } = listeners(duel.defs);
 	if (!listensToEvents) return duel;
 	let waiting = duel.waiting;

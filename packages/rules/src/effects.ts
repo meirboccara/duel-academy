@@ -152,6 +152,15 @@ export interface EffectRecord {
 	 * 2026-11-23) for Terraforming and Pot of Greed; Konami's Q&A on Drish (fid 24396) shows the same per-card call for one bullet.
 	 */
 	readonly requiresAddToHand?: boolean;
+	/**
+	 * The effect is there to draw at once ("Draw 2 cards", "Draw 1 card, then ..."): it cannot be activated while its player cannot draw by
+	 * card effects (a `draw` lock) or cards cannot be added from the Deck to the hand (an `add-to-hand` lock: a draw adds a card), as
+	 * `drawCards` reads it (`drawLocked`). A search is not a draw: it sets `requiresAddToHand`, which a `draw` lock does not stop. A card
+	 * whose draws come later (the Mulcharmy monsters: Konami's notes, "can be activated even when no draw is possible") leaves it unset.
+	 * Backed by YGOProJudge only (asked 2026-11-24 for Pot of Greed and Upstart Goblin under "you cannot draw cards by card effects": not
+	 * activatable; it cited no official source).
+	 */
+	readonly requiresDraw?: boolean;
 	/** "This activation cannot be negated." */
 	readonly activationCannotBeNegated?: Immunity;
 	/** "This effect cannot be negated." */

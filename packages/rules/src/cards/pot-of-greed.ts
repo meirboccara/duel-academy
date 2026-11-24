@@ -1,4 +1,4 @@
-import { moveCards } from "../duel";
+import { drawCards } from "../deck";
 import type { CardDef } from "../effects";
 import type { CardSources } from "../coverage";
 import { } from "./helpers";
@@ -6,7 +6,9 @@ import { konamiCardUrl } from "../sources";
 
 /**
  * "Draw 2 cards." A Normal Spell. Drawing is a move from the Deck to the hand, so the cards drawn are added at the same
- * time (one batch). It needs two cards in the Deck: kept from Academy's old engine; no Konami page was read for it.
+ * time (one batch). It needs two cards in the Deck: kept from Academy's old engine; no Konami page was read for it. It cannot be
+ * activated while its player cannot draw by card effects or cannot add cards from the Deck to the hand (`requiresDraw`): YGOProJudge's
+ * answers only (asked 2026-11-23 and 2026-11-24, no source cited).
  */
 export const POT_OF_GREED: CardDef = {
 	code: "pot-of-greed",
@@ -15,9 +17,9 @@ export const POT_OF_GREED: CardDef = {
 		{
 			type: "activation",
 			categories: ["draw"],
-			requiresAddToHand: true,
+			requiresDraw: true,
 			condition: (duel, { player }) => duel.piles[player].deck.length >= 2,
-			operation: (duel, link) => moveCards(duel, duel.piles[link.player].deck.slice(0, 2), { zone: "hand" }),
+			operation: (duel, link) => drawCards(duel, link.player, 2),
 		},
 	],
 };

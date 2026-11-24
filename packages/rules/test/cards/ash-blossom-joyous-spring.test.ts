@@ -20,11 +20,22 @@ describe("Ash Blossom & Joyous Spring, written as an effect record", () => {
 		expect(codes(done, "you", "hand")).toEqual([]);
 		expect(codes(done, "you", "graveyard")).toEqual(["terraforming"]);
 	});
-	it(`${cites("ash-blossom-joyous-spring", "text")} is not offered against an effect that includes none of the three: a draw, a destruction`, () => {
-		const drawn = position({ defs, options, you: { hand: ["pot-of-greed"], deck: ["umi", "other-field"] }, rival: { hand: [card] } });
-		expect(offered(play(drawn, "activate pot-of-greed"))).toEqual(["pass"]);
+	it(`${cites("ash-blossom-joyous-spring", "text")} is not offered against an effect that includes none of the three: a destruction`, () => {
 		const typhoon = position({ defs, options, you: { hand: ["mystical-space-typhoon"] }, rival: { hand: [card], set: ["umi"] } });
 		expect(offered(play(typhoon, "activate mystical-space-typhoon > umi"))).toEqual(["pass"]);
+	});
+	it(`${cites("ash-blossom-joyous-spring", "draw-is-add-to-hand")} answers an effect that draws: a draw is "add a card from the Deck to the hand" (Konami's Q&A, OCG only)`, () => {
+		const drawn = position({ defs, options, you: { hand: ["pot-of-greed"], deck: ["umi", "other-field"] }, rival: { hand: [card] } });
+		expect(offered(play(drawn, "activate pot-of-greed"))).toEqual([`activate ${card}`, "pass"]);
+		const negated = play(drawn, "activate pot-of-greed", `activate ${card}`, "pass", "pass");
+		expect(codes(negated, "you", "hand")).toEqual([]);
+		expect(codes(negated, "you", "deck")).toEqual(["umi", "other-field"]);
+	});
+	it(`${cites("ash-blossom-joyous-spring", "notes-whole-link")} negates the whole Chain Link: Upstart Goblin's opponent gains no LP either`, () => {
+		const goblin = position({ defs, options, you: { hand: ["upstart-goblin"], deck: ["umi"] }, rival: { hand: [card] } });
+		const stopped = play(goblin, "activate upstart-goblin", `activate ${card}`, "pass", "pass");
+		expect(codes(stopped, "you", "hand")).toEqual([]);
+		expect(stopped.lp.rival).toBe(8000);
 	});
 	it(`${cites("ash-blossom-joyous-spring", "text")} can be used once per turn: a second copy is not offered once the first has been used`, () => {
 		const start = position({ defs, options, you: { hand: ["terraforming"], set: ["needlebug-nest"], deck: ["umi", "other-field"] }, rival: { hand: [card, card] } });
