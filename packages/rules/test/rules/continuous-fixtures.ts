@@ -73,7 +73,7 @@ export function continuousCards(log: string[] = []): Record<string, CardDef> {
 		{ code: "monster", kind: "monster" },
 		// A Spell with no effect: something to Set, so the opponent gets priority.
 		{ code: "idle", kind: "spell" },
-		{ code: "big", kind: "monster", facts: { level: 4, atk: 2000, def: 1000 } },
+		{ code: "big", kind: "monster", facts: { level: 4, atk: 2000, def: 1000, effect: true } },
 		// A monster with a Continuous Effect: "Neither player can add cards from the Main Deck to the hand" (a floodgate).
 		{ code: "no-search", kind: "monster", facts: { level: 4, atk: 1000, def: 1000 }, effects: [{ type: "continuous", range: "field", operation: (duel) => duel, affects: () => true, modifies: () => [{ kind: "lock", what: "add-to-hand", who: "both" }] }] },
 		// A monster with a Continuous Effect: "Your opponent cannot add cards from the Main Deck to the hand" (a lock on one player).

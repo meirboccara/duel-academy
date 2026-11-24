@@ -74,7 +74,7 @@ export function negationCards(log: string[] = []): Record<string, CardDef> {
 		// Obelisk's printed "This card's Normal Summon cannot be negated", on a Level 4 monster.
 		{ code: "unstoppable", kind: "monster", facts: { level: 4 }, summon: { cannotBeNegated: ["normal"] } },
 		{ code: "normal-4", kind: "monster", facts: { level: 4, normal: true } },
-		{ code: "effect-b", kind: "monster" },
+		{ code: "effect-b", kind: "monster", facts: { effect: true } },
 		// "Sweep: send all monsters to the GY."
 		{ code: "dust", kind: "spell", effects: [{ type: "activation", operation: (duel) => moveCards(duel, [...duel.piles.you.monster, ...duel.piles.rival.monster], { zone: "graveyard" }) }] },
 		// "When this card is sent to the GY: ..." (Critter): a mandatory trigger activated in the Graveyard.

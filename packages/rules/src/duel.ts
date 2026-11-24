@@ -52,6 +52,11 @@ export interface CardInstance {
 	/** Step 8: the number of the turn in which it was played onto the field (Summoned, Set, placed); 0 off the field. A change of control or a flip keeps it. */
 	readonly arrived: number;
 	/**
+	 * How many times the card has come onto the field from elsewhere. It does not change while the card stays on the field (a flip, a
+	 * change of control, a move between zones there): "that card on the field" is still it until this changes (Ghost Ogre & Snow Rabbit).
+	 */
+	readonly fieldEntries: number;
+	/**
 	 * Step 8: it was Summoned by its own procedure and the Summon succeeded ("properly Special Summoned", RB10): only then can a
 	 * Fusion, Synchro, Xyz, Link or Ritual Monster be Special Summoned from the Graveyard or from banishment. Kept on the field
 	 * (face-down too), in the Graveyard, while banished and face-up on the Extra Deck (a Pendulum Monster); lost in the hand, the Deck
@@ -322,7 +327,7 @@ export function createDuel(setup: DuelSetup): Duel {
 		for (const zone of ["deck", "extra"] as const) {
 			for (const code of setup[side][zone] ?? []) {
 				const id = nextId++;
-				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0, position: "attack", slot: null, equippedTo: null, attachedTo: null, arrived: 0, proper: false, summonedBy: null };
+				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0, position: "attack", slot: null, equippedTo: null, attachedTo: null, arrived: 0, fieldEntries: 0, proper: false, summonedBy: null };
 				piles[side][zone].push(id);
 			}
 		}
@@ -471,6 +476,7 @@ function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined): Du
 		equippedTo: renewed && !(before.zone === "spell" && zone === "spell" && face === "up" && !flippedDown) ? null : before.equippedTo,
 		attachedTo: zone === "material" ? to.attachedTo! : null,
 		// Played onto the field now, also as a monster that was there as a Spell (a Pendulum Monster leaving its Pendulum Zone).
+		fieldEntries: isOnField(zone) && !isOnField(before.zone) ? before.fieldEntries + 1 : before.fieldEntries,
 		arrived: !isOnField(zone) ? 0 : isOnField(before.zone) && !(zone === "monster" && before.zone !== "monster") ? before.arrived : duel.turn.number,
 		proper: forgets ? false : before.proper,
 		summonedBy: forgets ? null : before.summonedBy,

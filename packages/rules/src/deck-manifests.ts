@@ -51,11 +51,13 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Effect Veiler",
-        "count": 3
+        "count": 3,
+        "code": "effect-veiler"
       },
       {
         "name": "Ghost Ogre & Snow Rabbit",
-        "count": 3
+        "count": 3,
+        "code": "ghost-ogre-snow-rabbit"
       },
       {
         "name": "Infinite Impermanence",
@@ -324,7 +326,8 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Ghost Ogre & Snow Rabbit",
-        "count": 3
+        "count": 3,
+        "code": "ghost-ogre-snow-rabbit"
       },
       {
         "name": "Harpie's Feather Duster",

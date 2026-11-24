@@ -92,8 +92,8 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [ ] | Dominus Purge | Missing |
 | [ ] | Droll & Lock Bird | Registered; completeness pending |
 | [ ] | Ecclesia and the Dark Dragon | Missing |
-| [ ] | Effect Veiler | Missing |
-| [ ] | Ghost Ogre & Snow Rabbit | Missing |
+| [x] | Effect Veiler | Registered; complete (printed facts, Konami texts, one test per clause and ruling) |
+| [x] | Ghost Ogre & Snow Rabbit | Registered; complete (printed facts, Konami texts, one test per clause and ruling) |
 | [ ] | Hieratic Seal of the Heavenly Spheres | Missing |
 | [ ] | Infinite Impermanence | Registered; completeness pending |
 | [ ] | Lightning Storm | Missing |

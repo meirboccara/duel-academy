@@ -1,3 +1,4 @@
+import { isEffectMonster } from "./helpers";
 import { targetsOf, type CardDef } from "../effects";
 import type { CardSources } from "../coverage";
 import { other } from "../duel";
@@ -24,7 +25,7 @@ export const INFINITE_IMPERMANENCE: CardDef = {
 			handIf: (duel, { player }) => controlsNoCards(duel, player),
 			// A face-up monster the opponent controls whose effects are not negated already (Konami's note: not a legal target;
 			// the TCG text has no such sentence), and not a Normal Monster, which has no effects to negate (same note).
-			target: (duel, { player }) => duel.piles[other(player)].monster.filter((id) => duel.cards[id]!.face === "up" && !isNegated(duel, id) && duel.defs[duel.cards[id]!.code]?.facts?.normal !== true),
+			target: (duel, { player }) => duel.piles[other(player)].monster.filter((id) => duel.cards[id]!.face === "up" && !isNegated(duel, id) && isEffectMonster(duel, id)),
 			operation: (duel, link) => {
 				const target = targetsOf(duel, link)[0];
 				// "that target": still face-up in the Monster Zone when this resolves.

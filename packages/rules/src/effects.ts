@@ -240,6 +240,8 @@ export interface Facts {
 	readonly atk?: number;
 	readonly def?: number;
 	readonly normal?: true;
+	/** Printed as an Effect Monster. A card with effect records is one anyway; a test card with no record can say so here. */
+	readonly effect?: true;
 }
 
 /** Who is Summoning what: the player, and the monster to be Summoned as it is now (in the Extra Deck, the hand...). */

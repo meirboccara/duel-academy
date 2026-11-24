@@ -9,3 +9,9 @@ export const factsOf = (duel: Duel, id: number) => duel.defs[duel.cards[id]!.cod
 
 /** The ids of the Spells and Traps on the field of both players: the Spell & Trap piles and the Field Zones. */
 export const spellsAndTraps = (duel: Duel): number[] => [...duel.piles.you.spell, ...duel.piles.rival.spell, ...duel.piles.you.field, ...duel.piles.rival.field];
+
+/** An Effect Monster: a monster card with effects that is not (treated as) a Normal Monster. A monster with no effect record is not one. */
+export const isEffectMonster = (duel: Duel, id: number): boolean => {
+	const def = duel.defs[duel.cards[id]!.code];
+	return def?.kind === "monster" && def.facts?.normal !== true && (def.facts?.effect === true || (def.effects?.length ?? 0) > 0);
+};

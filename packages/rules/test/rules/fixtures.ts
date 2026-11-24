@@ -59,7 +59,7 @@ export const REAL_CARDS: Record<string, CardDef> = {
 	"normal-4": { code: "normal-4", kind: "monster", facts: { level: 4, normal: true } },
 	"normal-4-b": { code: "normal-4-b", kind: "monster", facts: { level: 4, normal: true } },
 	"normal-6": { code: "normal-6", kind: "monster", facts: { level: 6, normal: true } },
-	"effect-4": { code: "effect-4", kind: "monster", facts: { level: 4 } },
+	"effect-4": { code: "effect-4", kind: "monster", facts: { level: 4, effect: true } },
 	// Needlebug Nest (cid 7769), a Normal Trap: "Send the top 5 cards of your Deck to the GY." Not one of the core's cards.
 	"needlebug-nest": {
 		code: "needlebug-nest",

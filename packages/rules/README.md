@@ -481,7 +481,7 @@ Known limits of step 9 (what the tests do not prove):
 Exact-list readiness foundation (2026-11-24; checklist in `docs/rules-core-spec.md`, card inventory in `docs/card-plan.md`):
 - `READINESS_DECKS` / `deckReadiness` (`src/deck-manifests.ts`): exact Blue-Eyes 746021 and Sky Striker 745443 inventories with
   separate Side inventories. It reports registration only; `ready` is always `false`. Names without a code are unsupported, not
-  substituted. 56 of the 60 distinct Main/Extra names are absent.
+  substituted. 54 of the 60 distinct Main/Extra names are absent.
 - `Facts` now has typed printed `name`, `attribute`, `monsterType`, `archetypes` and exact `mentions`. Use `printedFacts`,
   `hasPrintedName`, `belongsTo` and `mentionsCard`; they never infer from `code` or text fragments. Effective Level/ATK/DEF stay
   in `level`/`atk`/`def`; effective name, Attribute, Type and archetype changes are not modelled.
@@ -498,4 +498,20 @@ Known limits of the readiness foundation:
   separate and provides no predicate. Raye, Roze and Radiant Typhoon Vision are not scripted.
 - Every destroyed move needs its attribution: `move` throws on `reason: "destroyed"` without `destruction`, and on a `destruction`
   without that reason. The built-in Equip and battle moves pass `game-mechanic` and `battle`. `deckReadiness` counts a card as
-  registered only when its printed name matches the manifest, and the manifests are frozen at runtime. Ghost Ogre and Effect Veiler are still unscripted.
+  registered only when its printed name matches the manifest, and the manifests are frozen at runtime.
+
+Ghost Ogre & Snow Rabbit and Effect Veiler (2026-11-24; `src/cards/ghost-ogre-snow-rabbit.ts`, `effect-veiler.ts`; Konami pages read 2026-11-24, texts and notes quoted in each file's sources):
+- Ghost Ogre is two records, one per place (`range: "hand"` and `"field"`), sharing the printed once-per-turn by name through `once.key`.
+  It answers the top link only when its card was on the field when activated and the effect is not a card activation (`type` is not
+  `activation`): a monster's effect in the Monster Zone, or an effect of a Spell/Trap already face-up (Konami's notes, OCG; a
+  monster treated as an Equip Card is read by its place, untested until step 11 adds such monsters). It destroys with
+  `effectDestruction(link)`, it does not negate. The answered card is destroyed while it has not left the field since it was
+  activated (`CardInstance.fieldEntries` unchanged): a monster turned face-down in the chain still is (Konami Q&A fid 6334), and so
+  is one turned face-down and up again, or whose control changed; a card that left the field, even to come back to the same zone, is
+  not, and nothing happens (Konami's notes).
+- Effect Veiler: Quick Effect in the hand, in the opponent's Main Phase 1 or 2 only; the cost is sending itself. Targets a face-up
+  Effect Monster the opponent controls (a monster with effect records, or a test card printed `effect: true`; not a Normal Monster (Konami Q&A fid 12318 on a Dual Monster treated as Normal; the core has
+  no Dual state, so the Normal flag stands for it), and not already negated. Infinite Impermanence uses the same Effect Monster test. The face-up and not-already-negated limits rest on
+  YGOProJudge's answers only (asked 2026-11-24, no source cited; the same limit is written in Konami's notes for Infinite
+  Impermanence). A face-down monster is treated as not a legal target (YGOProJudge only).
+- Limits: effective Level, Attribute, Type or name changes are not modelled.
