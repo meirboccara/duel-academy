@@ -1076,3 +1076,46 @@ in the cards' sources; the mapping clause to test is each card's `CardSources` a
   with the card absent because they assert that something is not offered (Primite Lordly Lode's and Pot of Prosperity's Deck-lock tests, the
   "not activated" tests of Bystial Magnamhut and Deep-Eyes White Dragon); the `facts` tests of the five Spells and Traps, and the Q&A tests added
   after reading more Q&A (Lode's declaration, Magnamhut's lock, Dominus Purge's three, the White Phantom Beast's reveal), were written after the card.
+
+Blue-Eyes Extra Deck batch: five of the six Extra Deck cards asked for, from the exact 746021 list (2026-11-24; `src/cards/{ancient-fairy-life-dragon,crimson-dragon,
+hieratic-seal-of-the-heavenly-spheres,spirit-with-eyes-of-blue,lightstorm-dragon}.ts`, tests in `test/cards/` with the made-up cards of
+`test/cards/extra-deck-fixtures.ts` (Synchro and Link materials of every Level, "Ancient Fairy Dragon", "World of Spirits", "Eternal Sunshine", Spells and Traps
+that mention "Crimson Dragon", Dragon Synchro Monsters to be Summoned by Crimson Dragon, a "Blue-Eyes" monster that is not a Dragon), `test/cards/blue-eyes-fixtures.ts`
+and `test/rules/{blue-eyes-gap,attack}-fixtures.ts`; every code starts with `fixture-`; no mechanic was built). Every printed clause of the five is a record, none is
+`unmodelled`; the five are registered in `CARD_DEFS` / `CARD_SOURCES` and in the manifest (33 of the 60 Main/Extra names are now registered, 27 missing). Konami's EN and
+FR card pages were each read once (one page per card; the text was taken verbatim from the page's own text block), the Japanese notes of each card and the Q&A named in the
+cards' sources (OCG only).
+- **Blue-Eyes Spirit Dragon is not written** (clause and reason): its second effect, "when an effect of a card in the GY is activated (Quick Effect): You can negate the
+  activation", is, in Konami's notes (補足情報, 2024-03-23), usable "ダメージステップ中でも" (also in the Damage Step), and the core offers only Counter Traps and effects
+  that change ATK or DEF there (limit L1 of `docs/rules-core/blue-eyes-gaps.md`). No stand-in was written: the card stays unregistered with its manifest entry
+  without a code. Its other clauses (the Synchro procedure with "Blue-Eyes" non-Tuners, the lock on Special Summoning 2 or more monsters at the same time, the Tribute that
+  Special Summons a LIGHT Dragon Synchro Monster in Defense Position and destroys it in the End Phase, "not treated as" a Synchro Summon only for itself) have their mechanics.
+  Its notes also say its third effect cannot be activated in the Damage Step and not if it was Special Summoned from the GY or banishment; its 18 Q&A were not opened.
+- Ancient Fairy Life Dragon: the draw and the search are one effect read when it resolves (notes): "World of Spirits" on either field then, face-up, turns the draw into
+  the search, so a Chain that destroys it in between draws instead; the effect is activated only while the branch the field shows at the activation can be done (a draw that
+  is not locked, or a card to add with no lock on adding): the core's reading of "cannot activate when it cannot be done". Its permission is `in-defense` for "Ancient Fairy
+  Dragon" by name and every monster whose `facts.mentions` has that name, itself included. Its three Q&A (fids 24407, 23968, 14252) were opened: they are about Defense
+  Position attacks and were already played by the core (`direct-and-defense-attacks.test.ts`); the card's tests show them with the card, and they were not red first.
+- Crimson Dragon: the Quick Effect reads the Extra Deck as it is before the return (so "Crimson Dragon" itself is not a candidate) and frees the zone it leaves for the
+  Summon; the core performs the two moves one after the other, so their two events are not in one batch (a limit; nothing on the list depends on it). A monster that "must be
+  Synchro Summoned" may be chosen, and a Synchro Summon trigger answers the Summon (`specialSummon(..., { kind: "synchro" })`). The Quick Effect is not offered in the Damage
+  Step (notes), and its target must be a face-up Synchro Monster of Level 7 or higher read now. Q&A fid 12750 (no window to negate a Summon treated as a Synchro Summon) is
+  tested with "Solemn Judgment".
+- Hieratic Seal of the Heavenly Spheres: the cost pays 1 monster of the hand or field, face-down ones included, and is not offered when it would leave no face-up card to return
+  (Q&A fid 21579); a Quick-Play Spell chained and still on the field is neither returned nor counted (fid 21580); the Tributed trigger is two records (Graveyard, face-up banishment) and
+  is not put on a Chain when the card has left that place by then (fid 24070, tested with a banishment in response). "Once per opponent's turn" is a use for each copy
+  (`once: instance`), spent when negated: **YGOProJudge's answer only** (asked 2026-11-24, no source cited); the same answer says it cannot Tribute itself when it is the only
+  face-up card, as Konami's Q&A says. Its other three Q&A (ATK/DEF changes, Link Ribbon, and one whose title was not shown) were not opened.
+- Spirit with Eyes of Blue: "Special Summon ... except Dragon monsters" is a `summon` lock on the printed Type; its third effect is activated only while a Dragon "Blue-Eyes" monster
+  can be Special Summoned with the lock in place, and may then Summon a non-Dragon since the Tribute ends the lock: **YGOProJudge's answer only** (asked 2026-11-24, no source
+  cited; contested once, it kept its answer). "Add it to your hand or send it to the GY" is `askMay` (choosing the card adds it, passing sends it); with cards unable to be added
+  from the Deck, it is sent. The Effect Monster Summoned from the GY is negated and cannot attack while it stays that card (a flip face-down makes it a new card: notes). Its "Eyes of Blue"
+  archetype is the name's wording, no Konami page lists it. Its two Q&A (fids 23362, 23215, about "True Light") were opened and read in full and are not about this card's clauses.
+- Lightstorm Dragon: the first effect's `targetCount` reads the Normal Monsters of the player's own GY (+1); the second is two records (Graveyard, face-up banishment) for a destruction by
+  battle or card effect, and the "cannot be activated unless you control a Normal Monster" is a lasting lock on the Set card as it is (a face-up Normal Monster of the Monster Zone lifts it): how
+  long it follows the card is **YGOProJudge's answer only** (asked 2026-11-24, no source cited). The card has no Q&A.
+- YGOProJudge, every `ask` of this batch (three chats, one question each): (1) the Spirit with Eyes restriction and its Tribute (the first send returned an error and was sent a second time with the
+  card named; then one follow-up contesting the answer); (2) how long the Lightstorm Dragon restriction lasts; (3) Hieratic Seal's "once per opponent's turn" and Tributing itself. None cited an official
+  source.
+- Tests that passed with the card absent (they assert something is not offered): Ancient Fairy Life Dragon 1, Crimson Dragon 2, Hieratic Seal 2, Spirit with Eyes of Blue 1, Lightstorm Dragon 2; the Q&A tests
+  of Ancient Fairy Life Dragon and Crimson Dragon were written after the card and passed at once against existing core rules. Every other test was red first.

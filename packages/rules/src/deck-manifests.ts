@@ -129,7 +129,8 @@ const DECKS: readonly DeckManifest[] = [
     "extra": [
       {
         "name": "Ancient Fairy Life Dragon",
-        "count": 1
+        "count": 1,
+        "code": "ancient-fairy-life-dragon"
       },
       {
         "name": "Blue-Eyes Spirit Dragon",
@@ -145,15 +146,18 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Crimson Dragon",
-        "count": 1
+        "count": 1,
+        "code": "crimson-dragon"
       },
       {
         "name": "Hieratic Seal of the Heavenly Spheres",
-        "count": 2
+        "count": 2,
+        "code": "hieratic-seal-of-the-heavenly-spheres"
       },
       {
         "name": "Lightstorm Dragon",
-        "count": 1
+        "count": 1,
+        "code": "lightstorm-dragon"
       },
       {
         "name": "Neo Blue-Eyes Ultimate Dragon",
@@ -165,7 +169,8 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Spirit with Eyes of Blue",
-        "count": 2
+        "count": 2,
+        "code": "spirit-with-eyes-of-blue"
       },
       {
         "name": "Stardust Sifr Divine Dragon",
