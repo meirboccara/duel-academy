@@ -1,2 +1,4 @@
 # card-back.test.ts compares this file byte-for-byte with cardBackSvg(), which emits LF.
 apps/duel-nextjs/public/card-back.svg text eol=lf
+# Shell scripts run under bash, which fails on CRLF line endings.
+*.sh text eol=lf
