@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { seeded } from "@duel-academy/engine";
 import { cardOf, inExtraDeck } from "@duel-academy/engine";
 import { levelById } from "./levels";
-import { MASTERS, MASTER_LP, MASTER_TIER, PERSONAS, TIERS, copiesAllowed, deckProblems, duelSetup, masterDeck, masterLevelId, shuffled, type MasterId } from "./masters";
+import { MASTERS, MASTER_LP, MASTER_SHORT_NAMES, MASTER_TIER, PERSONAS, TIERS, copiesAllowed, deckProblems, duelSetup, masterDeck, masterLevelId, masterOfLevel, masterPicture, shuffled, type MasterId } from "./masters";
 import { STARTERS } from "./starters";
 import { hint, next, play, start, type Session } from "./session";
 
@@ -157,5 +159,17 @@ describe("the coin of a duel", () => {
 		const seeds = new Set([1, 2, 3, 4, 5, 6].map((seed) => duelSetup("joey-wheeler", STARTERS.dragon.deck, seeded(seed)).seed));
 		expect(seeds.size).toBeGreaterThan(3);
 		expect(seeds.has(undefined)).toBe(false);
+	});
+});
+
+describe("who the child duels on the masters' island", () => {
+	it("each trainer has a short name a child knows them by, and a picture in both sizes", () => {
+		expect(MASTERS.map((master) => MASTER_SHORT_NAMES[master])).toEqual(["Rex", "Weevil", "Mako", "Joey", "Arkana", "Bakura", "Pegasus", "Yugi", "Jaden", "Yusei", "Marik", "Kaiba", "Atem"]);
+		for (const master of MASTERS) for (const height of [256, 512] as const) expect(existsSync(join(process.cwd(), "public", masterPicture(master, height)))).toBe(true);
+	});
+	it("a duel level names its trainer; any other level has none", () => {
+		expect(masterOfLevel(masterLevelId("atem"))).toBe("atem");
+		expect(masterPicture("atem")).toBe("/trainers/yami-yugi-256.webp");
+		expect(masterOfLevel("w1-field")).toBeNull();
 	});
 });

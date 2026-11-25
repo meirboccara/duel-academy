@@ -55,6 +55,17 @@ export function behindTrainer(hex: Hex, point: Point): boolean {
 	return Math.abs(point.x - at.x) < 1.5 && north > 0.3 && north < 3.4;
 }
 
+/** A trainer's face on a duel stop stands this far behind the stop (north), so the figure on the stop is in front of it. */
+export const STOP_FACE_BACK = 0.4;
+/**
+ * True when the figure (a point of the world) is behind the face standing on this duel stop, as the camera sees it
+ * from the south: the face would hide it, so it lets the figure show through. The faces are narrower than a trainer.
+ */
+export function behindStop(stop: Point, point: Point): boolean {
+	const north = stop.z - STOP_FACE_BACK - point.z;
+	return Math.abs(point.x - stop.x) < 1 && north > 0.2 && north < 3;
+}
+
 export interface ShopSpot {
 	/** The house that is the shop: one of `island.props`. */
 	building: Placement;

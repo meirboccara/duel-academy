@@ -29,6 +29,22 @@ export const MASTER_NAMES: Record<MasterId, string> = {
 	"seto-kaiba": "Seto Kaiba",
 	atem: "Atem",
 };
+/** What the children call them: under a trainer's face on the masters' island, where the whole name does not fit. */
+export const MASTER_SHORT_NAMES: Record<MasterId, string> = {
+	"rex-raptor": "Rex",
+	"weevil-underwood": "Weevil",
+	"mako-tsunami": "Mako",
+	"joey-wheeler": "Joey",
+	arkana: "Arkana",
+	"yami-bakura": "Bakura",
+	"maximillion-pegasus": "Pegasus",
+	"yugi-muto": "Yugi",
+	"jaden-yuki": "Jaden",
+	"yusei-fudo": "Yusei",
+	"yami-marik": "Marik",
+	"seto-kaiba": "Kaiba",
+	atem: "Atem",
+};
 
 /**
  * The trainers' levels (the owner's choice): the first ones are really basic, then medium, strong, and expert.

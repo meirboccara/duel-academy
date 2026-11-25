@@ -2,10 +2,11 @@
 
 import { Check, ChevronLeft, ChevronRight, Lock, Play, Star } from "lucide-react";
 import dynamic from "next/dynamic";
-import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Locale } from "@/lib/i18n/locales";
 import type { PlayCopy } from "@/lib/junior/play/copy";
 import { WORLD_IDS, levelsOf, type WorldId } from "@/lib/junior/play/levels";
+import { MASTER_SHORT_NAMES, masterOfLevel, masterPicture, type MasterId } from "@/lib/junior/play/masters";
 import type { PlayProgress } from "@/lib/junior/play/progress";
 import type { Avatar } from "@/lib/junior/profiles";
 import { WORLD_COPY } from "@/lib/junior/world/copy";
@@ -76,6 +77,19 @@ export interface IslandWorldProps {
 const stopIcon = (status: StopStatus) =>
 	status === "star" ? <Star className="h-5 w-5 fill-gold-400 text-gold-400" aria-hidden /> : status === "solved" ? <Check className="h-5 w-5 text-spell" aria-hidden /> : status === "locked" ? <Lock className="h-4 w-4" aria-hidden /> : <Play className="h-4 w-4 rtl:rotate-180" aria-hidden />;
 
+/** A trainer to duel, on a stop of the masters' island: the face, round, greyed while the duel is still locked. */
+function TrainerFace({ master, status, size }: { master: MasterId; status: StopStatus; size: "stop" | "play" }) {
+	return (
+		<img
+			src={masterPicture(master)}
+			alt=""
+			width={256}
+			height={256}
+			className={`shrink-0 rounded-full border-2 bg-ink-800 object-cover object-top ${size === "stop" ? "h-12 w-12" : "h-10 w-10"} ${status === "locked" ? "border-white/20 opacity-60 grayscale" : status === "next" ? "border-gold-400" : "border-white/60"}`}
+		/>
+	);
+}
+
 /**
  * The landing of Junior: an archipelago in 3D, one island per world. The child taps an island and the boat sails
  * there; taps a glowing stop and the level starts. The canvas is decoration for assistive technology: every
@@ -112,6 +126,8 @@ export function IslandWorld({ progress, copy, locale, moving, hidden, corner, co
 	};
 
 	const statuses = useMemo(() => WORLD_IDS.map((id) => islandStatus(progress, id)), [progress]);
+	/* On the row of trainers, the next one to duel is scrolled into sight (once per button, not on every render). */
+	const showNext = useCallback((node: HTMLButtonElement | null) => node?.scrollIntoView?.({ block: "nearest", inline: "center" }), []);
 	const stops = useMemo(() => Object.fromEntries(world.islands.flatMap((island) => island.stops.map((stop) => [stop.levelId, stopStatus(progress, stop.levelId)]))), [world, progress]);
 	if (!supported) return null;
 
@@ -119,6 +135,9 @@ export function IslandWorld({ progress, copy, locale, moving, hidden, corner, co
 	const levels = levelsOf(island.world);
 	const status = statuses[focus]!;
 	const nextHere = levels.find((level) => stops[level.id] === "next");
+	const nextTrainer = nextHere ? masterOfLevel(nextHere.id) : null;
+	/* The masters' island: thirteen trainers, each shown by face. They stay on one row the child scrolls through. */
+	const duels = levels.some((level) => masterOfLevel(level.id));
 	const solved = levels.filter((level) => stops[level.id] === "solved" || stops[level.id] === "star").length;
 	const title = copy.worlds[island.world].title;
 	const before = focus > 0 ? copy.worlds[WORLD_IDS[focus - 1]!].title : "";
@@ -176,16 +195,37 @@ export function IslandWorld({ progress, copy, locale, moving, hidden, corner, co
 				{trainer && status !== "locked" && trainer(island.world)}
 				{nextHere && (
 					<button type="button" onClick={() => onOpen(nextHere.id)} className="inline-flex min-h-14 max-w-full items-center gap-3 rounded-2xl bg-gold-400 px-7 py-3 text-lg font-semibold text-ink-950 shadow-[0_0_24px_rgba(255,216,74,0.6)] max-sm:w-full max-sm:justify-center [@media(max-height:32rem)]:min-h-12 [@media(max-height:32rem)]:w-auto [@media(max-height:32rem)]:py-2 [@media(max-height:32rem)]:text-base">
-						<Play className="h-6 w-6 rtl:rotate-180" aria-hidden />
+						{nextTrainer ? <TrainerFace master={nextTrainer} status="next" size="play" /> : <Play className="h-6 w-6 rtl:rotate-180" aria-hidden />}
 						{words.play(copy.levels[nextHere.id]?.title ?? "")}
 					</button>
 				)}
 				{status !== "locked" && (
-					<ol aria-label={words.stopsLabel} className="flex flex-wrap justify-center gap-2">
+					<ol aria-label={words.stopsLabel} className={duels ? "flex max-w-full snap-x gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]" : "flex flex-wrap justify-center gap-2"}>
 						{levels.map((level, i) => {
 							const state = stops[level.id]!;
 							const label = copy.levels[level.id]?.title ?? level.id;
 							const said = state === "star" ? copy.starMark : state === "solved" ? copy.solvedMark : state === "locked" ? copy.locked : words.next_;
+							const master = masterOfLevel(level.id);
+							if (master)
+								return (
+									<li key={level.id} className="snap-center">
+										<button
+											type="button"
+											ref={state === "next" ? showNext : undefined}
+											disabled={state === "locked"}
+											onClick={() => onOpen(level.id)}
+											aria-label={words.stop(i + 1, label, said)}
+											title={label}
+											className={`relative flex w-[4.5rem] flex-col items-center gap-0.5 rounded-xl border-2 px-1 pb-1 pt-1.5 text-xs font-semibold backdrop-blur-sm ${state === "next" ? "border-gold-400 bg-gold-400/30 text-white" : state === "locked" ? "border-white/20 bg-ink-950/40 text-white/60" : "border-white/60 bg-ink-950/50 text-white"}`}
+										>
+											<TrainerFace master={master} status={state} size="stop" />
+											<bdi dir="ltr" className="max-w-full truncate">
+												{MASTER_SHORT_NAMES[master]}
+											</bdi>
+											{state !== "next" && <span className="absolute end-0.5 top-0.5 rounded-full bg-ink-950/70 p-0.5">{stopIcon(state)}</span>}
+										</button>
+									</li>
+								);
 							return (
 								<li key={level.id}>
 									<button

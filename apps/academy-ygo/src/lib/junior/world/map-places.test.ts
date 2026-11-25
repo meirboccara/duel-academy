@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { standIndex } from "./hero-path";
 import { hexDistance, hexKey, hexToPoint } from "./hex";
-import { behindTrainer, canBoard, nearShop, restIndex, shopSpot, stopOn, towardsSea, trainerHex, trainerPoint } from "./map-places";
+import { behindStop, behindTrainer, canBoard, nearShop, restIndex, shopSpot, stopOn, towardsSea, trainerHex, trainerPoint } from "./map-places";
 import type { StopStatus } from "./status";
 import { pathBetween, walkable } from "./walk-graph";
 import { buildWorld } from "./world";
@@ -154,5 +154,20 @@ describe("boarding", () => {
 			expect(towardsSea(island, { x: 0, z: -1 }), island.world).toBe(false);
 			expect(towardsSea(island, { x: -1, z: 0 }), island.world).toBe(false);
 		}
+	});
+});
+
+describe("a trainer's face on a duel stop", () => {
+	const stop = { x: 4, z: 2 };
+	it("lets the figure show through only when it stands behind the face, as the camera sees it", () => {
+		/* On the stop itself the figure is in front of the face, which stands a little behind it. */
+		expect(behindStop(stop, stop)).toBe(false);
+		expect(behindStop(stop, { x: 4, z: 0.5 })).toBe(true);
+		expect(behindStop(stop, { x: 4.6, z: 0 })).toBe(true);
+		/* Beside it, or far behind it on the next road, the figure is not hidden. */
+		expect(behindStop(stop, { x: 6, z: 0.5 })).toBe(false);
+		expect(behindStop(stop, { x: 4, z: -2 })).toBe(false);
+		/* In front of it, closer to the camera. */
+		expect(behindStop(stop, { x: 4, z: 3.5 })).toBe(false);
 	});
 });

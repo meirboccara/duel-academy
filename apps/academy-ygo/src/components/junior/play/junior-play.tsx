@@ -12,7 +12,7 @@ import { PLAY_COPY, playCopyFor } from "@/lib/junior/play/copy";
 import { seeded } from "@duel-academy/engine";
 import { DECK_COPY } from "@/lib/junior/play/deck-copy";
 import { NO_DECK, deckKeyFor, deckReady, deckable, keepOwnDeck, loadDeck, refreshDeck, saveDeck, startWith, starterCards, starterUpdate, type DeckRecord } from "@/lib/junior/play/deck-record";
-import { MASTER_NAMES, duelSetup } from "@/lib/junior/play/masters";
+import { MASTER_NAMES, duelSetup, masterOfLevel, masterPicture } from "@/lib/junior/play/masters";
 import { LEVELS, RULE_IDS, WORLD_IDS, levelById, levelsOf, type WorldId } from "@/lib/junior/play/levels";
 import { PLAY_PROGRESS_KEY, emptyPlayProgress, isSolved, isUnlocked, loadPlayProgress, mergePlayProgress, nextLevel, recordSolve, ruleMastery, savePlayProgress, type PlayProgress, type PlayStorage } from "@/lib/junior/play/progress";
 import type { Outcome } from "@/lib/junior/play/session";
@@ -524,6 +524,8 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 										const unlocked = isUnlocked(progress, item.id);
 										const title = copy.levels[item.id]?.title ?? item.id;
 										const state = record ? (record.clean ? copy.starMark : copy.solvedMark) : unlocked ? "" : copy.locked;
+										/* On the masters' island, the trainer to duel is shown by face. */
+										const master = masterOfLevel(item.id);
 										return (
 											<li key={item.id}>
 												<button
@@ -533,6 +535,7 @@ export function JuniorPlay({ player, onTitle }: { player?: JuniorPlayer; onTitle
 													onClick={() => open(item.id)}
 													className={`inline-flex min-h-12 items-center gap-2 rounded-xl border-2 px-4 py-2 font-semibold ${record ? "border-spell bg-spell/15 text-fg" : unlocked ? "border-gold-400 text-fg" : "border-white/15 text-fg-muted"}`}
 												>
+													{master && <img src={masterPicture(master)} alt="" width={256} height={256} className={`h-10 w-10 shrink-0 rounded-full border-2 border-white/40 bg-ink-800 object-cover object-top ${unlocked ? "" : "opacity-60 grayscale"}`} />}
 													{record ? record.clean ? <Star className="h-5 w-5 fill-gold-400 text-gold-400" aria-hidden /> : <Check className="h-5 w-5 text-spell" aria-hidden /> : unlocked ? null : <Lock className="h-4 w-4" aria-hidden />}
 													{title}
 												</button>

@@ -6,17 +6,18 @@ import * as THREE from "three";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { masterOfLevel, masterPicture } from "@/lib/junior/play/masters";
 import type { Avatar } from "@/lib/junior/profiles";
 import { FOV, closeView, farDistance, seaView } from "@/lib/junior/world/camera";
 import type { MapAction, MapControls } from "@/lib/junior/world/controls";
 import { hexToPoint, type Hex, type Point } from "@/lib/junior/world/hex";
-import { canBoard, nearShop, restIndex, shopSpot, stopOn, trainerHex, trainerPoint, type ShopSpot } from "@/lib/junior/world/map-places";
+import { STOP_FACE_BACK, behindStop, canBoard, nearShop, restIndex, shopSpot, stopOn, trainerHex, trainerPoint, type ShopSpot } from "@/lib/junior/world/map-places";
 import { SAIL_SPEED, SAIL_STEP, landingAt, seaRoute, steerBoat } from "@/lib/junior/world/sea";
 import type { IslandStatus, StopStatus } from "@/lib/junior/world/status";
 import { nearestWalkable, spotOf } from "@/lib/junior/world/walk-graph";
 import type { Outfit } from "@/lib/junior/world/wardrobe";
 import type { Island, Placement, World } from "@/lib/junior/world/world";
-import { CardPanels } from "./card-panel";
+import { CardPanels, useCardArt } from "./card-panel";
 import { Hero, newPilot, type Pilot } from "./hero";
 import { useMapInput, type MapInput } from "./map-input";
 import { Trainers } from "./trainer-figure";
@@ -198,14 +199,57 @@ function starShape() {
 	return shape;
 }
 
-function StopMarker({ at, status, color, star, onPick, clock }: { at: Point; status: StopStatus; color: string; star: THREE.BufferGeometry; onPick: () => void; clock: React.RefObject<number> }) {
+/** A trainer's face over a duel stop: about the child's figure's height, so the stops on the road stay apart. */
+const PORTRAIT = 1.5;
+/** The face stands a little behind the stop, so the child's figure on the stop is in front of it. */
+const PORTRAIT_BACK = -STOP_FACE_BACK;
+/** The face cuts out everything fainter than this; with the figure behind it, this much of the face is left. */
+const PORTRAIT_CUT = 0.35;
+const PORTRAIT_SEE_THROUGH = 0.32;
+
+/**
+ * A trainer to duel, standing on the stop: the character's own picture on a plane that faces the camera, like the
+ * island trainers. Greyed while the duel is locked. Taps pass through to the stop. When the child's figure walks
+ * behind it, the face turns see-through, so the figure is never lost.
+ */
+function StopPortrait({ texture, locked, at, pilot }: { texture: THREE.Texture; locked: boolean; at: Point; pilot: React.RefObject<Pilot> }) {
+	const { invalidate } = useThree();
+	const image = texture.image as { width?: number; height?: number } | undefined;
+	const aspect = image?.width && image.height ? image.width / image.height : 1;
+	const width = Math.min(PORTRAIT, PORTRAIT * aspect);
+	const height = width / aspect;
+	const material = useMemo(() => new THREE.MeshBasicMaterial({ map: texture, transparent: true, alphaTest: PORTRAIT_CUT, toneMapped: false, side: THREE.DoubleSide, color: locked ? "#7d838e" : "#ffffff" }), [texture, locked]);
+	useEffect(() => () => material.dispose(), [material]);
+	useFrame((_, delta) => {
+		const figure = pilot.current.at;
+		const wanted = figure && behindStop(at, figure) ? PORTRAIT_SEE_THROUGH : 1;
+		if (material.opacity === wanted) return;
+		const next = THREE.MathUtils.lerp(material.opacity, wanted, 1 - Math.exp(-Math.min(delta, 0.1) * 10));
+		material.opacity = Math.abs(next - wanted) < 0.01 ? wanted : next;
+		material.alphaTest = PORTRAIT_CUT * material.opacity;
+		invalidate();
+	});
+	/* One unit tall, standing on its feet. */
+	const plane = useMemo(() => new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0), []);
+	useEffect(() => () => plane.dispose(), [plane]);
+	return (
+		<group position={[0, 0.08, PORTRAIT_BACK]} rotation={[-0.16, 0, 0]}>
+			<mesh geometry={plane} material={material} scale={[width, height, 1]} raycast={() => null} />
+		</group>
+	);
+}
+
+function StopMarker({ at, status, color, star, portrait, pilot, onPick, clock }: { at: Point; status: StopStatus; color: string; star: THREE.BufferGeometry; portrait?: THREE.Texture; pilot: React.RefObject<Pilot>; onPick: () => void; clock: React.RefObject<number> }) {
 	const spinner = useRef<THREE.Group>(null);
+	/* With a trainer's face on the stop, the star or the gem floats over the trainer's head. */
+	const rest = portrait ? PORTRAIT + 0.35 : 1.05;
+	const lifted = portrait ? PORTRAIT + 0.5 : 1.7;
 	useFrame(() => {
 		const group = spinner.current;
 		if (!group) return;
 		const t = clock.current ?? 0;
 		if (status === "next") {
-			group.position.y = 1.7 + Math.sin(t * 2.4) * 0.18;
+			group.position.y = lifted + Math.sin(t * 2.4) * 0.18;
 			group.rotation.y = t * 1.2;
 		} else group.rotation.y = t * 0.5;
 	});
@@ -220,6 +264,7 @@ function StopMarker({ at, status, color, star, onPick, clock }: { at: Point; sta
 				<cylinderGeometry args={[0.95, 0.95, 2.4, 12]} />
 				<meshBasicMaterial transparent opacity={0} depthWrite={false} />
 			</mesh>
+			{portrait && <StopPortrait texture={portrait} locked={status === "locked"} at={at} pilot={pilot} />}
 			{status === "locked" ? (
 				<mesh position={[0, 0.06, 0]}>
 					<cylinderGeometry args={[0.28, 0.32, 0.12, 12]} />
@@ -231,7 +276,7 @@ function StopMarker({ at, status, color, star, onPick, clock }: { at: Point; sta
 						<ringGeometry args={[0.55, 0.78, 32]} />
 						<meshBasicMaterial color={status === "next" ? "#ffd84a" : color} transparent opacity={0.9} />
 					</mesh>
-					<group ref={spinner} position={[0, status === "next" ? 1.7 : 1.05, 0]}>
+					<group ref={spinner} position={[0, status === "next" ? lifted : rest, portrait ? PORTRAIT_BACK : 0]} scale={portrait ? 0.6 : 1}>
 						{status === "next" ? (
 							<mesh scale={[0.42, 0.6, 0.42]}>
 								<octahedronGeometry args={[1, 0]} />
@@ -243,7 +288,7 @@ function StopMarker({ at, status, color, star, onPick, clock }: { at: Point; sta
 							</mesh>
 						)}
 					</group>
-					{status === "next" && (
+					{status === "next" && !portrait && (
 						<mesh position={[0, 0.75, 0]}>
 							<cylinderGeometry args={[0.03, 0.03, 1.2, 6]} />
 							<meshBasicMaterial color="#ffe58a" transparent opacity={0.7} />
@@ -817,6 +862,24 @@ function Scene({ world, focus, islandStatus, stopStatus, moving, avatar, outfit,
 	toShop.current = onShop;
 	/* Each island's trainer tile, where a trainer stands; and the shop, which is never that tile. */
 	const trainerTiles = useMemo(() => world.islands.map((item, index) => (trainerPictures?.[index] ? trainerHex(item) : null)), [world, trainerPictures]);
+	/* The faces of the trainers to duel, on the island in view and its two neighbours; once fetched, they stay. */
+	const portraitUrls = useMemo(() => {
+		const urls = new Set<string>();
+		for (const index of [focus, focus + 1, focus - 1]) {
+			const item = world.islands[index];
+			if (!item || islandStatus[index] === "locked") continue;
+			for (const stop of item.stops) {
+				const master = masterOfLevel(stop.levelId);
+				if (master) urls.add(masterPicture(master));
+			}
+		}
+		return [...urls];
+	}, [world, focus, islandStatus]);
+	const portraits = useCardArt(portraitUrls);
+	const portraitOf = (levelId: string) => {
+		const master = masterOfLevel(levelId);
+		return master ? portraits.get(masterPicture(master)) : undefined;
+	};
 	const shopOn = shopIsland !== undefined ? world.islands[shopIsland] : undefined;
 	const shop = useMemo(() => (shopOn ? shopSpot(shopOn, trainerTiles[shopOn.index] ?? null) : null), [shopOn, trainerTiles]);
 	/* Where a trainer stands, the card does not: the character is there in person. */
@@ -940,6 +1003,8 @@ function Scene({ world, focus, islandStatus, stopStatus, moving, avatar, outfit,
 								status={stopStatus[stop.levelId] ?? "locked"}
 								color={COLORS[item.color]}
 								star={star}
+								portrait={portraitOf(stop.levelId)}
+								pilot={pilot}
 								clock={clock}
 								onPick={() => tapStop(index, stop.levelId)}
 							/>

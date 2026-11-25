@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LanguageProvider, LanguageSwitcher } from "@/lib/i18n/provider";
 import { PLAY_COPY } from "@/lib/junior/play/copy";
 import { LEVELS, WORLD_IDS } from "@/lib/junior/play/levels";
-import { masterLevelId } from "@/lib/junior/play/masters";
+import { masterLevelId, masterPicture } from "@/lib/junior/play/masters";
 import { PLAY_PROGRESS_KEY, emptyPlayProgress } from "@/lib/junior/play/progress";
 import { starsEarned } from "@/lib/junior/world/shop";
 import { useEffect } from "react";
@@ -586,6 +586,14 @@ describe("full screen", () => {
 });
 
 describe("the masters' island", () => {
+	it("shows each trainer's face on the list of duels, locked ones too", () => {
+		setup(masterLevelId("joey-wheeler"));
+		const joey = screen.getByRole("button", { name: /^Duel: Joey Wheeler/ });
+		expect(joey.querySelector("img")?.getAttribute("src")).toBe(masterPicture("joey-wheeler"));
+		const atem = screen.getByRole("button", { name: /^Duel: Atem.*Solve the one before/ });
+		expect(atem.querySelector("img")?.getAttribute("src")).toBe(masterPicture("atem"));
+		expect(screen.getByRole("button", { name: /^Fill the field/ }).querySelector("img")).toBeNull();
+	});
 	it("asks for a starter Deck first, then deals a whole duel against the trainer at 8000 Life Points", async () => {
 		const user = setup(masterLevelId("rex-raptor"));
 		await openLevel(user, "Duel: Rex Raptor · beginner");
