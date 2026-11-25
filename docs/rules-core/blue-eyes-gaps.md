@@ -8,6 +8,8 @@ and the cards are scripted afterwards (CLAUDE.md model split).
 Printed texts: Konami's TCG card database, English, each card page read once on 2026-11-24 (card id `cid` below). "Exists" names the
 mechanic of `packages/rules/README.md` the clause uses. "Built" names what this slice added (README, last section).
 
+> Update 2026-11-25: Spirit Dragon, Tyrant Dragon, Ultimate Spirit Dragon, Neo Ultimate Dragon, Psychic End Punisher, Stardust Sifr Divine Dragon and TY-PHON are now scripted and registered (packages/rules/README.md, last section). The core gained `Once.acrossMoves`, an `attackedNow` that needs no damage calculation and a first-time protection kept through a flip; the Q&A that forced them are in that section.
+
 ## Summary
 
 | Card | cid | Status after this slice |

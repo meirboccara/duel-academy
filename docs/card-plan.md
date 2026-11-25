@@ -81,9 +81,9 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [x] | Ancient Fairy Life Dragon | Registered 2026-11-24; Synchro procedure, draw or World of Spirits search, Defense Position attack permission, EN/FR text, Konami's notes and its three Q&A (fids 24407, 23968, 14252); independent review pending |
 | [ ] | Ash Blossom & Joyous Spring | Registered; answers draw effects since 2026-11-24 (Konami Q&A fid 21685); printed facts incomplete, completeness pending |
 | [x] | Bingo Machine, Go!!! | Registered 2026-11-24 to the definition of done: reveal 3, the opponent's random pick (the Duel's RNG), shuffle, once per turn; the minimum of 3 revealable cards rests on YGOProJudge only; its one Q&A (Puppet Queen, not in the core) not opened |
-| [ ] | Blue-Eyes Spirit Dragon | Missing; ready to script: limit L1 is resolved (`EffectRecord.damageStep`, set on its negation per Konami's notes); not registered |
-| [ ] | Blue-Eyes Tyrant Dragon | Missing; its Summoning condition (Tributing 1 "Blue-Eyes White Dragon" equipped with a Fusion Monster) is built and tested with a made-up card since 2026-11-24; blocked by its third effect (end of the Damage Step, Set a Trap from the GY) and its 11 unread Q&A |
-| [ ] | Blue-Eyes Ultimate Spirit Dragon | Missing |
+| [x] | Blue-Eyes Spirit Dragon | Registered 2026-11-25; Synchro procedure with "Blue-Eyes" non-Tuners, the lock on Special Summoning 2+ monsters at once, the negation of a GY effect (also in the Damage Step, `damageStep`), the Tribute that Special Summons a LIGHT Dragon Synchro Monster in Defense Position and destroys it in the End Phase, EN/FR text, Konami's notes and 11 of its 18 Q&A (4 pending: cards the core lacks; 7 not opened); independent review pending |
+| [x] | Blue-Eyes Tyrant Dragon | Registered 2026-11-25; Fusion and Tribute Summoning conditions, unaffected by Trap Cards/effects, attacks all monsters, the Set effect from the field, the GY and banishment, EN/FR text, Konami's notes and the 7 Q&A about its clauses (2 pending: Noble de Noir, Lifeline); built for it: `Once.acrossMoves`, `attackedNow` needs no damage calculation; independent review pending |
+| [x] | Blue-Eyes Ultimate Spirit Dragon | Registered 2026-11-25; Synchro procedure (2+ Tuners), the GY banish lock, the negation with the ATK gain (also in the Damage Step), the Special Summon from the GY or banishment, EN/FR text, Konami's notes and its 2 Q&A (1 pending: Magical Bullet); independent review pending |
 | [x] | Blue-Eyes White Dragon | Registered 2026-11-24; complete (Normal Monster: printed facts, Konami's flavour text EN/FR; no effect) |
 | [x] | Blue-Eyes White Dragon, the White Phantom Beast | Registered 2026-11-24; all three effects (hand trigger, destroy and attack lock, Quick negation), EN/FR text, Konami's notes; Q&A fid 276 (Draw Phase draw) pending a normal draw in the core; independent review pending |
 | [x] | Bystial Magnamhut | Registered 2026-11-24; both effects (Ignition and Quick from the hand, End Phase add), EN/FR text, Konami's notes and Q&A fid 22474; independent review pending |
@@ -104,14 +104,14 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [x] | Mulcharmy Fuwalos | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
 | [x] | Mulcharmy Purulia | Registered; complete (printed facts, Konami texts, one test per clause and ruling; YGOProJudge-only choices labelled) |
 | [ ] | Mystical Space Typhoon | Registered; completeness pending |
-| [ ] | Neo Blue-Eyes Ultimate Dragon | Missing |
+| [x] | Neo Blue-Eyes Ultimate Dragon | Registered 2026-11-25; Fusion procedure, the attack-again effect (twice per turn, the cost, the only face-up card), the GY Quick Effect negate-and-destroy (also in the Damage Step), EN/FR text, Konami's notes and 4 of its 7 Q&A (2 pending: Wonder Clover, Matter Transporter); independent review pending |
 | [x] | Pot of Prosperity | Registered 2026-11-24; cost, halved damage, excavation, oath, EN/FR text, Konami's notes and Q&A (fids 9932, 17846, 23378, 23511); independent review pending |
 | [ ] | Pot of Sloth | Missing |
 | [x] | Primite Dragon Ether Beryl | Registered 2026-11-24; all three effects, EN/FR text, Konami's notes; the Standby Phase effect is offered once at the start of the phase (L2); independent review pending |
 | [x] | Primite Drillbeam | Registered 2026-11-24; both effects, EN/FR text, Konami's notes and both Q&A; negating the effect of a Spell it is chained to is YGOProJudge only (R3); no Tokens in the core; independent review pending |
 | [x] | Primite Lordly Lode | Registered 2026-11-24; all three effects, EN/FR text, Konami's notes and Q&A (fids 10803, 24080; 12551 pending Tokens); independent review pending |
 | [ ] | Prototype Sky Striker Ace - Amatsu | Missing |
-| [ ] | Psychic End Punisher | Missing |
+| [x] | Psychic End Punisher | Registered 2026-11-25; Synchro procedure, unaffected by the opponent's activated effects while its LP are not higher, the 1000 LP banishment of 2 targets, the Battle Phase ATK gain, EN/FR text, Konami's notes and 3 of its 8 Q&A (1 pending: Super Polymerization); independent review pending |
 | [ ] | Radiant Typhoon Vision | Missing |
 | [x] | Raigeki | Registered; complete (printed facts, Konami texts, one test per clause and ruling; Konami sources only) |
 | [x] | Roar of the Blue-Eyed Dragons | Registered 2026-11-24; both effects and the shared use, EN/FR text, Konami's notes; independent review pending |
@@ -131,8 +131,8 @@ Side inventories stay in the manifest separately and are not scripting targets. 
 | [ ] | Sky Striker Mobilize - Linkage! | Missing |
 | [ ] | Sky Striker Special Maneuver - Lemnisgate! | Missing |
 | [x] | Spirit with Eyes of Blue | Registered 2026-11-24; Link procedure, Special Summon lock, Mausoleum of White take, Tribute Summon with the Effect Monster restriction, EN/FR text, Konami's notes; its two Q&A are about True Light (not applicable); activating only with a Dragon "Blue-Eyes" monster and Summoning a non-Dragon after the Tribute are YGOProJudge only; independent review pending |
-| [ ] | Stardust Sifr Divine Dragon | Missing |
-| [ ] | Super Starslayer TY-PHON - Sky Crisis | Missing |
+| [x] | Stardust Sifr Divine Dragon | Registered 2026-11-25; Synchro procedure (Synchro Monsters only), Must be Synchro Summoned, the first-time destruction protection, the negation of a monster effect with a destruction, the GY Special Summon, EN/FR text, Konami's notes and 13 of its 15 Q&A (3 pending: already-negated effect, Blue-Eyes Jet Dragon, Forbidden Chalice); built for it: a card keeps its "first time" use when turned face-down, two such protections apply once; independent review pending |
+| [x] | Super Starslayer TY-PHON - Sky Crisis | Registered 2026-11-25; Xyz procedure and the alternative Xyz Summon (highest ATK, transfer, no Summon afterwards), the lock on monsters with 3000+ ATK (on the field: YGOProJudge only), the detach-and-return effect, EN/FR text, Konami's notes and its 2 Q&A (the Token ruling is pending: the core has no Tokens); independent review pending |
 | [ ] | The Dragon that Devours the Dogma | Missing |
 | [ ] | The Fallen & The Virtuous | Missing |
 | [x] | True Light | Registered 2026-11-24 to the definition of done: protection, destruction trigger, activation alone / with its effect / Ignition Effect, EN/FR text, Konami's notes, Q&A fids 23374 and 23215; the other six Q&A entries are about cards the core does not have (titles read only) |

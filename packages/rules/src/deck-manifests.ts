@@ -134,15 +134,18 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Blue-Eyes Spirit Dragon",
-        "count": 2
+        "count": 2,
+        "code": "blue-eyes-spirit-dragon"
       },
       {
         "name": "Blue-Eyes Tyrant Dragon",
-        "count": 1
+        "count": 1,
+        "code": "blue-eyes-tyrant-dragon"
       },
       {
         "name": "Blue-Eyes Ultimate Spirit Dragon",
-        "count": 1
+        "count": 1,
+        "code": "blue-eyes-ultimate-spirit-dragon"
       },
       {
         "name": "Crimson Dragon",
@@ -161,11 +164,13 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Neo Blue-Eyes Ultimate Dragon",
-        "count": 1
+        "count": 1,
+        "code": "neo-blue-eyes-ultimate-dragon"
       },
       {
         "name": "Psychic End Punisher",
-        "count": 1
+        "count": 1,
+        "code": "psychic-end-punisher"
       },
       {
         "name": "Spirit with Eyes of Blue",
@@ -174,11 +179,13 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Stardust Sifr Divine Dragon",
-        "count": 1
+        "count": 1,
+        "code": "stardust-sifr-divine-dragon"
       },
       {
         "name": "Super Starslayer TY-PHON - Sky Crisis",
-        "count": 1
+        "count": 1,
+        "code": "super-starslayer-ty-phon-sky-crisis"
       }
     ],
     "side": [

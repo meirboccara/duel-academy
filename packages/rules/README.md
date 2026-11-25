@@ -978,8 +978,11 @@ fusion-including,damage-halved,chosen-cost,end-of-damage-step,extra-deck-gaps,su
 - **A cost of several cards chosen one at a time**: `CostSpec.choose` (`from`, `counts`). `legalActions` lists the activation once
   per count (`Action.pay`, named `x3` by the bot); `act` then asks for the cards (`choose`) and activates once they are chosen. The
   opponent answers the activation, never the choice.
-- **The end of the Damage Step**: `battledNow(duel, id)`, `attackedNow`, `destroyedByBattleNow` (`Battle.fought`: damage calculation
-  was performed), by card id so that a monster destroyed by that battle can activate from the Graveyard or from banishment.
+- **The end of the Damage Step**: `battledNow(duel, id)` and `destroyedByBattleNow` (`Battle.fought`: damage calculation was
+  performed), by card id so that a monster destroyed by that battle can activate from the Graveyard or from banishment;
+  `attackedNow(duel, id)`: the attacking monster once the attack's Damage Step has begun, with no need for damage calculation
+  (fid 19155), and only while it is still the card that attacked (one that left the field in that Damage Step and came back is a
+  new card, which did not attack).
 - **Smaller additions**: `targetCount` may be a function of the board; `fromActivated` for "unaffected by ... activated effects";
   a `banish-from-graveyard` lock with `banisher: "opponent"` (`banishLocked` and `canBeBanished` take the banishing player);
   `summon.onlyByOwnProcedure` ("Must be Synchro Summoned"); `Duel.summons` / `summonedCount` (the Summons of this turn and the last);
@@ -1155,3 +1158,45 @@ What can be activated in the Damage Step (limit L1, 2026-11-25; `damageStepAllow
   a general Konami rule: yes at every timing, "a general game mechanic", no Konami source cited; (3) the Counter Trap question again,
   asking for a TCG source, with one follow-up contesting it: still yes, but "there is no exact sentence in an official TCG document",
   "based on general judge practice"; the TCG page section it named does not exist. The TCG rulebook's wording was kept.
+
+Blue-Eyes second Extra Deck batch: the seven remaining Extra Deck cards of the exact 746021 list (2026-11-25; `src/cards/{blue-eyes-spirit-dragon,blue-eyes-tyrant-dragon,
+blue-eyes-ultimate-spirit-dragon,neo-blue-eyes-ultimate-dragon,psychic-end-punisher,stardust-sifr-divine-dragon,super-starslayer-ty-phon-sky-crisis}.ts`, tests in `test/cards/` with the
+made-up cards of `test/cards/blue-eyes-extra-fixtures.ts` (and the earlier fixture files), every code starting with `fixture-`, none registered). Every printed clause of the seven is a
+record, none is `unmodelled`; the seven are registered in `CARD_DEFS` / `CARD_SOURCES` and in the manifest (40 of the 60 Main/Extra names are now registered, 20 missing). Konami's EN and FR
+card pages and the Japanese notes were each read once (a page fetched once, its text block quoted verbatim); the Q&A that concern each card's own clauses were opened (OCG only), the others are
+named in each card's sources. Blue-Eyes Spirit Dragon, left unwritten by the first Extra Deck batch for its Damage Step clause, is written now (limit L1: `EffectRecord.damageStep`).
+- `damageStep: true` is set on exactly the three records the notes name (src/damage-step-sources.ts): Blue-Eyes Spirit Dragon's negation (not its Tribute effect, whose notes say no), Blue-Eyes
+  Ultimate Spirit Dragon's negation, and Neo Blue-Eyes Ultimate Dragon's Quick Effect in the Graveyard (its first effect is a Trigger Effect). Counter Traps keep the TCG limit.
+- Three core changes, each forced by a Konami Q&A (OCG only) and tested through the card that has the clause, not by a new rules test (the rules tests still pass unchanged):
+  `Once.acrossMoves` (a "once per turn" use follows the card from the field to the Graveyard or banishment: Blue-Eyes Tyrant Dragon, fid 23394, a use on the field is a use in the Graveyard too;
+  no further: a card that comes to the field again, Summoned again from the Extra Deck for one, has a new use, keyed on `fieldEntries`; the YGOProJudge-only default, a moved card has a use of its
+  own, stays for every other card); `attackedNow` is true once the attack's Damage Step has begun, with no need for damage calculation (Neo Blue-Eyes
+  Ultimate Dragon, fid 19155: the attack target destroyed by an effect, no calculation, the effect is still activated), for the card that is still the attacker; and the "first time each turn" destruction protection (`spareDestruction`)
+  is kept by the card while it stays on the field, so a card turned face-down keeps its use (Stardust Sifr Divine Dragon, fid 16068), and every such protection that applies is used by the same
+  destruction, so two Sifr protect once, not twice (fid 16069). The use is each protection's own, not the card's: an effect that applies anew protects the same card once more (fid 16067), and so does a
+  protection not yet applied to the card that turn (a second Sifr Summoned later, or the Sifr of the player who took control of it: no Konami page states these two cases; they follow from fids
+  16067 and 16069, and YGOProJudge agreed once shown them, after a first unsourced answer to the contrary). A card that leaves the field and comes back still has a first time of its own (YGOProJudge only).
+- Blue-Eyes Spirit Dragon: the negation reads the card of the top Chain Link as it was when activated (`Link.card.zone` is the Graveyard, also for a cost that banishes the card itself: fid 18175,
+  and when the card is gone by the time it resolves: fid 18172; a Trigger Effect of a card sent to the Graveyard is one: fid 24155, tested with the real "True Light"). The Tribute effect needs
+  `summonedBy: "synchro"`: kept through a flip face-down or a temporary banishment (notes, fid 14641), lost by any Special Summon, from the Graveyard or banishment too. The monster is Summoned in
+  Defense Position (not a Synchro Summon, so "Stardust Sifr Divine Dragon" is not a candidate: fid 18150) and destroyed in the End Phase by a delayed effect (no Chain Link: YGOProJudge's answer, in
+  src/delayed.ts). 7 of its 18 Q&A (Soul Charge, Light's Guidance, Peacock, Gigantic Kaiju Sleep, Synchro Cancel, Too Shallow Grave) were not opened; 4 opened are pending (cards the core lacks).
+- Blue-Eyes Tyrant Dragon: its 11 Q&A were all listed and the 7 about its own clauses opened (fids 23897, 11046, 16016, 23394, 20, 12701, 12647): the Skill Drain ordering (negated when Skill Drain
+  already applied, untouched when activated later) is the core's stamp order and needed no change; the "attack all monsters" Q&A (11046, 16016) were already played by the core; Noble de Noir
+  (fid 12701) and Lifeline (fid 12647) are pending. "Blue-Eyes" as its archetype is read from its name (its notes do not say it).
+- Blue-Eyes Ultimate Spirit Dragon: the ATK gain is its own effect on itself (`own`: it stops while its effects are negated, with the card leaving the Monster Zone or turned face-down); the negation
+  answers a card or effect "activated on the field", a Spell or Trap Card placed on the field to be activated included (a Continuous Spell too: fid 24092), not one from the hand or the Graveyard.
+  Its 2 Q&A were opened (fid 21322, the "Magical Bullet" monsters, is pending).
+- Neo Blue-Eyes Ultimate Dragon: "this is the only face-up card you control" counts monsters, Spells and Traps and the Field Zone, Set cards not; the cost is any "Blue-Eyes" Fusion Monster of the
+  Extra Deck. 4 of its 7 Q&A were opened; fid 19182 (Wonder Clover: the effect is not activated while another permission already lets it attack again) and fid 22795 (Interdimensional Matter Transporter)
+  are pending, the cards being absent. That the permission ends when the dragon is no longer face-up is `attackAgain`'s own rule (tested in the rules tests), not retested here.
+- Psychic End Punisher: the ATK gain is a fixed number read when it resolves (the LP difference), with no duration printed, so it lasts as long as it is the same card on the field; it is offered even
+  when the difference is 0 (no page says otherwise). 3 of its 8 Q&A opened (fid 23510, Super Polymerization, pending).
+- Stardust Sifr Divine Dragon: 13 of its 15 Q&A opened; the three pending are about cards the core lacks (Blue-Eyes Jet Dragon, Forbidden Chalice) or the already-negated effect of the notes, which no
+  card the core has can produce. "Stardust" as its archetype is read from its name. The negation destroys the card it chooses when it resolves (itself when alone, then spared by its own protection).
+- Super Starslayer TY-PHON - Sky Crisis: the alternative Xyz Summon, its Main Phase limit and the Summon lock after it need nothing new; a face-down monster has no ATK to compare, so it is neither the
+  material nor in the comparison (the core's reading, no page read); the Token ruling of the notes is pending (the core has no Tokens). The lock on monsters with 3000 or more ATK applies to the
+  face-up monsters on the field and their current ATK, not to a monster in the hand or Graveyard: **YGOProJudge's answer only** (one question, 2026-11-25, chat 9dc0dafb, no source cited, no
+  follow-up, closed).
+- Tests that passed with the card absent (they assert that something is not offered): Spirit Dragon 1 of 19, Tyrant 2 of 15, Ultimate Spirit Dragon 2 of 15, Neo 2 of 17, Punisher 3 of 15, Sifr 6 of
+  21, TY-PHON 1 of 13; every other test was red first. The three Spirit Dragon tests about fids 18175, 18172 and 24155, and the fixes made after the first green run, were written after the card.

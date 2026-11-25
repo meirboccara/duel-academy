@@ -473,8 +473,9 @@ export function canBeTargetedBy(duel: Duel, id: number, by: EffectSource): boole
  * a "first time each turn" protection recorded), or `null` when nothing protects it and it is destroyed. "Cannot be destroyed by card
  * effects" and "unaffected" stop an effect's destruction, "cannot be destroyed by battle" battle's; none stops a card being sent to
  * the Graveyard, banished or Tributed otherwise (YGOProJudge's answer, asked 2026-11-24, no source cited). A "first time" protection
- * is used only when nothing else protects the card, once per card and turn, battle and effects alike; a card that moved is a new card
- * with a first time of its own (YGOProJudge again).
+ * is used only when nothing else protects the card, once per card and turn, battle and effects alike; a card that left the field and came
+ * back has a first time of its own (YGOProJudge), but a card that stays on the field keeps the use it made when it is turned face-down or
+ * changes control there (`CardInstance.fieldEntries`, not `moves`): Konami's Japanese Q&A fid 16068 (Stardust Sifr Divine Dragon, OCG only).
  */
 export function spareDestruction(duel: Duel, id: number, how: "effect" | "battle", by: EffectSource | null): Duel | null {
 	if (quiet(duel)) return null;
@@ -483,11 +484,15 @@ export function spareDestruction(duel: Duel, id: number, how: "effect" | "battle
 	const shields = shieldsOf(duel, target, how === "effect" ? "effect-destruction" : "battle-destruction", by);
 	if (shields.length === 0) return null;
 	if (shields.some((entry) => !(entry.layer as ProtectLayer).firstEachTurn)) return duel;
-	for (const entry of shields) {
-		const key = `${entry.stamp}:${entry.source?.id ?? "lasting"}:${target.id}.${target.moves}`;
-		if (!duel.spared.includes(key)) return { ...duel, spared: [...duel.spared, key] };
-	}
-	return null;
+	// Every "first time" protection that applies is applied to this destruction: two of them (two "Stardust Sifr Divine Dragon") protect the
+	// card once, not twice (Konami's Japanese Q&A fid 16069, OCG only). The use is each protection's own (its stamp and source), not the card's:
+	// fid 16069 says each dragon's effect is applied to that destruction, and fid 16067 that an effect applying anew (the dragon turned face-down
+	// and face-up again) protects the same card once more that turn. So a protection that had not yet been applied to the card this turn (a second
+	// dragon Summoned later, or the dragon of the player who took control of the card) protects it once: no Konami page read states those two
+	// cases; they follow from those two Q&A, and YGOProJudge agreed once shown them (asked 2026-11-25; its first answer, with no source, was the
+	// opposite).
+	const keys = shields.map((entry) => `${entry.stamp}:${entry.source?.id ?? "lasting"}:${target.id}.${target.fieldEntries}`).filter((key) => !duel.spared.includes(key));
+	return keys.length === 0 ? null : { ...duel, spared: [...duel.spared, ...keys] };
 }
 
 /** Does a continuous record of a face-up card apply now: the condition holds and the card's effects are not negated. */

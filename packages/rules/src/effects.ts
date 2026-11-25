@@ -63,6 +63,14 @@ export interface Once {
 	readonly key?: string;
 	/** "You can use this effect ... twice per turn": how many uses the limit allows (default 1). Each activation spends one. */
 	readonly times?: number;
+	/**
+	 * `instance` only: the use follows the card from the field to where it goes next (the Graveyard, banishment), instead of being forgotten with
+	 * the old card ("a card that moved is a new card"). Konami's Japanese Q&A fid 23394 (Blue-Eyes Tyrant Dragon, OCG only): its "once per turn"
+	 * effect used on the field cannot be used again the same turn from the Graveyard after the card was destroyed in a later battle. That is all the
+	 * Q&A covers: a card that comes to the field again from elsewhere (`CardInstance.fieldEntries`) is a new card with a use of its own, as is a
+	 * moved card when this is left unset.
+	 */
+	readonly acrossMoves?: true;
 }
 
 /**

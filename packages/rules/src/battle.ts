@@ -332,8 +332,16 @@ export function battledNow(duel: Duel, id: number): boolean {
 	return battle?.fought === true && (battle.attacker.id === id || battle.target?.id === id);
 }
 
-/** "If this card attacked": as `battledNow`, for the attacking monster only. */
-export const attackedNow = (duel: Duel, id: number): boolean => duel.battle?.fought === true && duel.battle.attacker.id === id;
+/**
+ * "If this card attacked": the attacking monster of the attack in progress, once its Damage Step has begun. Not the monster it attacked, and
+ * not held to damage calculation: Konami's Japanese Q&A fid 19155 (Neo Blue-Eyes Ultimate Dragon, OCG only): when its attack target is destroyed
+ * in the Damage Step by an effect and no damage calculation is performed, the attacker still attacked and the effect can be activated at the end
+ * of the Damage Step. (An attack replayed in the Battle Step has no Damage Step: nothing was attacked.) The card must still be the card that
+ * attacked (`isStill`): one that left the field during that Damage Step and came back is a new card, which did not attack (the core's "new card"
+ * rule; Konami's notes on that dragon only speak of a card banished and returned before it attacks, and a card destroyed by that battle cannot
+ * activate). `false` once the attack is over.
+ */
+export const attackedNow = (duel: Duel, id: number): boolean => duel.battle !== null && duel.battle.step !== "declared" && duel.battle.attacker.id === id && isStill(duel, duel.battle.attacker);
 
 /** Was this card destroyed by the battle in progress (decided at damage calculation; it leaves the field at the end of the Damage Step)? */
 export const destroyedByBattleNow = (duel: Duel, id: number): boolean => duel.battle?.fought === true && duel.battle.destroyed.some((ref) => ref.id === id);

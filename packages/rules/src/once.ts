@@ -20,7 +20,8 @@ const BUCKETS: Record<OnceScope, Bucket> = { instance: "turn", name: "turn", act
  * The key of one use of an effect, or `null` when it has no limit. Always read on the card as it is before it is
  * activated (a Spell or Trap Card not yet placed), so that checking and spending use the same key. An `instance` limit
  * tells a copy apart by its id and its `moves`: a card that has moved is a new card, with no use (YGOProJudge, the owner's
- * rules site, no source cited; no Konami page found). Every other scope is by player and name: a second copy is blocked
+ * rules site, no source cited; no Konami page found), unless the record says `acrossMoves` (Konami's Q&A fid 23394: the use is then kept from the field to the Graveyard or banishment, and
+ * told apart by `fieldEntries`, so a card that comes to the field again has a new use). Every other scope is by player and name: a second copy is blocked
  * (`once-name-second-copy`) and, for `duel`, each player has their own (`duel-per-player-control`); for the others that
  * both players may each use their own is YGOProJudge's answer too.
  */
@@ -28,7 +29,8 @@ export function keyOf(effect: EffectRecord, player: Side, card: CardInstance, in
 	const once = effect.once;
 	if (!once) return null;
 	const base = once.key ?? `${card.code}:${index}`;
-	return once.scope === "instance" ? `instance:${card.id}.${card.moves}:${once.key ?? index}` : `${once.scope}:${player}:${base}`;
+	if (once.scope === "instance") return `instance:${card.id}${once.acrossMoves ? `@${card.fieldEntries}` : `.${card.moves}`}:${once.key ?? index}`;
+	return `${once.scope}:${player}:${base}`;
 }
 
 /** The `defs` whose shared limits were found to agree (the definitions are shared by every Duel and never changed). */
@@ -37,11 +39,12 @@ const agreed = new WeakSet<object>();
 /**
  * A limit several effects share (`Once.key`) has one count: each effect reads its own `times` when it is checked, so effects
  * sharing a key with different `times` would disagree on whether the limit is reached. That is a mistake in the cards, not
- * something to ignore: it throws. Read once per `defs`. An `instance` limit is per copy, so its key is shared within one card only.
+ * something to ignore: it throws. Read once per `defs`. An `instance` limit is per copy, so its key is shared within one card only; its effects
+ * must also agree on `acrossMoves`, or they would not read the same key.
  */
 function checkSharedLimits(defs: Duel["defs"]): void {
 	if (agreed.has(defs)) return;
-	const limits = new Map<string, { readonly times: number; readonly code: string }>();
+	const limits = new Map<string, { readonly times: number; readonly code: string; readonly acrossMoves: boolean }>();
 	for (const def of Object.values(defs)) {
 		for (const effect of def.effects ?? []) {
 			const once = effect.once;
@@ -49,8 +52,10 @@ function checkSharedLimits(defs: Duel["defs"]): void {
 			const limit = once.scope === "instance" ? `instance:${def.code}:${once.key}` : `${once.scope}:${once.key}`;
 			const times = once.times ?? 1;
 			const first = limits.get(limit);
-			if (!first) limits.set(limit, { times, code: def.code });
+			const acrossMoves = once.acrossMoves === true;
+			if (!first) limits.set(limit, { times, code: def.code, acrossMoves });
 			else if (first.times !== times) throw new Error(`${def.code}: effects that share the once-per-turn key "${once.key}" (with ${first.code}) must allow the same number of uses (times ${first.times} and ${times})`);
+			else if (once.scope === "instance" && first.acrossMoves !== acrossMoves) throw new Error(`${def.code}: effects that share the once-per-turn key "${once.key}" must agree on acrossMoves`);
 		}
 	}
 	agreed.add(defs);

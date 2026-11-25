@@ -110,6 +110,19 @@ describe("once per turn: \"You can only use this effect of [name] once per turn\
 		expect(count(once, "activate once-pair")).toBe(2);
 		expect(count(play(once, "activate once-pair", "pass", "pass"), "activate once-pair")).toBe(0);
 	});
+	// One limit has one key: effects of a card that share an `instance` key must agree on whether the use follows the card when it moves.
+	it("refuses effects that share an instance key but not `acrossMoves` (a definition error)", () => {
+		const shared = (code: string, flags: readonly boolean[]): CardDef => ({
+			code,
+			kind: "monster",
+			effects: flags.map((across): EffectRecord => ({ type: "quick", range: "field", once: { scope: "instance", key: code, ...(across ? { acrossMoves: true as const } : {}) }, operation: (duel) => duel })),
+		});
+		const mixed = position({ defs: { ...defsWith(), "once-across-mixed": shared("once-across-mixed", [true, false]) }, options, you: { monsters: ["once-across-mixed"] } });
+		expect(() => offered(mixed)).toThrow(/once-across-mixed.*share.*acrossMoves/);
+		const agreed = position({ defs: { ...defsWith(), "once-across-pair": shared("once-across-pair", [true, true]) }, options, you: { monsters: ["once-across-pair"] } });
+		expect(count(agreed, "activate once-across-pair")).toBe(2);
+		expect(count(play(agreed, "activate once-across-pair", "pass", "pass"), "activate once-across-pair")).toBe(0);
+	});
 	// The core's reading: a card that came back is a new card (step 1), and Q&A fid 24139 blocks a new second copy.
 	it("counts a card that came back as the same name, and lifts the limit with the turn", () => {
 		const start = position({ defs: defsWith(), options, you: { monsters: ["once-name"] } });
