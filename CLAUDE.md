@@ -36,3 +36,11 @@ Moved out of `meirboccara/project-meir` into its own repo; the docs in `docs/` c
   - Its answers often cite no source: treat them as a lead, not a record. Tests in `packages/rules` still cite Konami
     sources; when YGOProJudge and a Konami page disagree, Konami wins. Where only YGOProJudge backs a choice, say so in
     the code comment or README.
+  - **Grade the answer** once a Konami page settles the question, after `close`: one final verdict per chat, sent once.
+    `scripts/ygoprojudge-chat.sh verdict <sessionId> okay` when it matches Konami;
+    `scripts/ygoprojudge-chat.sh verdict <sessionId> issue <reason> <comment-file>` to report a wrong ruling, with
+    `reason` one of `wrong_ruling`, `unclear`, `missed_question`, `should_not_answer`, `other`, and a comment (1-1000
+    characters) that says what is wrong and quotes the Konami source (URL or Q&A id). It grades the chat's latest answer
+    and opens a report the site's admins review. `HTTP 201` or `200`: recorded; `409 verdict_conflict`: a verdict
+    already stands, leave it; `409 session_not_closed`: close first. With no Konami page, send no verdict: the answer
+    stays a lead.

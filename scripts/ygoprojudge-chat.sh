@@ -5,6 +5,9 @@
 #   scripts/ygoprojudge-chat.sh ask <sessionId> <file> [cards]    -> sends the question in <file>, prints the answer and its sources
 #   scripts/ygoprojudge-chat.sh answer <sessionId>                -> prints the latest answer of the chat; sends nothing
 #   scripts/ygoprojudge-chat.sh close <sessionId>
+#   scripts/ygoprojudge-chat.sh verdict <sessionId> okay
+#   scripts/ygoprojudge-chat.sh verdict <sessionId> issue <reason> <comment-file>
+#                                                                 -> the final verdict on a closed chat's latest answer
 #
 # Every message costs money: a question is never sent twice. `ask` first reads the chat; if the same question is already in it,
 # it sends nothing and prints the answer given (or says it is still pending: read it later with `answer`). An answer can take
@@ -12,6 +15,8 @@
 # One topic per chat, in general terms (no person or project names). Follow up or contest in the same chat at most 2-3 times,
 # then close it (CLAUDE.md, "TCG rules questions"). The key is read from the YGOJ_PARTNER_KEY environment variable, or else from
 # ~/.config/ygoprojudge/key; it is never printed and never stored in this repo. Needs bash, curl and python.
+# A verdict is final (one per chat): `okay`, or `issue` with a reason (wrong_ruling, unclear, missed_question,
+# should_not_answer, other) and a comment of 1-1000 characters, read from a file, that cites the Konami source.
 set -u
 KEY="${YGOJ_PARTNER_KEY:-}"
 if [ -z "$KEY" ] && [ -r "$HOME/.config/ygoprojudge/key" ]; then KEY=$(tr -d '\r\n' < "$HOME/.config/ygoprojudge/key"); fi
@@ -75,6 +80,16 @@ print(json.dumps(d))' "$3" "${4:-}")
   close)
     [ -z "${2:-}" ] && { echo "usage: $0 close <sessionId>"; exit 1; }
     curl -s -m 60 "${HEADERS[@]}" -X POST "$BASE/chat-sessions/$2/close" > /dev/null && echo closed ;;
+  verdict)
+    [ -z "${2:-}" ] || [ -z "${3:-}" ] && { echo "usage: $0 verdict <sessionId> okay | issue <reason> <comment-file>"; exit 1; }
+    if [ "$3" = "okay" ]; then body='{"verdict":"okay"}'
+    elif [ "$3" = "issue" ] && [ -n "${4:-}" ] && [ -n "${5:-}" ]; then
+      body=$(python -c 'import json,sys
+print(json.dumps({"verdict": "issue", "reason": sys.argv[1], "comment": open(sys.argv[2], encoding="utf8").read().strip()}))' "$4" "$5") || exit 1
+    else echo "usage: $0 verdict <sessionId> okay | issue <reason> <comment-file>"; exit 1; fi
+    # 201: recorded. 200: this same verdict was already recorded. 409: a different verdict stands, or the chat is still open
+    # (session_not_closed: close it first), or it holds no answer to grade.
+    curl -s -m 60 "${HEADERS[@]}" -X POST "$BASE/chat-sessions/$2/verdict" -d "$body" -w '\nHTTP %{http_code}\n' ;;
   *)
-    echo "usage: $0 open <conversationId> | ask <sessionId> <file> [cards] | answer <sessionId> | close <sessionId>"; exit 1 ;;
+    echo "usage: $0 open <conversationId> | ask <sessionId> <file> [cards] | answer <sessionId> | close <sessionId> | verdict <sessionId> okay|issue <reason> <comment-file>"; exit 1 ;;
 esac
