@@ -16,6 +16,8 @@ set -u
 KEY="${YGOJ_PARTNER_KEY:-}"
 if [ -z "$KEY" ] && [ -r "$HOME/.config/ygoprojudge/key" ]; then KEY=$(tr -d '\r\n' < "$HOME/.config/ygoprojudge/key"); fi
 [ -z "$KEY" ] && { echo "no YGOProJudge key: set YGOJ_PARTNER_KEY or create ~/.config/ygoprojudge/key (ask the owner)"; exit 1; }
+# Questions and answers may hold Japanese (Konami quotes): make python read and print UTF-8 whatever the console's code page.
+export PYTHONIOENCODING=utf-8 PYTHONUTF8=1
 BASE=https://ygoprojudge.com/api/partner/v1
 HEADERS=(-H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -H "X-Agent-Id: rules-core/1")
 
@@ -59,7 +61,9 @@ case "${1:-}" in
     question=$(python -c 'import sys; print(open(sys.argv[1], encoding="utf8").read().strip())' "$3")
     # Never send the same question twice: if the chat already holds it, show what it got instead.
     existing=$(view "$2" | python -c "$SHOW" "$question"); code=$?
-    if [ $code -ne 4 ]; then echo "ALREADY ASKED in this chat: nothing sent."; echo "$existing"; exit 0; fi
+    # 0: asked and answered, 3: asked and pending: send nothing. 4: not asked yet: send. Anything else: an error, send nothing.
+    if [ $code -eq 0 ] || [ $code -eq 3 ]; then echo "ALREADY ASKED in this chat: nothing sent."; echo "$existing"; exit 0; fi
+    if [ $code -ne 4 ]; then echo "ERROR reading the chat (nothing sent):"; echo "$existing"; exit 1; fi
     body=$(python -c 'import json,sys
 d = {"text": open(sys.argv[1], encoding="utf8").read().strip()}
 if len(sys.argv) > 2 and sys.argv[2]: d["cards"] = sys.argv[2]
