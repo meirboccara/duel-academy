@@ -1,0 +1,2225 @@
+{
+  "setup": {
+    "seed": 4,
+    "you": {
+      "deck": [
+        "ash-blossom-joyous-spring",
+        "ash-blossom-joyous-spring",
+        "ash-blossom-joyous-spring",
+        "lightning-storm",
+        "lightning-storm",
+        "mulcharmy-fuwalos",
+        "mulcharmy-fuwalos",
+        "mulcharmy-fuwalos",
+        "mulcharmy-purulia",
+        "mulcharmy-purulia",
+        "mulcharmy-purulia",
+        "mystical-space-typhoon",
+        "pot-of-sloth",
+        "pot-of-sloth",
+        "radiant-typhoon-vision",
+        "radiant-typhoon-vision",
+        "radiant-typhoon-vision",
+        "raigeki",
+        "raigeki",
+        "raigeki",
+        "sky-striker-ace-raye",
+        "sky-striker-ace-raye",
+        "sky-striker-ace-raye",
+        "sky-striker-ace-roze",
+        "sky-striker-ace-roze",
+        "sky-striker-mecha-shark-cannon",
+        "sky-striker-mecha-widow-anchor",
+        "sky-striker-mobilize-engage",
+        "sky-striker-mobilize-engage",
+        "sky-striker-mobilize-linkage",
+        "sky-striker-mobilize-linkage",
+        "sky-striker-mobilize-linkage",
+        "sky-striker-special-maneuver-lemnisgate",
+        "sky-striker-special-maneuver-lemnisgate",
+        "the-fallen-and-the-virtuous",
+        "the-fallen-and-the-virtuous",
+        "the-fallen-and-the-virtuous",
+        "upstart-goblin",
+        "upstart-goblin",
+        "upstart-goblin"
+      ],
+      "extra": [
+        "ecclesia-and-the-dark-dragon",
+        "prototype-sky-striker-ace-amatsu",
+        "sp-little-knight",
+        "sky-striker-ace-azalea",
+        "sky-striker-ace-hayate",
+        "sky-striker-ace-hayate",
+        "sky-striker-ace-kagari",
+        "sky-striker-ace-kagari",
+        "sky-striker-ace-kagari",
+        "sky-striker-ace-shizuku",
+        "sky-striker-ace-zeke",
+        "sky-striker-ace-zero",
+        "sky-striker-ace-zero",
+        "sky-striker-ace-zero",
+        "the-dragon-that-devours-the-dogma"
+      ]
+    },
+    "rival": {
+      "deck": [
+        "ash-blossom-joyous-spring",
+        "ash-blossom-joyous-spring",
+        "ash-blossom-joyous-spring",
+        "bingo-machine-go",
+        "blue-eyes-white-dragon",
+        "blue-eyes-white-dragon",
+        "blue-eyes-white-dragon-the-white-phantom-beast",
+        "bystial-magnamhut",
+        "deep-eyes-white-dragon",
+        "deep-eyes-white-dragon",
+        "deep-eyes-white-dragon",
+        "dominus-purge",
+        "dominus-purge",
+        "dominus-purge",
+        "droll-lock-bird",
+        "effect-veiler",
+        "effect-veiler",
+        "effect-veiler",
+        "ghost-ogre-snow-rabbit",
+        "ghost-ogre-snow-rabbit",
+        "ghost-ogre-snow-rabbit",
+        "infinite-impermanence",
+        "infinite-impermanence",
+        "infinite-impermanence",
+        "maiden-of-white",
+        "maiden-of-white",
+        "maiden-of-white",
+        "majesty-of-the-white-dragons",
+        "mausoleum-of-white",
+        "pot-of-prosperity",
+        "primite-dragon-ether-beryl",
+        "primite-drillbeam",
+        "primite-lordly-lode",
+        "primite-lordly-lode",
+        "primite-lordly-lode",
+        "roar-of-the-blue-eyed-dragons",
+        "sage-with-eyes-of-blue",
+        "sage-with-eyes-of-blue",
+        "sage-with-eyes-of-blue",
+        "true-light",
+        "wishes-for-eyes-of-blue",
+        "wishes-for-eyes-of-blue",
+        "wishes-for-eyes-of-blue"
+      ],
+      "extra": [
+        "ancient-fairy-life-dragon",
+        "blue-eyes-spirit-dragon",
+        "blue-eyes-spirit-dragon",
+        "blue-eyes-tyrant-dragon",
+        "blue-eyes-ultimate-spirit-dragon",
+        "crimson-dragon",
+        "hieratic-seal-of-the-heavenly-spheres",
+        "hieratic-seal-of-the-heavenly-spheres",
+        "lightstorm-dragon",
+        "neo-blue-eyes-ultimate-dragon",
+        "psychic-end-punisher",
+        "spirit-with-eyes-of-blue",
+        "spirit-with-eyes-of-blue",
+        "stardust-sifr-divine-dragon",
+        "super-starslayer-ty-phon-sky-crisis"
+      ]
+    },
+    "first": "you"
+  },
+  "log": [
+    {
+      "turn": 1,
+      "phase": "draw",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "standby",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 40,
+        "effect": 0,
+        "targets": [],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate upstart-goblin",
+        "rival": "activate upstart-goblin"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "summon",
+        "card": 25,
+        "how": "normal",
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "summon sky-striker-ace-roze",
+        "rival": "summon sky-striker-ace-roze"
+      },
+      "passes": [
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "summon",
+        "card": 45,
+        "how": "special"
+      },
+      "seen": {
+        "you": "special-summon sky-striker-ace-hayate",
+        "rival": "special-summon ?"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "place",
+        "zone": 5
+      },
+      "seen": {
+        "you": "place 5",
+        "rival": "place 5"
+      },
+      "passes": [
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 31,
+        "effect": 0,
+        "targets": [],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate sky-striker-mobilize-linkage",
+        "rival": "activate sky-striker-mobilize-linkage"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "choose",
+        "card": 47
+      },
+      "seen": {
+        "you": "choose sky-striker-ace-kagari",
+        "rival": "choose ?"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "place",
+        "zone": 5,
+        "positions": [
+          "attack"
+        ]
+      },
+      "seen": {
+        "you": "place 5",
+        "rival": "place 5"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 47,
+        "effect": 0,
+        "targets": [
+          31
+        ]
+      },
+      "seen": {
+        "you": "activate sky-striker-ace-kagari #1 > sky-striker-mobilize-linkage",
+        "rival": "activate sky-striker-ace-kagari #1 > sky-striker-mobilize-linkage"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 71,
+        "effect": 0,
+        "targets": [
+          47
+        ]
+      },
+      "seen": {
+        "you": "activate effect-veiler > sky-striker-ace-kagari",
+        "rival": "activate effect-veiler > sky-striker-ace-kagari"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 34,
+        "effect": 0,
+        "targets": [
+          25,
+          31
+        ],
+        "groups": [
+          1,
+          1
+        ],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate sky-striker-special-maneuver-lemnisgate #1 > sky-striker-ace-roze > sky-striker-mobilize-linkage {1,1}",
+        "rival": "activate sky-striker-special-maneuver-lemnisgate #1 > sky-striker-ace-roze > sky-striker-mobilize-linkage {1,1}"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "set",
+        "card": 15,
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "set radiant-typhoon-vision",
+        "rival": "set ?"
+      },
+      "passes": [
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "end",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival",
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "draw",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "draw",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "draw",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "standby",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "standby",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 59,
+        "effect": 0,
+        "targets": [],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate bingo-machine-go",
+        "rival": "activate bingo-machine-go"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 2,
+        "effect": 0,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate ash-blossom-joyous-spring",
+        "rival": "activate ash-blossom-joyous-spring"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 89,
+        "effect": 0,
+        "targets": [],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate primite-lordly-lode #1",
+        "rival": "activate primite-lordly-lode #1"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 86
+      },
+      "seen": {
+        "you": "choose ?",
+        "rival": "choose primite-dragon-ether-beryl"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 66,
+        "effect": 0,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate deep-eyes-white-dragon #1",
+        "rival": "activate deep-eyes-white-dragon #1"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 94
+      },
+      "seen": {
+        "you": "choose ?",
+        "rival": "choose sage-with-eyes-of-blue"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "summon",
+        "card": 94,
+        "how": "normal",
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0,
+        "position": "attack"
+      },
+      "seen": {
+        "you": "summon sage-with-eyes-of-blue",
+        "rival": "summon sage-with-eyes-of-blue"
+      },
+      "passes": [
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 94,
+        "effect": 0,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate sage-with-eyes-of-blue #1",
+        "rival": "activate sage-with-eyes-of-blue #1"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 81
+      },
+      "seen": {
+        "you": "choose ?",
+        "rival": "choose maiden-of-white"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 81,
+        "effect": 0,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate maiden-of-white #1",
+        "rival": "activate maiden-of-white #1"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "place",
+        "zone": 1
+      },
+      "seen": {
+        "you": "place 1",
+        "rival": "place 1"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 95,
+        "effect": 4,
+        "targets": [],
+        "mode": 1
+      },
+      "seen": {
+        "you": "activate true-light #5 :2",
+        "rival": "activate true-light #5 :2"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 97
+      },
+      "seen": {
+        "you": "choose ?",
+        "rival": "choose wishes-for-eyes-of-blue"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "summon",
+        "card": 110,
+        "how": "special"
+      },
+      "seen": {
+        "you": "special-summon ?",
+        "rival": "special-summon spirit-with-eyes-of-blue"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "place",
+        "zone": 4
+      },
+      "seen": {
+        "you": "place 4",
+        "rival": "place 4"
+      },
+      "passes": [
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 110,
+        "effect": 1,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate spirit-with-eyes-of-blue #2",
+        "rival": "activate spirit-with-eyes-of-blue #2"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 84
+      },
+      "seen": {
+        "you": "choose ?",
+        "rival": "choose mausoleum-of-white"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 84,
+        "effect": 0,
+        "targets": [],
+        "zones": [
+          0
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate mausoleum-of-white #1",
+        "rival": "activate mausoleum-of-white #1"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival",
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 97,
+        "effect": 0,
+        "targets": [],
+        "paid": [
+          86
+        ]
+      },
+      "seen": {
+        "you": "activate wishes-for-eyes-of-blue #1 ~ primite-dragon-ether-beryl",
+        "rival": "activate wishes-for-eyes-of-blue #1 ~ primite-dragon-ether-beryl"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 92
+      },
+      "seen": {
+        "you": "choose ?",
+        "rival": "choose sage-with-eyes-of-blue"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "summon",
+        "card": 92,
+        "how": "normal",
+        "extra": true,
+        "zones": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "summon sage-with-eyes-of-blue additional",
+        "rival": "summon sage-with-eyes-of-blue additional"
+      },
+      "passes": [
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 92,
+        "effect": 0,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate sage-with-eyes-of-blue #1",
+        "rival": "activate sage-with-eyes-of-blue #1"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 72
+      },
+      "seen": {
+        "you": "choose ?",
+        "rival": "choose effect-veiler"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 84,
+        "effect": 2,
+        "targets": [
+          92
+        ]
+      },
+      "seen": {
+        "you": "activate mausoleum-of-white #3 > sage-with-eyes-of-blue",
+        "rival": "activate mausoleum-of-white #3 > sage-with-eyes-of-blue"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 60
+      },
+      "seen": {
+        "you": "choose blue-eyes-white-dragon",
+        "rival": "choose blue-eyes-white-dragon"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 66,
+        "effect": 2,
+        "targets": [
+          60
+        ]
+      },
+      "seen": {
+        "you": "activate deep-eyes-white-dragon #3 > blue-eyes-white-dragon",
+        "rival": "activate deep-eyes-white-dragon #3 > blue-eyes-white-dragon"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "place",
+        "zone": 2,
+        "positions": [
+          "attack",
+          "defense"
+        ]
+      },
+      "seen": {
+        "you": "place 2",
+        "rival": "place 2"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 110,
+        "effect": 2,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate spirit-with-eyes-of-blue #3",
+        "rival": "activate spirit-with-eyes-of-blue #3"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "place",
+        "zone": 1,
+        "positions": [
+          "attack",
+          "defense"
+        ]
+      },
+      "seen": {
+        "you": "place 1",
+        "rival": "place 1"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 81,
+        "effect": 2,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate maiden-of-white #3",
+        "rival": "activate maiden-of-white #3"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "place",
+        "zone": 3,
+        "positions": [
+          "attack",
+          "defense"
+        ]
+      },
+      "seen": {
+        "you": "place 3",
+        "rival": "place 3"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "summon",
+        "card": 103,
+        "how": "special",
+        "positions": [
+          "attack",
+          "defense"
+        ],
+        "position": "attack"
+      },
+      "seen": {
+        "you": "special-summon ?",
+        "rival": "special-summon blue-eyes-ultimate-spirit-dragon"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "place",
+        "zone": 2
+      },
+      "seen": {
+        "you": "place 2",
+        "rival": "place 2"
+      },
+      "passes": [
+        "rival",
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "set",
+        "card": 83,
+        "zones": [
+          2,
+          3,
+          4
+        ],
+        "zone": 2
+      },
+      "seen": {
+        "you": "set ?",
+        "rival": "set majesty-of-the-white-dragons"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "battle",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "battle",
+      "side": "rival",
+      "action": {
+        "type": "attack",
+        "card": 60,
+        "target": 47
+      },
+      "seen": {
+        "you": "attack blue-eyes-white-dragon > sky-striker-ace-kagari",
+        "rival": "attack blue-eyes-white-dragon > sky-striker-ace-kagari"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "battle",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 15,
+        "effect": 0,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate radiant-typhoon-vision #1",
+        "rival": "activate radiant-typhoon-vision #1"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "battle",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 57,
+        "effect": 0,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate ash-blossom-joyous-spring",
+        "rival": "activate ash-blossom-joyous-spring"
+      },
+      "passes": [
+        "you",
+        "rival",
+        "rival",
+        "you",
+        "rival",
+        "you",
+        "rival",
+        "you",
+        "rival",
+        "you",
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "battle",
+      "side": "rival",
+      "action": {
+        "type": "attack",
+        "card": 103,
+        "target": null
+      },
+      "seen": {
+        "you": "attack blue-eyes-ultimate-spirit-dragon directly",
+        "rival": "attack blue-eyes-ultimate-spirit-dragon directly"
+      },
+      "passes": [
+        "rival",
+        "you",
+        "rival",
+        "you",
+        "rival",
+        "you",
+        "rival",
+        "you",
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "battle",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you",
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main2",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "end",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you",
+        "you"
+      ]
+    },
+    {
+      "turn": 3,
+      "phase": "draw",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "draw",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "draw",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "standby",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "standby",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 39,
+        "effect": 0,
+        "targets": [],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate upstart-goblin",
+        "rival": "activate upstart-goblin"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 3,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 33,
+        "effect": 0,
+        "targets": [
+          47,
+          34
+        ],
+        "groups": [
+          1,
+          1
+        ],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate sky-striker-special-maneuver-lemnisgate #1 > sky-striker-ace-kagari > sky-striker-special-maneuver-lemnisgate {1,1}",
+        "rival": "activate sky-striker-special-maneuver-lemnisgate #1 > sky-striker-ace-kagari > sky-striker-special-maneuver-lemnisgate {1,1}"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 103,
+        "effect": 1,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate blue-eyes-ultimate-spirit-dragon #2",
+        "rival": "activate blue-eyes-ultimate-spirit-dragon #2"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 3,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 3,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 3,
+      "phase": "battle",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "battle",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "battle",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 3,
+      "phase": "battle",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "main2",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "main2",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "end",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 3,
+      "phase": "end",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 4,
+      "phase": "draw",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 4,
+      "phase": "draw",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 4,
+      "phase": "draw",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 4,
+      "phase": "standby",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 4,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 4,
+      "phase": "battle",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 4,
+      "phase": "battle",
+      "side": "rival",
+      "action": {
+        "type": "attack",
+        "card": 103,
+        "target": null
+      },
+      "seen": {
+        "you": "attack blue-eyes-ultimate-spirit-dragon directly",
+        "rival": "attack blue-eyes-ultimate-spirit-dragon directly"
+      }
+    },
+    {
+      "turn": 4,
+      "phase": "battle",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you",
+        "rival",
+        "you",
+        "rival",
+        "you"
+      ]
+    }
+  ],
+  "disputes": []
+}

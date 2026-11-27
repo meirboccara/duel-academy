@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { ask, askSpecialSummon, CARD_DEFS, type CardDef, cites, type Duel, moveCards, printedFacts, targetsOf } from "../../src";
+import { addModifier, ask, askSpecialSummon, CARD_DEFS, type CardDef, cites, type Duel, moveCards, printedFacts, targetsOf } from "../../src";
 import { toStep } from "../rules/battle-fixtures";
 import { gapCards } from "../rules/blue-eyes-gap-fixtures";
 import { nextTurn as passUntil, toPhase } from "../rules/continuous-fixtures";
-import { codes, offered, play, position, type SideSpec } from "../rules/fixtures";
+import { codes, lastingLines, offered, play, position, type SideSpec } from "../rules/fixtures";
 import { blueEyesFixtures } from "./blue-eyes-fixtures";
 
 const card = "blue-eyes-white-dragon-the-white-phantom-beast";
@@ -60,6 +60,14 @@ const everOffered = (duel: Duel, label: string, passes = 16): boolean => {
 const PHANTOM = card;
 
 describe("Blue-Eyes White Dragon, the White Phantom Beast, written as effect records", () => {
+ it(`${cites("ash-blossom-joyous-spring", "qa-discard-while-banished-instead")} can pay its discard to negate a targeting effect under a GY-to-banish replacement`, () => {
+  const start = board({ monsters: [card], hand: ["fixture-normal-4"] }, { hand: ["fixture-targeter"], monsters: ["fixture-effect-4"] }, { everyWindow: true }, "rival");
+  const replaced = addModifier(start, { affects: () => false, until: Number.MAX_SAFE_INTEGER, layer: { kind: "redirect", from: "graveyard", to: "banished" } });
+  const aimed = mine(play(replaced, `activate fixture-targeter > ${card}`));
+  const paid = play(aimed, `activate ${card} ~ fixture-normal-4`);
+  expect(codes(paid, "you", "banished")).toEqual(["fixture-normal-4"]);
+  expect(paid.chain.map((link) => link.card.code)).toEqual(["fixture-targeter", card]);
+ });
 	it(`${cites("blue-eyes-white-dragon-the-white-phantom-beast", "facts")} is a LIGHT Dragon Effect Monster of Level 8 with 3000 ATK and 2500 DEF`, () => {
 		const duel = board({ hand: [card] });
 		expect(printedFacts(duel, find(duel, card).id)).toEqual({ name: "Blue-Eyes White Dragon, the White Phantom Beast", attribute: "LIGHT", monsterType: "Dragon", level: 8, atk: 3000, def: 2500, archetypes: ["Blue-Eyes"], mentions: ["Blue-Eyes White Dragon, the White Phantom Beast"] });
@@ -144,6 +152,7 @@ describe("Blue-Eyes White Dragon, the White Phantom Beast, written as effect rec
 			const start = board({ hand: ["fixture-revive-hand", card], monsters: ["fixture-normal-4", "fixture-blue-eyes-normal"] });
 			const summoned = settle(play(start, "activate fixture-revive-hand"));
 			const done = settle(play(summoned, `activate ${card}`));
+			expect(lastingLines(done).join("\n")).toContain('you cannot attack directly except with "Blue-Eyes" monsters');
 			const battle = toPhase(play(done, "pass"), "battle");
 			const attacks = offered(battle).filter((label) => label.startsWith("attack"));
 			// With no monster on the opponent's side every monster could attack directly: only the "Blue-Eyes" ones can.

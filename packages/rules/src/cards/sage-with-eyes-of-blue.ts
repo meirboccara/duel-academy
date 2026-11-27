@@ -4,7 +4,7 @@ import { ask, type CardDef, targetsOf } from "../effects";
 import { belongsTo, hasPrintedName } from "../identity";
 import { askSpecialSummon, canSpecialSummon } from "../procedures";
 import { konamiCardUrl } from "../sources";
-import { factsOf, isEffectMonster, sendThisToGraveyard } from "./helpers";
+import { discardThis, factsOf, isEffectMonster } from "./helpers";
 
 const NAME = "Sage with Eyes of Blue";
 
@@ -30,7 +30,7 @@ const effectTargets = (duel: Duel, player: Side): number[] => duel.piles[player]
  *   Summon an effect performs at Chain Link 2 or later is followed by another link, so the timing is missed (the core's "when" rule). It has no
  *   limit of its own. It cannot be activated with no Level 1 LIGHT Tuner to add in the Deck (rule record `search-needs-a-card`).
  * - Second effect: an Ignition Effect of the hand, activated only while a "Blue-Eyes" monster of the Deck can be Special Summoned (so the discard, the target and the use are not spent for nothing; the core's reading, as for True Light's modes), the discard being the cost and the target an Effect Monster in the Monster Zone, face-up
- *   (notes). When it resolves the target is sent to the GY (a plain move: the core has no "discarded" reason for the cost either); if that
+ *   (notes). When it resolves the target is sent to the GY (the cost itself uses `discarded`); if that
  *   succeeds, the player chooses a "Blue-Eyes" monster of the Deck and its zone and position. The send and the Summon are "treated as
  *   simultaneous" (notes): the core sends first, so the zone the target left is free for the Summon. A monster unaffected by this effect is
  *   not sent, and nothing is Summoned.
@@ -61,7 +61,7 @@ export const SAGE_WITH_EYES_OF_BLUE: CardDef = {
 			// An effect that Summons is activated only while a card can be Summoned (as True Light's modes and Maiden of White's third effect).
 			// The target is sent first, so the zone it leaves counts (the zones may be full now): read with each possible target already in the Graveyard.
 			condition: (duel, { player }) => effectTargets(duel, player).some((id) => blueEyesToSummon(moveCard(duel, id, { zone: "graveyard" }), player).length > 0),
-			cost: sendThisToGraveyard,
+			cost: discardThis,
 			target: (duel, { player }) => effectTargets(duel, player),
 			operation: (duel, link) => {
 				const target = targetsOf(duel, link)[0];

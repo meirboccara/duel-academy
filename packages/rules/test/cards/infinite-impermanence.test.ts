@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { act, type Action, type CardDef, cites, CARD_DEFS, fromTraps, isNegated, legalActions, moveCard } from "../../src";
+import { act, type Action, type CardDef, cites, CARD_DEFS, type Duel, fromTraps, isNegated, legalActions, moveCard, printedFacts } from "../../src";
+import { battleCards } from "../rules/battle-fixtures";
 import { negationCards } from "../rules/negation-fixtures";
 import { codes, offered, plainCards, play, position } from "../rules/fixtures";
 
@@ -177,6 +178,21 @@ describe("Infinite Impermanence's column (step 7)", () => {
 		play(act(cleared, { ...again, zone: 4 } as Action), "pass");
 		expect(log).toEqual([]);
 	});
+	it(`${cites("infinite-impermanence", "column-later-spell")} a Spell the turn player activates from the hand into that column later the same turn is negated`, () => {
+		const log: string[] = [];
+		const negated = play(board(log, ["spell"]), "activate ignition", `activate ${card} > ignition`, "pass");
+		const open = play(negated, "pass");
+		// Your zone 4 is the Impermanence's column: free it, then play the Spell from the hand there (zone 0, another column, is the control).
+		const cleared = moveCard(open, open.piles.you.spell.find((id) => open.cards[id]!.slot === 4)!, { zone: "graveyard" });
+		const spell = legalActions(cleared).find((action) => action.type === "activate" && cleared.cards[action.card]!.code === "spell")!;
+		expect(cleared.cards[(spell as { card: number }).card]!.zone).toBe("hand");
+		log.length = 0;
+		play(act(cleared, { ...spell, zone: 0 } as Action), "pass");
+		expect(log).toEqual(["spell"]);
+		log.length = 0;
+		play(act(cleared, { ...spell, zone: 4 } as Action), "pass");
+		expect(log).toEqual([]);
+	});
 	it(`${cites("infinite-impermanence", "wand-column-effect")} an effect activated by a Spell in that column is negated even when the Spell left as its cost; the Field Zone is in no column`, () => {
 		const log: string[] = [];
 		const start = board(log, ["umi"]);
@@ -218,6 +234,52 @@ describe("Infinite Impermanence's column (step 7)", () => {
 		for (let guard = 0; guard < 40 && !(duel.turn.number === 5 && duel.turn.phase === "main1"); guard++) duel = play(duel, "pass");
 		log.length = 0;
 		play(duel, "activate trap", "pass");
+		expect(log).toEqual(["trap"]);
+	});
+});
+
+describe("Infinite Impermanence: identity, the Damage Step and the column's requirement", () => {
+	const striker: CardDef = { code: "fixture-striker", kind: "monster", facts: { level: 4, atk: 3000, def: 0 }, effects: [{ type: "ignition", operation: (duel) => duel }] };
+	// An Ignition Effect monster unaffected by Trap effects: Infinite Impermanence cannot negate it ("this effect not received", Konami's notes).
+	const proof: CardDef = { code: "fixture-trap-proof", kind: "monster", facts: { level: 4, atk: 0, def: 0 }, effects: [{ type: "continuous", modifies: () => [{ kind: "protect", against: "effects", from: fromTraps }] }, { type: "ignition", operation: (duel) => duel }] };
+	const defs = { ...battleCards(), ...negationCards(), "fixture-striker": striker, "fixture-trap-proof": proof };
+	const against = `activate ${card} > fixture-striker`;
+	const impermanence = (duel: Duel) => offered(duel).filter((label) => label.startsWith(`activate ${card}`));
+
+	it(`${cites("infinite-impermanence", "facts")} is a Normal Trap`, () => {
+		const duel = position({ defs, rival: { set: [card] } });
+		expect(printedFacts(duel, duel.piles.rival.spell[0]!)).toEqual({ name: "Infinite Impermanence" });
+		expect(duel.defs[card]!.kind).toBe("trap");
+	});
+	it(`${cites("infinite-impermanence", "notes-damage-step")} cannot be activated in the Damage Step: offered when the attack is declared, not once the Damage Step has begun`, () => {
+		const mine = position({ defs, phase: "battle", options: { everyWindow: true }, you: { monsters: ["fixture-striker"] }, rival: { set: [card], monsters: ["big"] } });
+		// The attacker passes in the Battle Step (the attack declared): the rival holds priority and may activate it.
+		const attacked = play(mine, "attack fixture-striker > big", "pass");
+		expect(attacked.priority.holder).toBe("rival");
+		expect(impermanence(attacked)).toEqual([against]);
+		// In every window of the Damage Step the rival holds, it is not offered.
+		let seen = 0;
+		let next = attacked;
+		for (let guard = 0; guard < 12 && next.battle !== null; guard++) {
+			next = play(next, "pass");
+			if (next.battle?.step !== undefined && next.battle.step !== null && next.priority.holder === "rival") {
+				seen++;
+				expect(impermanence(next)).toEqual([]);
+			}
+		}
+		expect(seen).toBeGreaterThan(0);
+	});
+	it(`${cites("infinite-impermanence", "notes-column-needs-negation")} applies no column when its target's effects could not be negated, though it was Set and stays on the field`, () => {
+		const log: string[] = [];
+		const cards = { ...defs, ...plainCards(log), "fixture-trap-proof": { ...proof, effects: [proof.effects![0]!, { type: "ignition", operation: (duel: Duel) => (log.push("proof"), duel) }] } satisfies CardDef };
+		let start = position({ defs: cards, you: { monsters: ["fixture-trap-proof"], set: ["trap"] }, rival: { set: [card] } });
+		start = moveCard(start, start.piles.you.spell[0]!, { zone: "spell", face: "down", slot: 4 });
+		// The monster is unaffected by Trap effects: its effects stay applied, and no column is negated.
+		const done = play(start, "activate fixture-trap-proof", `activate ${card} > fixture-trap-proof`, "pass");
+		expect(log).toEqual(["proof"]);
+		expect(done.modifiers.filter((modifier) => typeof modifier.affects === "function")).toEqual([]);
+		log.length = 0;
+		play(done, "activate trap", "pass");
 		expect(log).toEqual(["trap"]);
 	});
 });

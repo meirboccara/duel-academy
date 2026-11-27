@@ -160,6 +160,13 @@ describe("Neo Blue-Eyes Ultimate Dragon, written as effect records", () => {
 	describe("its Quick Effect in the Graveyard", () => {
 		const theirTurn = (you: SideSpec = {}, rival: SideSpec = {}) => position({ defs, turn: "rival", options: { everyWindow: true }, you: { graveyard: [card], monsters: ["fixture-blue-eyes-effect", "fixture-plain-4"], ...you }, rival });
 		const negate = `activate ${card}`;
+		it(`${cites("neo-blue-eyes-ultimate-dragon", "negate")} pays its banish cost under its controller's Ultimate Spirit`, () => {
+			const duel = play(theirTurn({ monsters: ["blue-eyes-ultimate-spirit-dragon"] }, { set: ["fixture-smite"] }), "activate fixture-smite > blue-eyes-ultimate-spirit-dragon");
+			const done = settle(play(duel, negate));
+			expect(find(done, card).zone).toBe("banished");
+			expect(find(done, "blue-eyes-ultimate-spirit-dragon").zone).toBe("monster");
+			expect(codes(done, "rival", "graveyard")).toEqual(["fixture-smite"]);
+		});
 		it(`${cites("neo-blue-eyes-ultimate-dragon", "negate")} ${cites("neo-blue-eyes-ultimate-dragon", "notes-gy-quick")} ${cites("neo-blue-eyes-ultimate-dragon", "notes-gy-target-includes")} when a card or effect is activated that targets a "Blue-Eyes" monster its controller controls, banishes itself from the GY, negates the activation and destroys that card`, () => {
 			const duel = play(theirTurn({}, { set: ["fixture-smite"] }), "activate fixture-smite > fixture-blue-eyes-effect");
 			expect(own(duel, "activate")).toEqual([negate]);

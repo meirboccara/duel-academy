@@ -82,7 +82,10 @@ const modes = (reservesItsOwnZone: boolean): readonly EffectMode[] => [
  * mentions "Blue-Eyes White Dragon", with a different name from the cards you control and in your GY." A Continuous Trap.
  *
  * - Three ways to activate (Konami's notes, OCG): the card alone (no condition), the card with its effect in the same Chain Link (when that
- *   effect's condition is met), and later the Ignition Effect of the face-up card. The two activations are two records; the effect's once
+ *   effect's condition is met), and later the effect of the face-up card. That effect is Spell Speed 2, a Quick Effect in the core: in
+ *   either player's turn, in any phase, in response to other effects (RB10's Spell Speed table puts Continuous Traps' effects at Spell
+ *   Speed 2), but never in the Damage Step (Konami's notes, OCG; it changes no ATK/DEF, so `damageStepAllows` refuses it). YGOProJudge
+ *   gave the same answer (chat of 2026-11-26, citing RB10; graded okay). The two activations are two records; the effect's once
  *   per turn is shared by the second and third (`once.key`), by name, spent at activation. Both modes choose their card when the effect
  *   resolves (no target). Each mode is activated only while it can be done: a "Blue-Eyes White Dragon" that can be Special Summoned in the
  *   hand or GY (zones included); a card in the Deck that can be Set (a free Spell & Trap Zone, the one this card takes counted when it
@@ -115,7 +118,7 @@ export const TRUE_LIGHT: CardDef = {
 			event: (_duel, event, { card }) => event.type === "moved" && event.before.id === card.id && event.before.zone === "spell" && event.before.face === "up" && event.after.zone === "graveyard" && event.negated !== true,
 			operation: (duel, link) => moveCards(duel, duel.piles[link.player].monster, { zone: "graveyard", reason: "destroyed", destruction: effectDestruction(link) }),
 		},
-		{ type: "ignition", range: "field", once: { scope: "name", key: "true-light-effect" }, modes: modes(false) },
+		{ type: "quick", range: "field", once: { scope: "name", key: "true-light-effect" }, modes: modes(false) },
 	],
 };
 
@@ -141,6 +144,9 @@ export const TRUE_LIGHT_SOURCES: CardSources = {
 		{ id: "notes-activation-only", kind: "jp-notes", cid: 16653, url: NOTES, read: "2026-11-24", quote: "■カードの発動のみを行う場合、発動の条件はありません。" },
 		{ id: "notes-activation-with-effect", kind: "jp-notes", cid: 16653, url: NOTES, read: "2026-11-24", quote: "■①の効果の発動の条件を満たしている場合、カードの発動と同じチェーンブロックで①の効果を発動できます。" },
 		{ id: "notes-effect-in-zone", kind: "jp-notes", cid: 16653, url: NOTES, read: "2026-11-24", quote: "■魔法＆罠ゾーンで発動できるチェーンブロックの作られる効果です。" },
+		{ id: "notes-effect-no-damage-step", kind: "jp-notes", cid: 16653, url: NOTES, read: "2026-11-26", quote: "【①の効果について】■魔法＆罠ゾーンで発動できるチェーンブロックの作られる効果です。■ダメージステップ中には発動できません。" },
+		// TCG rulebook v10, Spell Speed table (page read 2026-11-26): the effect of the face-up card is Spell Speed 2.
+		{ id: "rb10-trap-speed-2", kind: "tcg-rule", url: "https://www.yugioh-card.com/en/downloads/rulebook/SD_RuleBook_EN_10.pdf", read: "2026-11-26", quote: "Spell Speed 2 Traps (Normal, Continuous), Quick-Play Spells, Effect Monster's Quick Effects These cards can be used to respond to a Spell Speed 1 or 2 effect, and can typically be activated during any phase." },
 		{ id: "notes-mode", kind: "jp-notes", cid: 16653, url: NOTES, read: "2026-11-24", quote: "■この効果を発動する際に●を１つ選択し、その●の効果として発動します。" },
 		{ id: "notes-summon-no-target", kind: "jp-notes", cid: 16653, url: NOTES, read: "2026-11-24", quote: "処理時に、自分の手札または墓地から「青眼の白龍」１体を選び、そのモンスターを特殊召喚します。（発動時には対象を選択しません。）" },
 		{ id: "notes-continuous", kind: "jp-notes", cid: 16653, url: NOTES, read: "2026-11-24", quote: "■魔法＆罠ゾーンで適用するチェーンブロックの作られない効果です。" },
@@ -156,6 +162,8 @@ export const TRUE_LIGHT_SOURCES: CardSources = {
 		{ source: "notes-activation-only" },
 		{ source: "notes-activation-with-effect" },
 		{ source: "notes-effect-in-zone" },
+		{ source: "notes-effect-no-damage-step" },
+		{ source: "rb10-trap-speed-2" },
 		{ source: "notes-mode" },
 		{ source: "notes-summon-no-target" },
 		{ source: "notes-continuous" },

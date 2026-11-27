@@ -52,7 +52,7 @@ export const DOMINUS_PURGE: CardDef = {
 				// The restriction of the second sentence: applied now, from the hand only, whether or not the negation took.
 				const locked = link.wasSet
 					? negated
-					: addModifier(negated, { affects: () => false, until: FOREVER, layer: { kind: "lock", what: "activate", who: link.player, stops: (_board, { def }) => def.kind === "monster" && LOCKED_ATTRIBUTES.includes(def.facts?.attribute ?? "") } });
+					: addModifier(negated, { affects: () => false, until: FOREVER, layer: { kind: "lock", what: "activate", who: link.player, stops: (_board, { def }) => def.kind === "monster" && LOCKED_ATTRIBUTES.includes(def.facts?.attribute ?? ""), describe: "the effects of DARK, WATER, and FIRE monsters" } });
 				if (!answered || negated === duel || !hasTrapInGraveyard(locked, link.player)) return locked;
 				const now = locked.cards[answered.card.id]!;
 				const there = (now.zone === "monster" || now.zone === "spell" || now.zone === "field" || now.zone === "hand") && now.moves === answered.card.moves;

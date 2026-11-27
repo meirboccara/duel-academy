@@ -1,0 +1,474 @@
+{
+  "setup": {
+    "seed": 2,
+    "you": {
+      "deck": [
+        "ash-blossom-joyous-spring",
+        "ash-blossom-joyous-spring",
+        "ash-blossom-joyous-spring",
+        "lightning-storm",
+        "lightning-storm",
+        "mulcharmy-fuwalos",
+        "mulcharmy-fuwalos",
+        "mulcharmy-fuwalos",
+        "mulcharmy-purulia",
+        "mulcharmy-purulia",
+        "mulcharmy-purulia",
+        "mystical-space-typhoon",
+        "pot-of-sloth",
+        "pot-of-sloth",
+        "radiant-typhoon-vision",
+        "radiant-typhoon-vision",
+        "radiant-typhoon-vision",
+        "raigeki",
+        "raigeki",
+        "raigeki",
+        "sky-striker-ace-raye",
+        "sky-striker-ace-raye",
+        "sky-striker-ace-raye",
+        "sky-striker-ace-roze",
+        "sky-striker-ace-roze",
+        "sky-striker-mecha-shark-cannon",
+        "sky-striker-mecha-widow-anchor",
+        "sky-striker-mobilize-engage",
+        "sky-striker-mobilize-engage",
+        "sky-striker-mobilize-linkage",
+        "sky-striker-mobilize-linkage",
+        "sky-striker-mobilize-linkage",
+        "sky-striker-special-maneuver-lemnisgate",
+        "sky-striker-special-maneuver-lemnisgate",
+        "the-fallen-and-the-virtuous",
+        "the-fallen-and-the-virtuous",
+        "the-fallen-and-the-virtuous",
+        "upstart-goblin",
+        "upstart-goblin",
+        "upstart-goblin"
+      ],
+      "extra": [
+        "ecclesia-and-the-dark-dragon",
+        "prototype-sky-striker-ace-amatsu",
+        "sp-little-knight",
+        "sky-striker-ace-azalea",
+        "sky-striker-ace-hayate",
+        "sky-striker-ace-hayate",
+        "sky-striker-ace-kagari",
+        "sky-striker-ace-kagari",
+        "sky-striker-ace-kagari",
+        "sky-striker-ace-shizuku",
+        "sky-striker-ace-zeke",
+        "sky-striker-ace-zero",
+        "sky-striker-ace-zero",
+        "sky-striker-ace-zero",
+        "the-dragon-that-devours-the-dogma"
+      ]
+    },
+    "rival": {
+      "deck": [
+        "ash-blossom-joyous-spring",
+        "ash-blossom-joyous-spring",
+        "ash-blossom-joyous-spring",
+        "bingo-machine-go",
+        "blue-eyes-white-dragon",
+        "blue-eyes-white-dragon",
+        "blue-eyes-white-dragon-the-white-phantom-beast",
+        "bystial-magnamhut",
+        "deep-eyes-white-dragon",
+        "deep-eyes-white-dragon",
+        "deep-eyes-white-dragon",
+        "dominus-purge",
+        "dominus-purge",
+        "dominus-purge",
+        "droll-lock-bird",
+        "effect-veiler",
+        "effect-veiler",
+        "effect-veiler",
+        "ghost-ogre-snow-rabbit",
+        "ghost-ogre-snow-rabbit",
+        "ghost-ogre-snow-rabbit",
+        "infinite-impermanence",
+        "infinite-impermanence",
+        "infinite-impermanence",
+        "maiden-of-white",
+        "maiden-of-white",
+        "maiden-of-white",
+        "majesty-of-the-white-dragons",
+        "mausoleum-of-white",
+        "pot-of-prosperity",
+        "primite-dragon-ether-beryl",
+        "primite-drillbeam",
+        "primite-lordly-lode",
+        "primite-lordly-lode",
+        "primite-lordly-lode",
+        "roar-of-the-blue-eyed-dragons",
+        "sage-with-eyes-of-blue",
+        "sage-with-eyes-of-blue",
+        "sage-with-eyes-of-blue",
+        "true-light",
+        "wishes-for-eyes-of-blue",
+        "wishes-for-eyes-of-blue",
+        "wishes-for-eyes-of-blue"
+      ],
+      "extra": [
+        "ancient-fairy-life-dragon",
+        "blue-eyes-spirit-dragon",
+        "blue-eyes-spirit-dragon",
+        "blue-eyes-tyrant-dragon",
+        "blue-eyes-ultimate-spirit-dragon",
+        "crimson-dragon",
+        "hieratic-seal-of-the-heavenly-spheres",
+        "hieratic-seal-of-the-heavenly-spheres",
+        "lightstorm-dragon",
+        "neo-blue-eyes-ultimate-dragon",
+        "psychic-end-punisher",
+        "spirit-with-eyes-of-blue",
+        "spirit-with-eyes-of-blue",
+        "stardust-sifr-divine-dragon",
+        "super-starslayer-ty-phon-sky-crisis"
+      ]
+    },
+    "first": "you"
+  },
+  "log": [
+    {
+      "turn": 1,
+      "phase": "draw",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "standby",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 38,
+        "effect": 0,
+        "targets": [],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate upstart-goblin",
+        "rival": "activate upstart-goblin"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 29,
+        "effect": 0,
+        "targets": [],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate sky-striker-mobilize-engage",
+        "rival": "activate sky-striker-mobilize-engage"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "choose",
+        "card": 21
+      },
+      "seen": {
+        "you": "choose sky-striker-ace-raye",
+        "rival": "choose ?"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "summon",
+        "card": 21,
+        "how": "normal",
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "summon sky-striker-ace-raye",
+        "rival": "summon sky-striker-ace-raye"
+      },
+      "passes": [
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 21,
+        "effect": 0,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate sky-striker-ace-raye #1",
+        "rival": "activate sky-striker-ace-raye #1"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "choose",
+        "card": 45
+      },
+      "seen": {
+        "you": "choose sky-striker-ace-hayate",
+        "rival": "choose ?"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "place",
+        "zone": 5,
+        "positions": [
+          "attack"
+        ]
+      },
+      "seen": {
+        "you": "place 5",
+        "rival": "place 5"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "set",
+        "card": 37,
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "set the-fallen-and-the-virtuous",
+        "rival": "set ?"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you",
+        "rival"
+      ]
+    }
+  ],
+  "disputes": [
+    {
+      "at": 20,
+      "turn": 1,
+      "phase": "battle",
+      "by": "rival",
+      "claim": "Turn 1 (the first turn of the duel) went from Main Phase 1 into the battle phase after both players passed. Under TCG rules the player who goes first cannot conduct a Battle Phase on the first turn of the duel; Main Phase 1 should go straight to the End Phase.",
+      "ruling": {
+        "decision": "Upheld: engine defect. On the first turn of the Duel the player who goes first cannot conduct a Battle Phase, and Main Phase 2 follows only a conducted Battle Phase, so turn 1 must go from Main Phase 1 to the End Phase. The engine entered the Battle Phase (Start Step, then Battle Step) on turn 1; it only blocks attack declarations there (battle.ts attackActions), while chain.ts nextPhase always advances main1 to battle. Duel stopped at this point; state not corrected.",
+        "via": "konami",
+        "sources": [
+          "Rulebook v10 (SD_RuleBook_EN_10.pdf) p. 34: \"IMPORTANT: The player who goes first cannot conduct their Battle Phase on their first turn.\"",
+          "Rulebook v10 p. 34 turn flowchart: \"If no battles are conducted\" Main Phase 1 goes to the End Phase",
+          "Rulebook v10 p. 39: \"If you conducted your Battle Phase, your turn moves to Main Phase 2 afterwards.\"",
+          "repo record no-battle-first-turn (src/battle-sources.ts)"
+        ]
+      }
+    }
+  ]
+}

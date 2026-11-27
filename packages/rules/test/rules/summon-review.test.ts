@@ -25,7 +25,8 @@ describe("a monster turned face-down is still the monster an earlier ruling of t
 		let next = flipFaceDown(takeControl(duel, id, "you", duel.turn.number), id);
 		expect(next.cards[id]).toMatchObject({ controller: "you", face: "down" });
 		while (next.turn.phase !== "end") next = play(next, "pass");
-		// The owner chooses the zone it comes back to.
+		// The player who took it gives it back in the End Phase; the owner chooses the zone it comes back to.
+		next = play(next, "apply lv4");
 		if (next.asking) next = act(next, legalActions(next)[0]!);
 		expect(next.cards[id]).toMatchObject({ controller: "rival", zone: "monster", face: "down" });
 	});

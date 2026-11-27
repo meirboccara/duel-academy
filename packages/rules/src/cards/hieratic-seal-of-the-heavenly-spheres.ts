@@ -1,6 +1,6 @@
 import type { CardSources } from "../coverage";
 import { type CardInstance, type Duel, moveCard, type Side } from "../duel";
-import { ask, type CardDef, effectOf, type EffectRecord } from "../effects";
+import { ask, type CardDef, type EffectRecord } from "../effects";
 import { FOREVER, addModifier } from "../modifiers";
 import { askSpecialSummon, canSpecialSummon, tribute } from "../procedures";
 import { konamiCardUrl } from "../sources";
@@ -10,11 +10,21 @@ const NAME = "Hieratic Seal of the Heavenly Spheres";
 
 /**
  * "1 face-up card on the field" that can be returned to the hand when the effect resolves: a face-up monster, Spell or Trap of either field,
- * except a Spell or Trap Card that is a Chain Link activated and still to be sent to the Graveyard after it resolves (a Quick-Play Spell
- * chained: Konami's Q&A fid 21580, OCG only). A Continuous card stays on the field and may be chosen.
+ * except a Spell or Trap Card activated in this Chain and still to be sent to the Graveyard after it (a Quick-Play Spell chained: Konami's
+ * Q&A fid 21580, OCG only), whether its link is still below or already resolved above. It is read from this turn's activations (the card as
+ * activated, unmoved), with the rule `resolveChain` sweeps by: a Continuous card, a Field Spell or an Equip Card equipping a monster stays and
+ * may be chosen. A card of an earlier Chain that is still unmoved stayed on the field for one of those reasons.
  */
 const returnable = (duel: Duel): number[] => {
-	const leaving = new Set(duel.chain.filter((link) => effectOf(duel, link).type === "activation" && effectOf(duel, link).stays !== true && duel.defs[link.card.code]?.kind !== "monster").map((link) => link.card.id));
+	const leaving = new Set(
+		duel.activations
+			.filter(({ card, effect }) => {
+				const now = duel.cards[card.id]!;
+				const record = duel.defs[card.code]?.effects?.[effect];
+				return now.moves === card.moves && now.zone === "spell" && now.face === "up" && now.equippedTo === null && record?.type === "activation" && record.stays !== true && duel.defs[card.code]?.kind !== "monster";
+			})
+			.map(({ card }) => card.id),
+	);
 	return (["you", "rival"] as const).flatMap((side) => [...duel.piles[side].monster, ...duel.piles[side].spell, ...duel.piles[side].field]).filter((id) => duel.cards[id]!.face === "up" && !leaving.has(id));
 };
 
@@ -32,7 +42,8 @@ const summonAtZero = (zone: "graveyard" | "banished"): EffectRecord => ({
 	range: zone,
 	timing: "if",
 	mandatory: true,
-	categories: ["special-summon", "change-atk"],
+	// "From your hand or Deck" includes Special Summoning from the Deck: Ash Blossom answers it (YGOProJudge only, 2026-11-26).
+	categories: ["special-summon", "summon-from-deck", "change-atk"],
 	once: { scope: "name", key: "hieratic-seal-of-the-heavenly-spheres-summon" },
 	event: tributedTo(zone),
 	operation: (duel, link) =>

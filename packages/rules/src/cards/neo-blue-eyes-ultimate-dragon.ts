@@ -4,6 +4,7 @@ import type { CardSources } from "../coverage";
 import { type Duel, effectDestruction, moveCard, moveCards, type Side } from "../duel";
 import type { CardDef } from "../effects";
 import { belongsTo, hasPrintedName } from "../identity";
+import { canBeBanished } from "../modifiers";
 import { konamiCardUrl } from "../sources";
 import { factsOf } from "./helpers";
 
@@ -72,7 +73,7 @@ export const NEO_BLUE_EYES_ULTIMATE_DRAGON: CardDef = {
 			damageStep: true,
 			categories: ["negate", "destroy"],
 			condition: (duel, { player }) => aimsAtBlueEyes(duel, player),
-			cost: (duel, { card }) => moveCard(duel, card.id, { zone: "banished" }),
+			cost: (duel, { card, player }) => (canBeBanished(duel, card.id, player) ? moveCard(duel, card.id, { zone: "banished", player }) : null),
 			operation: (duel, link) => (link.answers === null ? duel : negateActivationAndDestroy(duel, link.answers, effectDestruction(link))),
 		},
 	],

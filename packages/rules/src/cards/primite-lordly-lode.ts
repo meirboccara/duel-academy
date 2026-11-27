@@ -76,7 +76,8 @@ export const PRIMITE_LORDLY_LODE: CardDef = {
 				const locked = addModifier(duel, {
 					affects: () => false,
 					until: duel.turn.number,
-					layer: { kind: "lock", what: "activate", who: link.player, stops: (board, { card }) => card.zone === "monster" && card.specialSummoned && board.defs[card.code]?.kind === "monster" },
+					by: link,
+					layer: { kind: "lock", what: "activate", who: link.player, stops: (board, { card }) => card.zone === "monster" && card.specialSummoned && board.defs[card.code]?.kind === "monster", describe: "the effects of Special Summoned monsters on the field" },
 				});
 				const declared = link.declared?.kind === "name" ? link.declared.value : undefined;
 				const candidates = toSummon(locked, link.player).filter((id) => factsOf(locked, id)?.name === declared);

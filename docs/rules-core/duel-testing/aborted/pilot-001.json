@@ -1,0 +1,958 @@
+{
+  "setup": {
+    "seed": 1,
+    "you": {
+      "deck": [
+        "ash-blossom-joyous-spring",
+        "ash-blossom-joyous-spring",
+        "ash-blossom-joyous-spring",
+        "lightning-storm",
+        "lightning-storm",
+        "mulcharmy-fuwalos",
+        "mulcharmy-fuwalos",
+        "mulcharmy-fuwalos",
+        "mulcharmy-purulia",
+        "mulcharmy-purulia",
+        "mulcharmy-purulia",
+        "mystical-space-typhoon",
+        "pot-of-sloth",
+        "pot-of-sloth",
+        "radiant-typhoon-vision",
+        "radiant-typhoon-vision",
+        "radiant-typhoon-vision",
+        "raigeki",
+        "raigeki",
+        "raigeki",
+        "sky-striker-ace-raye",
+        "sky-striker-ace-raye",
+        "sky-striker-ace-raye",
+        "sky-striker-ace-roze",
+        "sky-striker-ace-roze",
+        "sky-striker-mecha-shark-cannon",
+        "sky-striker-mecha-widow-anchor",
+        "sky-striker-mobilize-engage",
+        "sky-striker-mobilize-engage",
+        "sky-striker-mobilize-linkage",
+        "sky-striker-mobilize-linkage",
+        "sky-striker-mobilize-linkage",
+        "sky-striker-special-maneuver-lemnisgate",
+        "sky-striker-special-maneuver-lemnisgate",
+        "the-fallen-and-the-virtuous",
+        "the-fallen-and-the-virtuous",
+        "the-fallen-and-the-virtuous",
+        "upstart-goblin",
+        "upstart-goblin",
+        "upstart-goblin"
+      ],
+      "extra": [
+        "ecclesia-and-the-dark-dragon",
+        "prototype-sky-striker-ace-amatsu",
+        "sp-little-knight",
+        "sky-striker-ace-azalea",
+        "sky-striker-ace-hayate",
+        "sky-striker-ace-hayate",
+        "sky-striker-ace-kagari",
+        "sky-striker-ace-kagari",
+        "sky-striker-ace-kagari",
+        "sky-striker-ace-shizuku",
+        "sky-striker-ace-zeke",
+        "sky-striker-ace-zero",
+        "sky-striker-ace-zero",
+        "sky-striker-ace-zero",
+        "the-dragon-that-devours-the-dogma"
+      ]
+    },
+    "rival": {
+      "deck": [
+        "ash-blossom-joyous-spring",
+        "ash-blossom-joyous-spring",
+        "ash-blossom-joyous-spring",
+        "bingo-machine-go",
+        "blue-eyes-white-dragon",
+        "blue-eyes-white-dragon",
+        "blue-eyes-white-dragon-the-white-phantom-beast",
+        "bystial-magnamhut",
+        "deep-eyes-white-dragon",
+        "deep-eyes-white-dragon",
+        "deep-eyes-white-dragon",
+        "dominus-purge",
+        "dominus-purge",
+        "dominus-purge",
+        "droll-lock-bird",
+        "effect-veiler",
+        "effect-veiler",
+        "effect-veiler",
+        "ghost-ogre-snow-rabbit",
+        "ghost-ogre-snow-rabbit",
+        "ghost-ogre-snow-rabbit",
+        "infinite-impermanence",
+        "infinite-impermanence",
+        "infinite-impermanence",
+        "maiden-of-white",
+        "maiden-of-white",
+        "maiden-of-white",
+        "majesty-of-the-white-dragons",
+        "mausoleum-of-white",
+        "pot-of-prosperity",
+        "primite-dragon-ether-beryl",
+        "primite-drillbeam",
+        "primite-lordly-lode",
+        "primite-lordly-lode",
+        "primite-lordly-lode",
+        "roar-of-the-blue-eyed-dragons",
+        "sage-with-eyes-of-blue",
+        "sage-with-eyes-of-blue",
+        "sage-with-eyes-of-blue",
+        "true-light",
+        "wishes-for-eyes-of-blue",
+        "wishes-for-eyes-of-blue",
+        "wishes-for-eyes-of-blue"
+      ],
+      "extra": [
+        "ancient-fairy-life-dragon",
+        "blue-eyes-spirit-dragon",
+        "blue-eyes-spirit-dragon",
+        "blue-eyes-tyrant-dragon",
+        "blue-eyes-ultimate-spirit-dragon",
+        "crimson-dragon",
+        "hieratic-seal-of-the-heavenly-spheres",
+        "hieratic-seal-of-the-heavenly-spheres",
+        "lightstorm-dragon",
+        "neo-blue-eyes-ultimate-dragon",
+        "psychic-end-punisher",
+        "spirit-with-eyes-of-blue",
+        "spirit-with-eyes-of-blue",
+        "stardust-sifr-divine-dragon",
+        "super-starslayer-ty-phon-sky-crisis"
+      ]
+    },
+    "first": "you"
+  },
+  "log": [
+    {
+      "turn": 1,
+      "phase": "draw",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 16,
+        "effect": 0,
+        "targets": [],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate radiant-typhoon-vision #1",
+        "rival": "activate radiant-typhoon-vision #1"
+      },
+      "passes": [
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "draw",
+      "side": "you",
+      "action": {
+        "type": "choose",
+        "card": 27
+      },
+      "seen": {
+        "you": "choose sky-striker-mecha-widow-anchor",
+        "rival": "choose sky-striker-mecha-widow-anchor"
+      },
+      "passes": [
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "draw",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "standby",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "summon",
+        "card": 22,
+        "how": "normal",
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "summon sky-striker-ace-raye",
+        "rival": "summon sky-striker-ace-raye"
+      },
+      "passes": [
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 22,
+        "effect": 0,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate sky-striker-ace-raye #1",
+        "rival": "activate sky-striker-ace-raye #1"
+      },
+      "passes": [
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "choose",
+        "card": 47
+      },
+      "seen": {
+        "you": "choose sky-striker-ace-kagari",
+        "rival": "choose ?"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "place",
+        "zone": 5,
+        "positions": [
+          "attack"
+        ]
+      },
+      "seen": {
+        "you": "place 5",
+        "rival": "place 5"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 47,
+        "effect": 0,
+        "targets": [
+          27
+        ]
+      },
+      "seen": {
+        "you": "activate sky-striker-ace-kagari #1 > sky-striker-mecha-widow-anchor",
+        "rival": "activate sky-striker-ace-kagari #1 > sky-striker-mecha-widow-anchor"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 78,
+        "effect": 0,
+        "targets": [
+          47
+        ],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate infinite-impermanence > sky-striker-ace-kagari",
+        "rival": "activate infinite-impermanence > sky-striker-ace-kagari"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 30,
+        "effect": 0,
+        "targets": [],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate sky-striker-mobilize-linkage",
+        "rival": "activate sky-striker-mobilize-linkage"
+      },
+      "passes": [
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "choose",
+        "card": 50
+      },
+      "seen": {
+        "you": "choose sky-striker-ace-shizuku",
+        "rival": "choose ?"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "place",
+        "zone": 5,
+        "positions": [
+          "attack"
+        ]
+      },
+      "seen": {
+        "you": "place 5",
+        "rival": "place 5"
+      }
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 27,
+        "effect": 0,
+        "targets": [
+          50
+        ],
+        "zones": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "activate sky-striker-mecha-widow-anchor > sky-striker-ace-shizuku",
+        "rival": "activate sky-striker-mecha-widow-anchor > sky-striker-ace-shizuku"
+      },
+      "passes": [
+        "rival",
+        "you",
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival",
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "battle",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival",
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "main2",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "end",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 50,
+        "effect": 1,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate sky-striker-ace-shizuku #2",
+        "rival": "activate sky-striker-ace-shizuku #2"
+      },
+      "passes": [
+        "rival",
+        "you",
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 1,
+      "phase": "end",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "rival",
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "draw",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "standby",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 81,
+        "effect": 0,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate maiden-of-white #1",
+        "rival": "activate maiden-of-white #1"
+      },
+      "passes": [
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "place",
+        "zone": 2
+      },
+      "seen": {
+        "you": "place 2",
+        "rival": "place 2"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 95,
+        "effect": 4,
+        "targets": [],
+        "mode": 1
+      },
+      "seen": {
+        "you": "activate true-light #5 :2",
+        "rival": "activate true-light #5 :2"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 96
+      },
+      "seen": {
+        "you": "choose ?",
+        "rival": "choose wishes-for-eyes-of-blue"
+      },
+      "passes": [
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 59,
+        "effect": 0,
+        "targets": [],
+        "zones": [
+          1,
+          3,
+          4
+        ],
+        "zone": 1
+      },
+      "seen": {
+        "you": "activate bingo-machine-go",
+        "rival": "activate bingo-machine-go"
+      },
+      "passes": [
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 61
+      },
+      "seen": {
+        "you": "choose ?",
+        "rival": "choose blue-eyes-white-dragon"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 62
+      },
+      "seen": {
+        "you": "choose ?",
+        "rival": "choose blue-eyes-white-dragon-the-white-phantom-beast"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 91
+      },
+      "seen": {
+        "you": "choose ?",
+        "rival": "choose roar-of-the-blue-eyed-dragons"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 62,
+        "effect": 0,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate blue-eyes-white-dragon-the-white-phantom-beast #1",
+        "rival": "activate blue-eyes-white-dragon-the-white-phantom-beast #1"
+      },
+      "passes": [
+        "you",
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "place",
+        "zone": 2,
+        "positions": [
+          "attack",
+          "defense"
+        ]
+      },
+      "seen": {
+        "you": "place 2",
+        "rival": "place 2"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 62,
+        "effect": 2,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate blue-eyes-white-dragon-the-white-phantom-beast #3",
+        "rival": "activate blue-eyes-white-dragon-the-white-phantom-beast #3"
+      },
+      "passes": [
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "activate",
+        "card": 22,
+        "effect": 1,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate sky-striker-ace-raye #2",
+        "rival": "activate sky-striker-ace-raye #2"
+      },
+      "passes": [
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "place",
+        "zone": 2,
+        "positions": [
+          "attack",
+          "defense"
+        ]
+      },
+      "seen": {
+        "you": "place 2",
+        "rival": "place 2"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "summon",
+        "card": 92,
+        "how": "normal",
+        "zones": [
+          0,
+          1,
+          3,
+          4
+        ],
+        "zone": 0
+      },
+      "seen": {
+        "you": "summon sage-with-eyes-of-blue",
+        "rival": "summon sage-with-eyes-of-blue"
+      },
+      "passes": [
+        "rival",
+        "you"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "activate",
+        "card": 92,
+        "effect": 0,
+        "targets": []
+      },
+      "seen": {
+        "you": "activate sage-with-eyes-of-blue #1",
+        "rival": "activate sage-with-eyes-of-blue #1"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "choose",
+        "card": 71
+      },
+      "seen": {
+        "you": "choose ?",
+        "rival": "choose effect-veiler"
+      },
+      "passes": [
+        "rival"
+      ]
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "you",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    },
+    {
+      "turn": 2,
+      "phase": "main1",
+      "side": "rival",
+      "action": {
+        "type": "pass"
+      },
+      "seen": {
+        "you": "pass",
+        "rival": "pass"
+      }
+    }
+  ],
+  "disputes": [
+    {
+      "at": 12,
+      "turn": 1,
+      "phase": "main1",
+      "by": "you",
+      "claim": "Potential Linkage timing bug: activating Linkage immediately moved Kagari to GY before opponent response and before Linkage resolves. Linkage sends the other controlled card as part of its effect, not activation cost. Chain currently shows Impermanence target following Kagari into GY. No state correction attempted.",
+      "ruling": {
+        "decision": "No error. After Linkage (chain link 3) was activated the rival had no legal response (only pass was legal), so the engine passed for them (act auto-pass, everyWindow off). Linkage then resolved: Kagari, the only card whose sending leaves room for an Ace, was sent by the effect, not as a cost, and the Ace was chosen. Impermanence then had no target (Kagari had left the field) and applied nothing. Kagari link 1 still added Widow Anchor. The chain target arrow following Kagari to the GY is display only. Follow-up: the engine log does not show passes made for a player, which made this look like a skipped response window.",
+        "via": "konami",
+        "sources": [
+          "Sky Striker Mobilize - Linkage! cid 17034 card text (send 1 other card ... and if you do, Special Summon) and notes-only-emz-monster",
+          "Infinite Impermanence cid 13631: Target 1 face-up monster your opponent controls",
+          "test/cards/sky-striker-mobilize-linkage.test.ts auto-pass regression (repo)"
+        ]
+      }
+    },
+    {
+      "at": 14,
+      "turn": 1,
+      "phase": "main1",
+      "by": "you",
+      "claim": "Move offered: activate sky-striker-mecha-widow-anchor > sky-striker-ace-shizuku. Widow Anchor (cid 13733) targets 1 face-up monster your opponent controls. Offering my own Shizuku as target appears illegal. Not taking the move; no state correction.",
+      "ruling": {
+        "decision": "Rejected and withdrawn by the raising player: Widow Anchor may target your own face-up Effect Monster. Its text says Target 1 face-up Effect Monster on the field, without an opponent-control requirement. The accepted activation on Shizuku stands; no undo or state correction.",
+        "via": "konami",
+        "sources": [
+          "https://www.db.yugioh-card.com/yugiohdb/card_search.action?ope=2&cid=13675&request_locale=en",
+          "src/cards/sky-striker-mecha-widow-anchor.ts condition and notes-targets source records"
+        ]
+      }
+    },
+    {
+      "at": 22,
+      "turn": 2,
+      "phase": "main1",
+      "by": "rival",
+      "claim": "Possible error, inferred from visible info only: on T1 the opponent activated Widow Anchor targeting their own Shizuku, which should negate Shizuku's effects until the end of that turn, yet Shizuku's End Phase effect (#2) was offered and activated that same End Phase. A monster whose effects are negated cannot activate its effects. Opponent hand count (3) also suggests the search added nothing. Please check whether the activation should have been offered. No state correction requested by me.",
+      "ruling": {
+        "decision": "No error. Negating a monster's effects does not stop it from activating them: the effect is activated and is negated at resolution if the monster is still face-up in the Monster Zone and still negated. Widow Anchor negated Shizuku's effects until the end of the turn, so Shizuku was still negated in that End Phase. Its End Phase effect (a Trigger Effect activated in the Monster Zone) could be activated and resolved negated: no Spell was added and its once per turn was used (that last point is the engine's reading, no Konami page found). The engine offered and resolved it correctly; no state correction.",
+        "via": "konami",
+        "sources": [
+          "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=8398&request_locale=ja",
+          "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=4&cid=13675&request_locale=ja",
+          "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=4&cid=13669&request_locale=ja",
+          "https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=4&cid=5740&request_locale=ja",
+          "test/cards/sky-striker-ace-shizuku.test.ts negated End Phase regression"
+        ]
+      }
+    }
+  ]
+}

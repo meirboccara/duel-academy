@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { act, cardsIn, type Duel, HIDDEN, legalActions, moveCard, redeal, type Side, viewFor, type Zone } from "../../src";
+import { act, ask, cardsIn, type Duel, HIDDEN, legalActions, moveCard, redeal, revealCards, type Side, viewFor, type Zone } from "../../src";
 import { codes, position, REAL_CARDS } from "../rules/fixtures";
 
 const seen = (duel: Duel, side: Side, zone: Zone) => cardsIn(duel, side, zone).map((card) => card.code);
@@ -12,6 +12,22 @@ const midgame = (): Duel =>
 	});
 
 describe("viewFor: what one player can see", () => {
+	it("choice candidates are not blanket reveals, for either seat; own Deck candidates and explicit reveals are visible only as entitled", () => {
+		for (const viewer of ["you", "rival"] as const) {
+			const other = viewer === "you" ? "rival" : "you";
+			const base = midgame();
+			const banished = moveCard(base, base.piles[other].deck[0]!, { zone: "banished", face: "down" });
+			const ownDeck = banished.piles[viewer].deck[0]!;
+			const hidden = [...banished.piles[other].hand, ...banished.piles[other].deck, ...banished.piles[other].spell, ...banished.piles[other].monster.filter((id) => banished.cards[id]!.face === "down"), ...banished.piles[other].banished];
+			const asked = ask(banished, viewer, [ownDeck, ...hidden], (duel) => duel);
+			const view = viewFor(asked, viewer).duel;
+			expect(view.cards[ownDeck]!.code).toBe(asked.cards[ownDeck]!.code);
+			for (const id of hidden) expect(view.cards[id]!.code).toBe(HIDDEN);
+			expect(viewFor(asked, other).duel.cards[ownDeck]!.code).toBe(HIDDEN);
+			const revealed = revealCards(asked, other, [hidden[0]!]);
+			for (const side of [viewer, other] as const) expect(viewFor(revealed, side).duel.cards[hidden[0]!]!.code).toBe(asked.cards[hidden[0]!]!.code);
+		}
+	});
 	it("hides the opponent's hand and the order and contents of both Decks; keeps its own hand and every public card", () => {
 		const duel = midgame();
 		const view = viewFor(duel, "you");

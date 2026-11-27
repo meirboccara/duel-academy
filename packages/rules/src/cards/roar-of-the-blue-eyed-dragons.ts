@@ -66,7 +66,7 @@ export const ROAR_OF_THE_BLUE_EYED_DRAGONS: CardDef = {
 				const locked = addModifier(duel, {
 					affects: () => false,
 					until: duel.turn.number,
-					layer: { kind: "lock", what: "summon", who: link.player, ways: ["special"], only: (board, card) => card.zone === "extra" && factsOf(board, card.id)?.monsterType !== "Dragon" },
+					layer: { kind: "lock", what: "summon", who: link.player, ways: ["special"], only: (board, card) => card.zone === "extra" && factsOf(board, card.id)?.monsterType !== "Dragon", describe: "from the Extra Deck, except Dragon monsters" },
 				});
 				return ask(locked, link.player, toSummon(locked, link.player), (board, picked) => askSpecialSummonIn(board, link.player, picked, "defense"));
 			},

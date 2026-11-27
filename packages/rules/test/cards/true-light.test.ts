@@ -87,15 +87,39 @@ describe("True Light, written as effect records", () => {
 			const other = board({ set: [card], deck: [card, "fixture-roar"] });
 			expect(own(other, `activate ${card}`)).toEqual([`activate ${card}`, `activate ${card} :1`]);
 		});
-		it(`${cites("true-light", "notes-effect-in-zone")} lets its effect be activated later, from the face-up card in the Spell & Trap Zone, as a Chain Link the opponent can respond to, in the player's own Main Phase`, () => {
+		it(`${cites("true-light", "notes-effect-in-zone")} lets its effect be activated later, from the face-up card in the Spell & Trap Zone, as a Chain Link the opponent can respond to`, () => {
 			const start = board({ faceupSpells: [card], hand: [BEWD] }, { set: ["fixture-effect-negator"] }, { everyWindow: true });
 			expect(own(start, `activate ${card}`)).toEqual([`activate ${card} :0`]);
 			const chained = play(start, `activate ${card} :0`);
 			expect(chained.chain.map((link) => [link.card.code, link.card.zone])).toEqual([[card, "spell"]]);
 			expect(offered(chained)).toEqual(["activate fixture-effect-negator", "pass"]);
-			// Not in the opponent's turn, and not from the Graveyard.
-			expect(own(board({ faceupSpells: [card], hand: [BEWD] }, {}, {}, "rival"), `activate ${card}`)).toEqual([]);
+			// Not from the Graveyard, nor while Set (the card alone is then what is activated).
 			expect(own(board({ graveyard: [card], hand: [BEWD] }), `activate ${card}`)).toEqual([]);
+		});
+		it(`${cites("true-light", "rb10-trap-speed-2")} makes the face-up card's effect Spell Speed 2: in the opponent's turn, in the Battle Phase, and in response to another effect`, () => {
+			// The opponent's Main Phase, with nothing on the chain.
+			const theirs = board({ faceupSpells: [card], hand: [BEWD] }, {}, { everyWindow: true }, "rival");
+			const holder = theirs.priority.holder === "you" ? theirs : play(theirs, "pass");
+			expect(own(holder, `activate ${card}`)).toEqual([`activate ${card} :0`]);
+			expect(codes(play(holder, `activate ${card} :0`, "pass", "pass", "place 0"), "you", "monster")).toEqual([BEWD]);
+			// The Battle Phase, after the opponent declares a direct attack (the Battle Step, not yet the Damage Step).
+			const battle = position({ defs, turn: "rival", phase: "battle", options: { everyWindow: true }, you: { faceupSpells: [card], hand: [BEWD] }, rival: { monsters: ["fixture-other-dragon"] } });
+			const declared = play(battle, "attack fixture-other-dragon directly");
+			expect(declared.battle?.step).toBe("declared");
+			const mine = declared.priority.holder === "you" ? declared : play(declared, "pass");
+			expect(own(mine, `activate ${card}`)).toEqual([`activate ${card} :0`]);
+			// In response to the opponent's effect on the chain (Spell Speed 2 answers Spell Speed 2).
+			const responding = play(board({ faceupSpells: [card], hand: [BEWD] }, { hand: ["fixture-targeter"], monsters: ["fixture-effect-4"] }, { everyWindow: true }, "rival"), "activate fixture-targeter > fixture-effect-4");
+			expect(responding.chain.map((link) => link.card.code)).toEqual(["fixture-targeter"]);
+			expect(own(responding, `activate ${card}`)).toEqual([`activate ${card} :0`]);
+		});
+		it(`${cites("true-light", "notes-effect-no-damage-step")} cannot activate the face-up card's effect during the Damage Step`, () => {
+			const start = position({ defs, turn: "rival", phase: "battle", options: { everyWindow: true }, you: { faceupSpells: [card], hand: [BEWD], monsters: ["fixture-effect-4"] }, rival: { monsters: ["fixture-other-dragon"] } });
+			const inStep = toStep(play(start, "attack fixture-other-dragon > fixture-effect-4"), "start");
+			expect(inStep.battle?.step).toBe("start");
+			const holder = inStep.priority.holder === "you" ? inStep : play(inStep, "pass");
+			expect(holder.battle?.step).toBe("start");
+			expect(own(holder, `activate ${card}`)).toEqual([]);
 		});
 		it(`${cites("true-light", "once")} lets the effect be used once per turn in all, by the activation with the effect or by the face-up card, the card alone not counting`, () => {
 			// The card alone first, then its effect: both allowed in the same turn.

@@ -3,7 +3,7 @@ import type { CardSources } from "../coverage";
 import { destroyCard, type Duel, effectDestruction, moveCard, type Side } from "../duel";
 import { ask, type CardDef, cardTypeOf, effectOf, targetsOf } from "../effects";
 import { belongsTo } from "../identity";
-import { level } from "../modifiers";
+import { canBeBanished, level } from "../modifiers";
 import { askSpecialSummon, canSpecialSummon } from "../procedures";
 import { konamiCardUrl } from "../sources";
 import { factsOf } from "./helpers";
@@ -74,7 +74,7 @@ export const STARDUST_SIFR_DIVINE_DRAGON: CardDef = {
 			range: "graveyard",
 			categories: ["special-summon"],
 			condition: (duel, { player }) => candidates(duel, player).length > 0,
-			cost: (duel, { card }) => moveCard(duel, card.id, { zone: "banished" }),
+			cost: (duel, { card, player }) => (canBeBanished(duel, card.id, player) ? moveCard(duel, card.id, { zone: "banished", player }) : null),
 			target: (duel, { player }) => candidates(duel, player),
 			operation: (duel, link) => {
 				const target = targetsOf(duel, link)[0];

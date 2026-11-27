@@ -9,6 +9,8 @@ import { SECOND_READINESS_SOURCES } from "./second-readiness-sources";
 import { EQUIP_SOURCES } from "./equip-sources";
 import { BLUE_EYES_GAP_SOURCES } from "./blue-eyes-gap-sources";
 import { DAMAGE_STEP_SOURCES } from "./damage-step-sources";
+import { CORE_GAP_SOURCES } from "./core-gap-sources";
+import { SKY_STRIKER_GAP_SOURCES } from "./sky-striker-gap-sources";
 import { konamiCardUrl, type SourceRecord } from "./sources";
 
 /**
@@ -295,6 +297,27 @@ export const RULE_SOURCES: readonly SourceRecord[] = [
 	...NEGATION_SOURCES,
 	...CONTINUOUS_SOURCES,
 	...BATTLE_SOURCES,
+	// RB10 pp. 33 and 35 (read again 2026-11-26): the Duel's lifecycle (`startDuel`, the normal draw in `nextPhase`).
+	{ ...rb10("opening-hand-five", "Finally, draw 5 cards from the top of your Deck; this is your starting hand."), read: "2026-11-26" },
+	{ ...rb10("normal-draw-or-lose", "The player whose turn it is (the “turn player”) draws 1 card from the top of their Deck. A player with no cards left in their Deck and unable to draw loses the Duel."), read: "2026-11-26" },
+	{ ...rb10("no-draw-first-turn", "The player who goes first cannot draw during the Draw Phase of their first turn."), read: "2026-11-26" },
+	// RB10 p. 34, the "Turn Structure" flowchart (PDF text cached 2026-11-23, read 2026-11-26): its arrow from Main Phase 1 to the End
+	// Phase. With record `no-battle-first-turn`, the first player's first turn goes Main Phase 1 -> End Phase (`phaseAfter`, `startDuel` play only).
+	{ ...rb10("no-battles-main1-to-end", "If no battles are conducted"), read: "2026-11-26" },
+	// RB10, "Main Phase 2" (read 2026-11-26): Main Phase 2 follows a Battle Phase only (`phaseAfter`).
+	{ ...rb10("main2-after-battle", "If you conducted your Battle Phase, your turn moves to Main Phase 2 afterwards."), read: "2026-11-26" },
+	// RB10, "End Phase" (PDF text cached 2026-11-23, read 2026-11-26): the hand size limit (`nextPhase`, `startDuel` play only).
+	{ ...rb10("hand-limit-six", "If you have more than 6 cards in your hand at the end of this phase, select and discard cards to the Graveyard until you only have 6 cards in your hand."), read: "2026-11-26" },
+	// A card sent from the hand to the GY by the hand size adjustment (Graff, Malebranche of the Burning Abyss, cid 11318) can activate
+	// its "sent to the GY" Trigger Effect (`nextPhase`: chained in that End Phase, before the turn passes).
+	{ ...qa("hand-discard-trigger-activates", 11318, 22996, "エンドフェイズの手札枚数の調整の際に手札から墓地へ送られた場合でも、その「彼岸の悪鬼 グラバースニッチ」の『③』のモンスター効果を発動する事はできます。"), read: "2026-11-26" },
+	// Scarm, Malebranche of the Burning Abyss (cid 11317, page dated 2020-12-02): sent from the hand to the GY by the End Phase hand size
+	// adjustment, its "add 1 ... from your Deck" effect (its ③, "during the End Phase of the turn this card was sent to the GY") cannot be
+	// activated (`Duel.closing`). The quote is the answer's last sentence, read whole on the official page (2026-11-26). It is about
+	// Scarm's own wording only; that nothing at all starts a chain once the discard's chain has resolved is the core's reading.
+	{ ...qa("hand-adjustment-end-phase-effect-closed", 11317, 17233, "また、同様に、エンドフェイズの手札枚数の調整の際に「彼岸の悪鬼 スカラマリオン」が手札から墓地へ送られた場合、「彼岸の悪鬼 スカラマリオン」の『デッキから「彼岸の悪鬼 スカラマリオン」以外の悪魔族・闇属性・レベル３モンスター１体を手札に加える』効果を発動する事はできません。"), read: "2026-11-26" },
+	...CORE_GAP_SOURCES,
+	...SKY_STRIKER_GAP_SOURCES,
 	...ZONE_SOURCES,
 	...SUMMON_SOURCES,
 	...READINESS_SOURCES,

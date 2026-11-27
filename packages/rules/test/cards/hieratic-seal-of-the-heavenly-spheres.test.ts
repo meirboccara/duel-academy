@@ -66,6 +66,16 @@ const effect = `activate ${card}`;
 const rivalTurn = (you: SideSpec, rival: SideSpec = {}, options = { everyWindow: true }) => mine(board({ extraZone: [card], ...you }, rival, options, "rival"));
 
 describe("Hieratic Seal of the Heavenly Spheres, written as effect records", () => {
+	it(`${cites("ash-blossom-joyous-spring", "text")} answers the Tributed effect, which includes a Summon from the Deck even when only a Dragon in the hand can be chosen (YGOProJudge lead for the hand-only case)`, () => {
+		const start = rivalTurn({ hand: ["fixture-dragon-4"], monsters: ["fixture-plain-2"] }, { hand: ["ash-blossom-joyous-spring"] });
+		// The first chain Tributes the Seal and returns the other monster; its mandatory GY trigger then starts a new chain.
+		const tributed = play(start, `${effect} ~ ${card}`, "pass", "pass");
+		const chained = tributed.priority.holder === "rival" ? tributed : play(tributed, "pass");
+		expect(offered(chained)).toContain("activate ash-blossom-joyous-spring");
+		const stopped = play(chained, "activate ash-blossom-joyous-spring", "pass", "pass");
+		expect(codes(stopped, "you", "monster")).toEqual([]);
+		expect(codes(stopped, "you", "hand")).toEqual(["fixture-dragon-4", "fixture-plain-2"]);
+	});
 	it(`${cites("hieratic-seal-of-the-heavenly-spheres", "facts")} is a LIGHT Dragon Link Effect Monster, Link 2 with its arrows at the bottom left and bottom right, 0 ATK and no DEF, that mentions itself`, () => {
 		const duel = board({ extra: [card] });
 		expect(printedFacts(duel, find(duel, card).id)).toEqual({
@@ -155,6 +165,12 @@ describe("Hieratic Seal of the Heavenly Spheres, written as effect records", () 
 			const withContinuous = board({ extraZone: [card], hand: ["fixture-plain-1"] }, { hand: ["fixture-continuous"] }, { everyWindow: true }, "rival");
 			const link1 = play(withContinuous, "activate fixture-continuous");
 			expect(offered(play(link1, `${effect} ~ fixture-plain-1`, "pass", "pass"))).toEqual([`choose ${card}`, "choose fixture-continuous"].sort());
+		});
+		it(`${cites("hieratic-seal-of-the-heavenly-spheres", "qa-quick-play-chain")} cannot return a Quick-Play Spell whose higher Chain Link already resolved`, () => {
+			const start = board({ extraZone: [card], hand: ["fixture-plain-1"] }, { set: ["fixture-noop-quick"] }, { everyWindow: true }, "rival");
+			const done = play(start, "pass", `${effect} ~ fixture-plain-1`, "activate fixture-noop-quick", "pass", "pass");
+			expect(find(done, card)).toMatchObject({ zone: "extra", face: "down" });
+			expect(find(done, "fixture-noop-quick").zone).toBe("graveyard");
 		});
 		it(`${cites("hieratic-seal-of-the-heavenly-spheres", "notes-no-damage-step")} cannot be activated in the Damage Step`, () => {
 			const start = board({ extraZone: [card], monsters: ["fixture-plain-1"], hand: ["fixture-plain-2"] }, { monsters: ["fixture-giant"] }, { everyWindow: true }, "rival");

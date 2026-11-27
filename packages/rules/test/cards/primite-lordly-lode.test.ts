@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addModifier, atk, CARD_DEFS, type CardDef, cites, type Duel, specialSummon, printedFacts } from "../../src";
 import { nextTurn as passUntil } from "../rules/continuous-fixtures";
-import { codes, offered, play, position, type SideSpec } from "../rules/fixtures";
+import { codes, lastingLines, offered, play, position, type SideSpec } from "../rules/fixtures";
 import { blueEyesFixtures } from "./blue-eyes-fixtures";
 import { primiteFixtures } from "./primite-fixtures";
 
@@ -87,6 +87,8 @@ describe("Primite Lordly Lode, written as effect records", () => {
 			expect(own(locked, "activate fixture-spell-breaker")).toContain(`activate fixture-spell-breaker > ${card}`);
 			// It ends with the turn.
 			expect(own(toMain(locked, 2), "activate fixture-ignition-monster")).toHaveLength(2);
+			// The line names the card it comes from.
+			expect(lastingLines(locked)).toEqual([`you cannot activate the effects of Special Summoned monsters on the field (${card}), until the end of turn ${locked.turn.number}`]);
 		});
 		it(`${cites("primite-lordly-lode", "notes-lock-already")} can be activated in a turn when the effect of a Special Summoned monster has already been activated`, () => {
 			const summoned = (() => {

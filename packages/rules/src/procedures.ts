@@ -1,9 +1,9 @@
 import type { ProcedureWay } from "./action";
 import { type CardInstance, closedPriority, type Duel, freeSlots, isOnField, materialsOf, moveCard, moveCards, type Position, type Side, type Summoning, type SummonKind } from "./duel";
 import { shuffleDecksOf } from "./deck";
-import { ask, askPlace, askZone, type CardDef, cardTypeOf, type MaterialCheck, type MaterialContext, type MaterialCount, type MaterialSlot, type Procedure } from "./effects";
+import { ask, askPlace, askZone, type CardDef, cardTypeOf, type MaterialCheck, type MaterialContext, type MaterialCount, type MaterialKind, type MaterialSlot, type Procedure } from "./effects";
 import { breakEffect, raiseEvent } from "./events";
-import { level, summonLocked, summonTogetherLocked } from "./modifiers";
+import { type EffectSource, level, summonLocked, summonTogetherLocked } from "./modifiers";
 import { beginSummon, landSummon } from "./summon";
 import { triggerPoint } from "./triggers";
 import { pendulumZones, summonZones } from "./zones";
@@ -213,7 +213,8 @@ function procedureSpec(duel: Duel, player: Side, card: CardInstance, own = true)
 	const procedure = def?.procedure;
 	if (!def || !procedure || procedure.kind === "ritual" || (procedure.kind === "fusion" && !procedure.contact && !(own && procedure.alternatives?.length))) return null;
 	const ctx = { player, summoned: card };
-	const mine = duel.piles[player].monster;
+	// A monster that "cannot be used as [Link] Material" is never among the cards to choose from (`CardDef.cannotBeMaterial`).
+	const mine = usableAs(duel, duel.piles[player].monster, procedure.kind);
 	const faceUp = mine.filter((id) => duel.cards[id]!.face === "up");
 	// A Fusion, Synchro or Xyz Monster goes to any free Main Monster Zone (2021 update): with one free now, no set of materials can leave it without a zone.
 	// (Not a Link Monster, nor a Pendulum Monster face-up on the Extra Deck: those need an Extra Monster Zone or a linked zone.)
@@ -236,6 +237,17 @@ function procedureSpec(duel: Duel, player: Side, card: CardInstance, own = true)
 			// The printed Fusion Materials are an action only for a contact Fusion; the other ways printed on the card always are.
 			return { ctx, pool: mine, recipes: open.filter((recipe) => (recipe.how === undefined ? procedure.contact !== undefined : own)), valid: zone };
 	}
+}
+
+/**
+ * The cards of `ids` that may be used as material for a Summon of this kind: not those whose card says "cannot be used as [Link]
+ * Material" (`CardDef.cannotBeMaterial`). That line is not an effect: it is read from the card itself, whatever is applied to it, so
+ * it holds while the card's effects are negated (Konami's Japanese notes on Sky Striker Ace = Zero, OCG only: records
+ * `cannot-be-link-material-not-an-effect`, `cannot-be-link-material-while-negated`).
+ */
+function usableAs(duel: Duel, ids: readonly number[], kind: MaterialKind): readonly number[] {
+	const barred = (id: number): boolean => duel.defs[duel.cards[id]!.code]?.cannotBeMaterial?.includes(kind) === true;
+	return ids.some(barred) ? ids.filter((id) => !barred(id)) : ids;
 }
 
 /** The way a recipe of a Fusion Monster is performed as an action: its other way's own (`how`), or the contact Fusion. */
@@ -304,13 +316,17 @@ export function startProcedure(duel: Duel, player: Side, id: number, position: P
 	return askMaterials(duel, player, spec, (board, ids) => {
 		const recipe = existsSet(board, spec, ids, true);
 		return askZone(board, player, zonesAfter(board, player, id, ids), (placed, zone) => {
+			const materials = asTheyAre(placed, ids);
 			const used = useMaterials(placed, id, procedure, ids, recipe);
 			// "If you do, ...": what this way of Summoning leaves behind, from the moment the materials are used.
 			const after = recipe?.ifYouDo ? recipe.ifYouDo(used, spec.ctx) : used;
-			return beginSummon(after, player, id, "special", zone, { position, kind: kindOf(procedure), proper: true });
+			return beginSummon(after, player, id, "special", zone, { position, kind: kindOf(procedure), proper: true, materials });
 		});
 	});
 }
+
+/** The materials of a Summon as they are now, before they are used: what the Summoned monster remembers (`CardInstance.summonMaterials`). */
+const asTheyAre = (duel: Duel, ids: readonly number[]): CardInstance[] => ids.map((id) => duel.cards[id]!);
 
 /** RB10: a Level 5 or 6 monster needs 1 Tribute, a Level 7 or higher monster 2. */
 export const tributesNeeded = (monsterLevel: number): number => (monsterLevel <= 4 ? 0 : monsterLevel <= 6 ? 1 : 2);
@@ -330,8 +346,10 @@ export function canTribute(duel: Duel, player: Side, card: CardInstance, count: 
 /**
  * Tributing: the monsters are sent to the Graveyard, and are not "destroyed" (RB10). Every Tribute goes through here (a Tribute Summon
  * or Set, a Ritual Summon, a Fusion Monster's "by Tributing" way). `usedFor`: the Tributes are also the materials of that Summon.
+ * `effect`: the Tribute is done by this effect's processing ("Tribute 1 monster your opponent controls" as an effect, not a cost):
+ * a monster unaffected by it is not Tributed, and the move says which effect did it (`moved.effect`).
  */
-export const tribute = (duel: Duel, ids: readonly number[], usedFor?: SummonKind): Duel => moveCards(duel, ids, { zone: "graveyard", reason: "tributed", ...(usedFor ? { usedFor } : {}) });
+export const tribute = (duel: Duel, ids: readonly number[], usedFor?: SummonKind, effect?: EffectSource): Duel => moveCards(duel, ids, { zone: "graveyard", reason: "tributed", ...(usedFor ? { usedFor } : {}), ...(effect ? { effect } : {}) });
 
 /**
  * A Tribute Summon, or a Tribute Set (`set`): the Tributes are chosen, then the zone (a Tribute frees its own); the Tributes are
@@ -341,8 +359,9 @@ export function startTribute(duel: Duel, player: Side, id: number, count: number
 	const spec = tributeSpec(duel, player, duel.cards[id]!, count);
 	return askMaterials(duel, player, spec, (board, ids) =>
 		askZone(board, player, freeSlots(without(board, ids), player, "monster"), (placed, zone) => {
+			const materials = asTheyAre(placed, ids);
 			const paid = tribute(placed, ids);
-			return set ? setMonster(paid, id, zone) : beginSummon(paid, player, id, "normal", zone, { kind: "tribute", extra });
+			return set ? setMonster(paid, id, zone) : beginSummon(paid, player, id, "normal", zone, { kind: "tribute", extra, materials });
 		}),
 	);
 }
@@ -480,12 +499,12 @@ function summonable(duel: Duel, player: Side, id: number, kind?: SummonKind): bo
  * `kind`: the effect performs that Summon ("Fusion Summon", "Ritual Summon"): the monster is then properly Summoned. Nothing happens
  * when the monster cannot be Summoned (`canSpecialSummon`) or the zone is not one it may go to.
  */
-export function specialSummon(duel: Duel, player: Side, id: number, options: { slot?: number; position?: Position; kind?: SummonKind } = {}): Duel {
+export function specialSummon(duel: Duel, player: Side, id: number, options: { slot?: number; position?: Position; kind?: SummonKind; materials?: readonly CardInstance[] } = {}): Duel {
 	if (!canSpecialSummon(duel, player, id, options.kind)) return duel;
 	const zones = summonZones(duel, player, id);
 	const slot = options.slot ?? zones[0]!;
 	if (!zones.includes(slot)) return duel;
-	const summoning: Summoning = { player, cards: [id], how: "special", negated: false, slots: [slot], positions: [isLink(duel, duel.cards[id]!) ? "attack" : (options.position ?? "attack")], ...(options.kind ? { kind: options.kind, proper: isOwnKind(duel.defs[duel.cards[id]!.code], options.kind) } : {}) };
+	const summoning: Summoning = { player, cards: [id], how: "special", negated: false, slots: [slot], positions: [isLink(duel, duel.cards[id]!) ? "attack" : (options.position ?? "attack")], ...(options.kind ? { kind: options.kind, proper: isOwnKind(duel.defs[duel.cards[id]!.code], options.kind) } : {}), ...(options.materials && options.materials.length > 0 ? { materials: options.materials } : {}) };
 	return landSummon(duel, summoning, "effect");
 }
 
@@ -493,12 +512,12 @@ export function specialSummon(duel: Duel, player: Side, id: number, options: { s
  * As `specialSummon`, the player choosing the zone (among `zones`, or every zone the monster may go to) and the battle position
  * (RB10). `then` continues once the monster is on the field; it is not run when the monster could not be Summoned.
  */
-export function askSpecialSummon(duel: Duel, player: Side, id: number, options: { zones?: readonly number[]; kind?: SummonKind; then?: (duel: Duel) => Duel } = {}): Duel {
+export function askSpecialSummon(duel: Duel, player: Side, id: number, options: { zones?: readonly number[]; kind?: SummonKind; materials?: readonly CardInstance[]; then?: (duel: Duel) => Duel } = {}): Duel {
 	if (!canSpecialSummon(duel, player, id, options.kind)) return duel;
 	const legal = summonZones(duel, player, id);
 	const zones = options.zones ? options.zones.filter((zone) => legal.includes(zone)) : legal;
 	return askPlace(duel, player, zones, summonPositions(duel, id), (board, zone, position) => {
-		const done = specialSummon(board, player, id, { slot: zone, position, kind: options.kind });
+		const done = specialSummon(board, player, id, { slot: zone, position, kind: options.kind, materials: options.materials });
 		return options.then && done !== board ? options.then(done) : done;
 	});
 }
@@ -601,7 +620,7 @@ export interface FusionOptions {
 }
 
 function fusionSpec(duel: Duel, player: Side, card: CardInstance, options: FusionOptions): MaterialSpec {
-	const pool = options.pool(duel, player).filter((id) => id !== card.id && isMonsterNow(duel, id));
+	const pool = usableAs(duel, options.pool(duel, player), "fusion").filter((id) => id !== card.id && isMonsterNow(duel, id));
 	// A Fusion Summon uses the printed Fusion Materials: the card's other ways of being Special Summoned (step 11) are not Fusion Summons.
 	const all = recipesOf(duel.defs[card.code]!);
 	const printed = all.length > 1 ? all.filter((recipe) => recipe.how === undefined) : all;
@@ -630,8 +649,9 @@ export function fusionSummon(duel: Duel, player: Side, options: FusionOptions): 
 	return ask(duel, player, fusable(duel, player, options), (board, picked) =>
 		askMaterials(board, player, fusionSpec(board, player, board.cards[picked]!, options), (chosen, ids) => {
 			const to = options.to ?? "graveyard";
+			const materials = asTheyAre(chosen, ids);
 			const sent = to === "deck" ? shuffleDecksOf(moveCards(chosen, ids, { zone: "deck" }), ids) : moveCards(chosen, ids, { zone: to, reason: "material", usedFor: "fusion" });
-			return askSpecialSummon(sent, player, picked, { kind: "fusion" });
+			return askSpecialSummon(sent, player, picked, { kind: "fusion", materials });
 		}),
 	);
 }
@@ -692,8 +712,9 @@ export function ritualSummon(duel: Duel, player: Side, options: RitualOptions): 
 	return ask(duel, player, ritualCandidates(duel, player, options), (board, picked) =>
 		askMaterials(board, player, ritualSpec(board, player, board.cards[picked]!, options), (chosen, ids) => {
 			const buried = ids.filter((id) => chosen.cards[id]!.zone === "graveyard");
+			const materials = asTheyAre(chosen, ids);
 			const tributed = tribute(chosen, ids.filter((id) => !buried.includes(id)));
-			return askSpecialSummon(moveCards(tributed, buried, { zone: "banished", player }), player, picked, { kind: "ritual" });
+			return askSpecialSummon(moveCards(tributed, buried, { zone: "banished", player }), player, picked, { kind: "ritual", materials });
 		}),
 	);
 }
@@ -734,16 +755,16 @@ export function summonByEffect(duel: Duel, index: number, player: Side, id: numb
 			(board, ids) => {
 				const recipe = existsSet(board, spec, ids, true);
 				return askPlace(board, player, zonesAfter(board, player, id, ids), summonPositions(board, id), (placed, zone, position) =>
-					attempt(useMaterials(placed, id, procedure, ids, recipe), { player, cards: [id], how: "special", negated: false, slots: [zone], positions: [position], kind: kindOf(procedure), proper: true }),
+					attempt(useMaterials(placed, id, procedure, ids, recipe), { player, cards: [id], how: "special", negated: false, slots: [zone], positions: [position], kind: kindOf(procedure), proper: true, materials: asTheyAre(placed, ids) }),
 				);
 			},
 			using,
 		);
 	}
 	const count = tributesNeeded(factsOf(duel, card)!.level!);
-	const normal = (board: Duel, zone: number): Summoning => ({ player, cards: [id], how: "normal", negated: false, slots: [zone], ...(count > 0 ? { kind: "tribute" as const } : {}) });
+	const normal = (board: Duel, zone: number, tributes: readonly number[] = NO_IDS): Summoning => ({ player, cards: [id], how: "normal", negated: false, slots: [zone], ...(count > 0 ? { kind: "tribute" as const, materials: asTheyAre(board, tributes) } : {}) });
 	if (count === 0) return askZone(duel, player, freeSlots(duel, player, "monster"), (placed, zone) => attempt(placed, normal(placed, zone)));
-	return askMaterials(duel, player, tributeSpec(duel, player, card, count), (board, ids) => askZone(board, player, freeSlots(without(board, ids), player, "monster"), (placed, zone) => attempt(tribute(placed, ids), normal(placed, zone))));
+	return askMaterials(duel, player, tributeSpec(duel, player, card, count), (board, ids) => askZone(board, player, freeSlots(without(board, ids), player, "monster"), (placed, zone) => attempt(tribute(placed, ids), normal(placed, zone, ids))));
 }
 
 /** The Pendulum Scales of the player's two Pendulum Zones, low then high; `null` unless both zones hold a Pendulum Monster. */

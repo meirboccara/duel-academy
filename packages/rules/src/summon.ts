@@ -1,4 +1,4 @@
-import { type CardInstance, closedPriority, destroyCard, type Destruction, type Duel, moveCardHeld, occupant, type Position, type Side, type Summoning, type SummonKind, type Zone } from "./duel";
+import { type CardInstance, closedPriority, destroyCard, type Destruction, type Duel, moveCardHeld, NO_MATERIALS, occupant, type Position, type Side, type Summoning, type SummonKind, type Zone } from "./duel";
 import { breakEffect, dropWhen, type GameEvent, raiseEvent } from "./events";
 import { triggerPoint } from "./triggers";
 import { summonZones } from "./zones";
@@ -20,6 +20,8 @@ export interface SummonAttempt {
 	readonly proper?: boolean;
 	/** A Normal Summon made "in addition to your Normal Summon/Set": it uses the turn's additional Normal Summon, not the Normal Summon/Set. */
 	readonly extra?: boolean;
+	/** The materials or Tributes used, each as it was before it was used (`Summoning.materials`). */
+	readonly materials?: readonly CardInstance[];
 }
 
 /**
@@ -39,6 +41,7 @@ export function beginSummon(duel: Duel, player: Side, id: number, how: "normal" 
 		...(attempt.position === undefined ? {} : { positions: [attempt.position] }),
 		...(attempt.kind === undefined ? {} : { kind: attempt.kind }),
 		...(attempt.proper ? { proper: true } : {}),
+		...(attempt.materials && attempt.materials.length > 0 ? { materials: attempt.materials } : {}),
 	};
 	const usesTurnSummon = how === "normal" && !attempt.extra;
 	return { ...next, summoning, normalSummoned: usesTurnSummon ? true : next.normalSummoned, extraNormalSummoned: attempt.extra ? true : next.extraNormalSummoned, priority: closedPriority(duel.turn.player) };
@@ -74,12 +77,14 @@ export function landSummon(duel: Duel, summoning: Summoning, by?: "effect"): Due
 	/** What each monster's arrival raises once all are in place: the events of its move, then (`summoned`) its Summon, with the card as it is then. */
 	const arrivals: Arrival[] = [];
 	for (const [i, id] of summoning.cards.entries()) {
-		const kind = { ...(summoning.kind === undefined ? {} : { kind: summoning.kind }), ...(by ? { by } : {}), player: summoning.player, from: next.cards[id]!.zone, batch };
+		const from = next.cards[id]!.zone;
+		const materials = summoning.materials && summoning.materials.length > 0 ? summoning.materials : undefined;
+		const kind = { ...(summoning.kind === undefined ? {} : { kind: summoning.kind }), ...(by ? { by } : {}), player: summoning.player, from, batch, ...(materials ? { materials } : {}) };
 		if (summoning.how === "flip") {
 			// A monster that left, or was turned face-up, during the window is no longer Flip Summoned.
 			if (next.cards[id]!.zone !== "monster" || next.cards[id]!.face !== "down") continue;
 			const turned = moveCardHeld(next, id, { zone: "monster", face: "up", position: "attack" });
-			next = turned.duel;
+			next = mark(turned.duel, id, { summonedTurn: turned.duel.turn.number });
 			arrivals.push({ id, moved: turned.events, flipped: true, summoned: { type: "summoned", how: "flip", player: summoning.player, from: "monster", batch } });
 			continue;
 		}
@@ -97,11 +102,12 @@ export function landSummon(duel: Duel, summoning: Summoning, by?: "effect"): Due
 		}
 		const placed = moveCardHeld(next, id, { zone: "monster", face: "up", controller: summoning.player, slot, position: summoning.positions?.[i] ?? "attack" });
 		const own = typeof summoning.proper === "object" ? summoning.proper[i] === true : summoning.proper === true;
-		next = mark(placed.duel, id, { proper: placed.duel.cards[id]!.proper || own, summonedBy: summoning.kind ?? null, specialSummoned: summoning.how === "special" });
+		// The monster as Summoned: by which procedure and with which materials, from where (a Special Summon), and in which turn.
+		next = mark(placed.duel, id, { proper: placed.duel.cards[id]!.proper || own, summonedBy: summoning.kind ?? null, specialSummoned: summoning.how === "special", summonedFrom: summoning.how === "special" ? from : null, summonedTurn: placed.duel.turn.number, summonMaterials: materials ?? NO_MATERIALS });
 		arrivals.push({ id, moved: placed.events, summoned: { type: "summoned", how: summoning.how, ...kind } });
 	}
 	// The turn notes each Summon that succeeded (`summonedCount`): who, how, from where.
-	const notes = arrivals.flatMap((arrival) => (arrival.summoned ? [{ turn: next.turn.number, player: summoning.player, how: arrival.summoned.how, from: arrival.summoned.from ?? "hand" }] : []));
+	const notes = arrivals.flatMap((arrival) => (arrival.summoned ? [{ turn: next.turn.number, player: summoning.player, how: arrival.summoned.how, from: arrival.summoned.from ?? "hand", code: next.cards[arrival.id]!.code }] : []));
 	if (notes.length > 0) next = { ...next, summons: [...next.summons, ...notes] };
 	// Every monster is in place: now each one's events, in the order of the group.
 	for (const arrival of arrivals) {

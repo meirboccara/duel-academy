@@ -27,16 +27,26 @@ export interface View {
 }
 
 /**
- * Cards the viewer knows whatever their place: the cards of the chain (activated, so revealed), the cards it is being asked to choose
- * from, and the cards revealed to both players that are still where they were revealed (`revealCards`).
+ * Cards the viewer knows whatever their place: activated chain cards, its own Deck's choice candidates, and cards deliberately revealed
+ * to both players that are still where they were revealed (`revealCards`). Being a choice candidate is not by itself a reveal.
  */
 function knownAnyway(duel: Duel, viewer: Side): Set<number> {
 	const known = new Set<number>(revealedNow(duel));
 	for (const link of duel.chain) known.add(link.card.id);
+	// A monster being Summoned is shown to both players while the Summon is attempted (it is still in the hand, or face-down for a Flip Summon).
+	for (const id of duel.summoning?.cards ?? []) known.add(id);
 	if (duel.asking) {
 		for (const link of duel.asking.links) known.add(link.card.id);
 		// A zone question and a declaration list options, not cards: their numbers are not card ids.
-		if (duel.asking.player === viewer && !duel.asking.zones && !duel.asking.declarations) for (const id of duel.asking.from) known.add(id);
+		if (duel.asking.player === viewer && !duel.asking.zones && !duel.asking.declarations) {
+			// What the chooser is entitled to see among the candidates: cards of its own Deck (a search; no one else sees a Deck). A
+			// candidate hidden from it for any other reason (a face-down card of the opponent on the field, banished or in the Extra
+			// Deck, a card of the opponent's hand or Deck) stays hidden: a choice names it by where it is, never by what it is.
+			for (const id of duel.asking.from) {
+				const card = duel.cards[id];
+				if (card && card.zone === "deck" && card.owner === viewer) known.add(id);
+			}
+		}
 	}
 	return known;
 }
@@ -60,7 +70,8 @@ export function viewFor(duel: Duel, side: Side): View {
 		pool.main.sort();
 		pool.extra.sort();
 	}
-	const masked: Duel = { ...duel, cards, rng: NO_RNG };
+	// The story of the last action (`Duel.story`) carries cards as they were, hidden ones too: a view keeps none of it.
+	const masked: Duel = { ...duel, cards, rng: NO_RNG, story: [] };
 	return { side, duel: withSnapshots(masked, (snapshot) => (cards[snapshot.id]!.code === HIDDEN ? { ...snapshot, code: HIDDEN } : snapshot)), unknown: pools };
 }
 

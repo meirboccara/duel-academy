@@ -1,7 +1,7 @@
 import type { CardDef, Declaration, Operation, SpellSpeed } from "./effects";
-import { type GameEvent, raiseEvent, type Waiting } from "./events";
+import { type GameEvent, raiseEvent, type StoryEntry, type Waiting } from "./events";
 import { NOTHING_USED, type Used } from "./once";
-import { banishLocked, type EffectSource, leavesFieldTo, locked, type Modifier, spareDestruction, unaffectedBy } from "./modifiers";
+import { banishLocked, type EffectSource, graveyardRedirect, leavesFieldTo, locked, type Modifier, spareDestruction, unaffectedBy } from "./modifiers";
 import type { Delayed, Watch } from "./delayed";
 import type { Building } from "./triggers";
 import { createRng } from "./rng";
@@ -69,13 +69,58 @@ export interface CardInstance {
 	readonly summonedBy: SummonKind | null;
 	/** It is on the field by a Special Summon ("Special Summoned monsters"); kept while it stays on the field, `false` elsewhere. */
 	readonly specialSummoned: boolean;
+	/**
+	 * Where it was Special Summoned from ("a monster Special Summoned from the Extra Deck"): the zone it came from in its last Special
+	 * Summon, `null` otherwise. Kept while it stays face-up in the Monster Zone (a change of control keeps it); lost when it is turned
+	 * face-down, also once face-up again, though it is still a Special Summoned monster (`specialSummoned`), and when it leaves the
+	 * field. A monster that was temporarily banished and came back has it again (`banishTemporarily`, src/temporary.ts). Konami's
+	 * Japanese Q&A fid 16743 (OCG only; records `from-extra-deck-lost-face-down`, `from-extra-deck-kept-through-temporary-banishment`).
+	 */
+	readonly summonedFrom: Zone | null;
+	/**
+	 * The number of the turn in which it was Summoned (Normal, Flip or Special), while it has stayed face-up in the Monster Zone since;
+	 * 0 otherwise. What "during the End Phase, if this card was Special Summoned this turn" reads (with `specialSummoned`): a change
+	 * of control keeps it (Konami's Japanese Q&A fid 11555), a monster that left the field, was temporarily banished or was turned
+	 * face-down is a new card with none (fid 24032, record `summoned-this-turn-needs-face-up-since`; OCG only).
+	 */
+	readonly summonedTurn: number;
+	/**
+	 * The number of the turn in which it was sent to the Graveyard, while it has stayed there since; 0 elsewhere. What "if this card
+	 * is in the GY because it was sent there this turn" reads (`sentTurn === duel.turn.number`). Any move to the Graveyard counts (from
+	 * the field, the hand or the Deck, also during the End Phase), except a card placed there by a rule (`MoveTo.placed`: not "sent",
+	 * Konami's Japanese Q&A fid 24001) and one banished instead (it is not in the GY). Konami's Japanese notes on The Dragon that Devours
+	 * the Dogma (OCG only; record `sent-this-turn-stayed-in-graveyard`): sent to the GY and still there at that turn's End Phase.
+	 */
+	readonly sentTurn: number;
+	/**
+	 * The materials of its last Summon by a procedure (a Synchro, Xyz, Link, Fusion or Ritual Summon, a Tribute Summon's Tributes), each
+	 * as it was just before it was used ("if this card was Link Summoned using a Link Monster as material"). Kept and lost as
+	 * `summonedBy`; empty otherwise. The `summoned` event carries the same list (`materials`).
+	 */
+	readonly summonMaterials: readonly CardInstance[];
 }
+
+/** No materials: shared by every card that was not Summoned with any. */
+export const NO_MATERIALS: readonly CardInstance[] = Object.freeze([]);
 
 export type Position = "attack" | "defense";
 
 /** Step 2 only tells a Main Phase from the others; steps inside the Battle Phase come later. */
 export type Phase = "draw" | "standby" | "main1" | "battle" | "main2" | "end";
 export const PHASES: readonly Phase[] = ["draw", "standby", "main1", "battle", "main2", "end"];
+
+/**
+ * The phase the turn moves on to after the current one, or `null` after the End Phase (the next turn). In `startDuel` play
+ * (`normalDraws`), the player who goes first has no Battle Phase on the Duel's first turn, so Main Phase 1 goes straight to the End
+ * Phase: no Battle Phase, its steps or triggers, and no Main Phase 2 (RB10, records `no-battle-first-turn`, `no-battles-main1-to-end`,
+ * `main2-after-battle`). `createDuel` fixtures keep the full order, as they keep any hand size.
+ */
+export function phaseAfter(duel: Pick<Duel, "turn" | "normalDraws">): Phase | null {
+	const { phase, number } = duel.turn;
+	if (phase === "main1" && number === 1 && duel.normalDraws) return "end";
+	const at = PHASES.indexOf(phase);
+	return at < PHASES.length - 1 ? PHASES[at + 1]! : null;
+}
 
 /**
  * One activation on the chain (step 2 of docs/rules-core-spec.md). Link 1 is `chain[0]`; the last link is the top.
@@ -123,6 +168,13 @@ export interface Link {
 	 * operation, and the effect that replaced it. Everything else of the link stands (its player, cost, once-per-turn use, targets).
 	 */
 	readonly replaced?: { readonly operation: Operation; readonly by: EffectSource };
+	/**
+	 * The ATK and DEF of the monster that activated this effect, read when it was activated, before its cost: only for a monster
+	 * face-up in the Monster Zone then ("when a monster your opponent controls with 2000 or more ATK activates its effect"). A monster
+	 * that left the field as its own cost is judged by these (Konami's Japanese Q&A fid 24164, OCG only: record
+	 * `activating-monster-atk-before-cost`). Absent for any other activation.
+	 */
+	readonly stats?: { readonly atk: number; readonly def: number };
 }
 
 /**
@@ -163,9 +215,12 @@ export interface Duel {
 	readonly live: readonly GameEvent[];
 	/**
 	 * Step 6: the `added-to-hand` events of the chain that has just resolved, which an effect marked `lingers` may still answer (Droll & Lock Bird: Konami's
-	 * notes say it can be activated after the chain in which the card was added). Cleared by the next break or activation.
+	 * notes say it can be activated after the chain in which the card was added). Cleared by the next break outside a chain or activation.
+	 * While the chain resolves, it holds those set aside by a break inside it (a link's "then"), which `resolveChain` carries to the end.
 	 */
 	readonly lingering: readonly GameEvent[];
+	/** What happened during the last `act`, in order, for the seat log only (`StoryEntry`, src/events.ts): no rule reads it. */
+	readonly story: readonly StoryEntry[];
 	/** Trigger effects whose condition was met and which wait for the next trigger point. */
 	readonly waiting: readonly Waiting[];
 	/** While trigger effects are being put on a chain: whose choice it is is in `priority.holder`. */
@@ -222,8 +277,29 @@ export interface Duel {
 	readonly activations: readonly Activation[];
 	/** The players who drew a card by a card effect this turn (`drawCards`, `drewByEffect` in src/deck.ts). */
 	readonly drewByEffect: readonly Side[];
+	/** `startDuel` play: the turn player normally draws in each Draw Phase after turn 1, and discards down to 6 cards at the end of their End Phase. `createDuel` fixtures do neither. */
+	readonly normalDraws: boolean;
+	/**
+	 * The End Phase is closing: the turn player's hand size discard has been made this turn (RB10 "End Phase", record `hand-limit-six`).
+	 * What follows is only the chain of the Trigger Effects that discard set off, with the answers to it (record
+	 * `hand-discard-trigger-activates`), and the hand checked again; nothing starts a new chain once it has resolved, and no "during the
+	 * End Phase" effect can be activated any more (record `hand-adjustment-end-phase-effect-closed`). Off again as the next turn begins.
+	 */
+	readonly closing: boolean;
 	/** The Summons that succeeded this turn and during the turn before, in order (`summonedCount`, src/summon.ts). */
 	readonly summons: readonly SummonNote[];
+	/**
+	 * The Battle Phase's step while no attack is in progress (RB10: Start Step, Battle Step, End Step; the Damage Step is `battle`):
+	 * `start` as the phase begins, `battle` once both players passed in it (attacks are declared there only), `end` once the turn player
+	 * ends their attacks, then Main Phase 2. `null` outside the Battle Phase. A Duel put in the Battle Phase without it (a fixture) is
+	 * read as in its Battle Step.
+	 */
+	readonly battleStep: BattleStep | null;
+	/**
+	 * How many cards that were sent to the Graveyard ("send", not a discard, a Tribute or a material) have been banished instead since
+	 * the Duel began (`graveyardRedirect`, src/modifiers.ts). A cost that raises it was not paid: what `payCost` reads (src/activation.ts).
+	 */
+	readonly sentInstead: number;
 	/** How many groups of simultaneous moves (`moveCards`) have happened: the last one's number tags its events. */
 	readonly batches: number;
 	/** What each card code does, as effect records (src/effects.ts): shared by reference, never copied, never changed. */
@@ -239,13 +315,17 @@ export interface Activation {
 	readonly negated?: true;
 }
 
-/** One Summon that succeeded: in which turn, who Summoned, how, and where the monster came from. Kept for that turn and the next. */
+/** One Summon that succeeded: in which turn, who Summoned, how, where the monster came from, and which card (its code). Kept for that turn and the next. */
 export interface SummonNote {
 	readonly turn: number;
 	readonly player: Side;
 	readonly how: "normal" | "flip" | "special";
 	readonly from: Zone;
+	readonly code?: string;
 }
+
+/** The steps of the Battle Phase outside an attack (RB10): see `Duel.battleStep`. */
+export type BattleStep = "start" | "battle" | "end";
 
 /** A card as it was: its id and its `moves` then. It is still that card while its `moves` has not changed. */
 export interface CardRef {
@@ -308,6 +388,8 @@ export interface Summoning {
 	 * finished resolving (Konami's Japanese Q&A 24054, record `summon-by-effect-chain-link-1`).
 	 */
 	readonly pending?: boolean;
+	/** The materials (or Tributes) used for this Summon, each as it was before it was used: what the monster remembers (`CardInstance.summonMaterials`). */
+	readonly materials?: readonly CardInstance[];
 	/** A negator took: the Summon will not succeed. */
 	readonly negated: boolean;
 }
@@ -337,6 +419,8 @@ export interface Asking {
 	 * `declare` action naming one of them.
 	 */
 	readonly declarations?: readonly Declaration[];
+	/** Display only: a "you can" question (`askMay`): choosing the one card accepts the optional part, `pass` declines it. */
+	readonly may?: true;
 }
 
 export interface DeckSetup {
@@ -396,7 +480,10 @@ const emptyPiles = (): Record<Zone, number[]> => Object.fromEntries(ZONES.map((z
 
 export const isOnField = (zone: Zone) => ON_FIELD.has(zone);
 
-/** A new duel: both Decks shuffled, turn 1, Draw Phase, the game state open. Nothing is drawn yet. */
+/**
+ * Low-level fixture constructor: shuffled Decks, no opening hands or automatic normal draws.
+ * Use `startDuel` for playable games. Kept separate so small, positioned rule fixtures stay unchanged.
+ */
 export function createDuel(setup: DuelSetup): Duel {
 	const rng = createRng(setup.seed);
 	const cards: Record<number, CardInstance> = {};
@@ -406,7 +493,7 @@ export function createDuel(setup: DuelSetup): Duel {
 		for (const zone of ["deck", "extra"] as const) {
 			for (const code of setup[side][zone] ?? []) {
 				const id = nextId++;
-				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0, position: "attack", slot: null, equippedTo: null, attachedTo: null, arrived: 0, fieldEntries: 0, proper: false, summonedBy: null, specialSummoned: false };
+				cards[id] = { id, code, owner: side, controller: side, zone, face: "down", moves: 0, extraDeck: zone === "extra", since: 0, position: "attack", slot: null, equippedTo: null, attachedTo: null, arrived: 0, fieldEntries: 0, proper: false, summonedBy: null, specialSummoned: false, summonedFrom: null, summonedTurn: 0, sentTurn: 0, summonMaterials: NO_MATERIALS };
 				piles[side][zone].push(id);
 			}
 		}
@@ -432,6 +519,7 @@ export function createDuel(setup: DuelSetup): Duel {
 		options,
 		live: [],
 		lingering: [],
+		story: [],
 		waiting: [],
 		building: null,
 		used: NOTHING_USED,
@@ -455,10 +543,32 @@ export function createDuel(setup: DuelSetup): Duel {
 		spared: [],
 		activations: [],
 		drewByEffect: [],
+		normalDraws: false,
+		closing: false,
 		summons: [],
+		battleStep: null,
+		sentInstead: 0,
 		batches: 0,
 		defs: setup.defs ?? {},
 	};
+}
+
+/**
+ * Starts play with five cards from each shuffled Main Deck (RB10 p. 33). Preparation is before the Duel:
+ * opening hands raise no in-Duel events or effects. The first Draw Phase has no normal draw (RB10 p. 35).
+ * Requires enough cards to prepare; this is not a tournament deck-list validator.
+ */
+export function startDuel(setup: DuelSetup): Duel {
+	if (setup.you.deck.length < 5 || setup.rival.deck.length < 5) throw new RangeError("starting a Duel requires at least five cards in each Main Deck");
+	const duel = createDuel(setup);
+	const cards = { ...duel.cards };
+	const piles = { ...duel.piles };
+	for (const side of ["you", "rival"] as const) {
+		const hand = duel.piles[side].deck.slice(0, 5);
+		piles[side] = { ...duel.piles[side], hand, deck: duel.piles[side].deck.slice(5) };
+		for (const id of hand) cards[id] = { ...cards[id]!, zone: "hand", moves: 1 };
+	}
+	return { ...duel, cards, piles, normalDraws: true };
 }
 
 /** The cards in a player's pile, in order (the top of the Deck first). */
@@ -508,7 +618,12 @@ export const effectDestruction = (link: Link): Destruction => ({ cause: "effect"
 /** Attribute a destruction paid at activation; this is not destruction by a card effect. */
 export const costDestruction = (ctx: { readonly card: CardInstance; readonly player: Side }): Destruction => ({ cause: "cost", source: ctx.card, player: ctx.player });
 
-export type MoveReason = "destroyed" | "tributed" | "material";
+/**
+ * `discarded`: a card discarded from the hand ("discard"). It matters under an effect that banishes the cards sent to the Graveyard
+ * instead: a discard cost is still paid there, a cost that "sends" a card to the GY is not (Konami's Japanese Q&A fid 23815, case A,
+ * and fid 14540, OCG only). A cost worded "discard ... to the GY" needs the card to reach the GY: write it as a send (no reason).
+ */
+export type MoveReason = "destroyed" | "tributed" | "material" | "discarded";
 /**
  * `effect`: the move is done by this card effect (pass the resolving link): a card that is unaffected by it does not move (src/modifiers.ts).
  * A cost, a Summon procedure or a rule of the game passes none, and is never stopped by a protection.
@@ -517,7 +632,12 @@ export type MoveReason = "destroyed" | "tributed" | "material";
  * from a Graveyard reads it today ("your opponent cannot banish cards from your GY"): one that names neither an effect nor a player
  * is stopped by such a lock (`banishLocked`, src/modifiers.ts).
  */
-type MoveTo = { destruction?: Destruction; effect?: EffectSource; player?: Side; zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: MoveReason; usedFor?: SummonKind; by?: "battle"; position?: Position; slot?: number; attachedTo?: number; equippedTo?: number };
+/**
+ * `placed`: the card is placed in the Graveyard by a rule of the game, which is not "sent to the GY" (a temporarily banished monster
+ * that cannot come back: Konami's Japanese Q&A fids 24001 and 24029, OCG only). The card moves and no `moved` event is raised, so no
+ * condition about a card sent to the Graveyard is met; an effect that banishes the cards sent to the GY instead does not replace it.
+ */
+type MoveTo = { destruction?: Destruction; effect?: EffectSource; player?: Side; placed?: true; zone: Zone; face?: Face; at?: "top" | "bottom"; controller?: Side; negated?: true; reason?: MoveReason; usedFor?: SummonKind; by?: "battle"; position?: Position; slot?: number; attachedTo?: number; equippedTo?: number };
 
 /**
  * Destroys a card: it goes to the Graveyard and the move says it was destroyed (`moved.reason`), which "when destroyed" triggers
@@ -568,9 +688,9 @@ function move(duel: Duel, id: number, to: MoveTo, batch: number | undefined, hel
  * whole group it belongs to is in place (the monsters of one Summon, src/summon.ts), so that what answers them at once (a watch)
  * reads the board with every card of the group on it.
  */
-export function moveCardHeld(duel: Duel, id: number, to: MoveTo): { readonly duel: Duel; readonly events: readonly GameEvent[] } {
+export function moveCardHeld(duel: Duel, id: number, to: MoveTo, batch?: number): { readonly duel: Duel; readonly events: readonly GameEvent[] } {
 	const events: GameEvent[] = [];
-	return { duel: move(duel, id, to, undefined, events), events };
+	return { duel: move(duel, id, to, batch, events), events };
 }
 
 /**
@@ -591,7 +711,8 @@ function stays(duel: Duel, id: number, to: MoveTo): Duel | null {
 /** Moves the card for real (see `moveCard`): nothing stops it any more. `held`: its events are put there instead of being raised. */
 function relocate(duel: Duel, id: number, to: MoveTo, batch: number | undefined, held?: GameEvent[]): Duel {
 	const before = instance(duel, id);
-	const raise = (board: Duel, event: GameEvent): Duel => (held ? (held.push(event), board) : raiseEvent(board, event));
+	// A card placed by a rule (`placed`) raises nothing: it was not sent anywhere.
+	const raise = (board: Duel, event: GameEvent): Duel => (to.placed ? board : held ? (held.push(event), board) : raiseEvent(board, event));
 	if (to.controller !== undefined && !isOnField(to.zone)) throw new Error("a controller can be chosen only on the field");
 	// RB10: a Pendulum Monster Card on the field that would be sent to the Graveyard is placed face-up on its owner's Extra Deck instead.
 	// A card whose activation was negated was never on the field (record `negated-card-not-from-field`): it goes to the Graveyard.
@@ -600,9 +721,14 @@ function relocate(duel: Duel, id: number, to: MoveTo, batch: number | undefined,
 	// "Banish it when it leaves the field" (`banishWhenItLeaves`): leaving the field for the Graveyard, the hand, the Deck or the Extra
 	// Deck, the card is banished instead, face-up. Becoming an Xyz Material is not replaced (see `banishWhenItLeaves`).
 	const banishedInstead = isOnField(before.zone) && !isOnField(sentTo) && sentTo !== "banished" && sentTo !== "material" && leavesFieldTo(duel, before) === "banished";
-	const zone = banishedInstead ? "banished" : sentTo;
+	// "Any card sent to the GY is banished instead" (`graveyardRedirect`): a card on its way to the Graveyard, from anywhere, is banished
+	// (face-up unless the effect says face-down). A Pendulum Monster leaving the field goes to the Extra Deck, not the Graveyard: untouched.
+	const redirected = !banishedInstead && sentTo === "graveyard" && !to.placed ? graveyardRedirect(duel, before) : null;
+	const zone = banishedInstead || redirected ? "banished" : sentTo;
 	const controller = isOnField(zone) ? (to.controller ?? before.controller) : before.owner;
-	const face = pendulumOut || banishedInstead ? "up" : (to.face ?? (FACE_DOWN_BY_DEFAULT.has(zone) ? "down" : "up"));
+	const face = pendulumOut || banishedInstead ? "up" : redirected ?? (to.face ?? (FACE_DOWN_BY_DEFAULT.has(zone) ? "down" : "up"));
+	// A card "sent" to the Graveyard and banished instead (not a discard, a Tribute or a material): a cost doing this was not paid.
+	if (redirected && to.reason !== "discarded" && to.reason !== "tributed" && to.reason !== "material") duel = { ...duel, sentInstead: duel.sentInstead + 1 };
 	const flippedDown = isOnField(zone) && before.face === "up" && face === "down";
 	const renewed = zone !== before.zone || controller !== before.controller || flippedDown;
 	// A card that comes face-up on the field starts to apply its continuous effects now (a move in the same zone, face-up, does not restart them).
@@ -631,6 +757,12 @@ function relocate(duel: Duel, id: number, to: MoveTo, batch: number | undefined,
 		summonedBy: forgets ? null : before.summonedBy,
 		// Only a monster in a Monster Zone is a "Special Summoned monster": not one that became an Equip Card (step 11; YGOProJudge only).
 		specialSummoned: zone === "monster" && isOnField(before.zone) ? before.specialSummoned : false,
+		// "Special Summoned from the Extra Deck", and "Summoned this turn": only while it stays face-up in the Monster Zone.
+		summonedFrom: zone === "monster" && before.zone === "monster" && !flippedDown ? before.summonedFrom : null,
+		summonedTurn: zone === "monster" && before.zone === "monster" && !flippedDown ? before.summonedTurn : 0,
+		// "Sent to the GY this turn": a card that stays in the Graveyard keeps it; one placed there by a rule was not sent (fid 24001).
+		sentTurn: zone !== "graveyard" ? 0 : before.zone === "graveyard" ? before.sentTurn : to.placed ? 0 : duel.turn.number,
+		summonMaterials: forgets ? NO_MATERIALS : before.summonMaterials,
 		moves: before.moves + (renewed ? 1 : 0),
 		since: cameUp ? duel.clock + 1 : before.since,
 	};
@@ -645,7 +777,10 @@ function relocate(duel: Duel, id: number, to: MoveTo, batch: number | undefined,
 	const over = (modifier: Modifier): boolean => modifier.layer.kind === "leaves" && typeof modifier.affects !== "function" && modifier.affects.card === id && modifier.affects.moves === before.moves;
 	const current = stamped.modifiers.length > 0 && stamped.modifiers.some(over) ? { ...stamped, modifiers: stamped.modifiers.filter((modifier) => !over(modifier)) } : stamped;
 	const moved = flippedDown && zone === before.zone && controller === before.controller ? keptThroughFlip(current, before.id, before.moves, after.moves) : current;
-	const raised = raise(moved, { type: "moved", before, after, batch, ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}), ...(to.usedFor ? { usedFor: to.usedFor } : {}), ...(to.by ? { by: to.by } : {}), ...(to.reason === "destroyed" ? { destruction: to.destruction! } : {}) });
+	// The effect whose processing does the move (`moved.effect`): the one named, or the one that destroys. Not a monster an effect
+	// uses as the material of a Summon (Konami's Japanese Q&A fid 23445: it did not leave "by the opponent's effect").
+	const cause = to.reason === "material" || to.usedFor ? undefined : (to.effect ?? (to.destruction?.cause === "effect" ? { card: to.destruction.source, player: to.destruction.player, effect: to.destruction.effect } : undefined));
+	const raised = raise(moved, { type: "moved", before, after, batch, ...(cause ? { effect: { card: cause.card, player: cause.player, ...(cause.effect === undefined ? {} : { effect: cause.effect }) } } : {}), ...(to.negated ? { negated: true as const } : {}), ...(to.reason ? { reason: to.reason } : {}), ...(to.usedFor ? { usedFor: to.usedFor } : {}), ...(to.by ? { by: to.by } : {}), ...(to.reason === "destroyed" ? { destruction: to.destruction! } : {}) });
 	const added = zone === "hand" && before.zone !== "hand" ? raise(raised, { type: "added-to-hand", card: after, from: before.zone, ...(batch === undefined ? {} : { batch }) }) : raised;
 	// RB10: if the equipped monster is destroyed, flipped face-down or removed from the field, its Equip Cards are destroyed.
 	const unequipped = before.zone === "monster" && before.face === "up" && (zone !== "monster" || face === "down");
@@ -732,6 +867,25 @@ export function changeControl(duel: Duel, id: number, side: Side, slot?: number)
 	const previousField = before.zone === "field" ? occupant(duel, side, "field", 0) : null;
 	if (previousField) duel = move(duel, previousField.id, { zone: "graveyard" }, undefined);
 	const after = { ...before, controller: side, slot: placedSlot, moves: before.moves + 1, since: before.face === "up" ? duel.clock + 1 : before.since };
-	const placed = place(duel, before, after, "top");
+	const placed = follow(place(duel, before, after, "top"), before, after);
 	return raiseEvent(before.face === "up" ? { ...placed, clock: placed.clock + 1 } : placed, { type: "moved", before, after });
+}
+
+/**
+ * A change of control on the field: the Trigger Effects of the card that were waiting for the next trigger point are still its
+ * effects, now its new controller's to activate. Konami's Japanese Q&A fid 24016 (OCG only; record
+ * `summon-trigger-controller-after-chain`): a monster Link Summoned in a chain and taken by a lower link of it: the player who
+ * controls it once the chain has resolved activates its "if Link Summoned" effect. The page is about that effect; the core applies
+ * it to every waiting Trigger Effect of the card (an inference), whose condition was met for the controller it had then.
+ */
+function follow(duel: Duel, before: CardInstance, after: CardInstance): Duel {
+	const its = (waiting: Waiting): boolean => waiting.card.id === before.id && waiting.card.moves === before.moves;
+	const followed = duel.waiting.some(its) ? { ...duel, waiting: duel.waiting.map((waiting) => (its(waiting) ? { ...waiting, card: after } : waiting)) } : duel;
+	// A negation of the card's effects ("negate its effects until the end of this turn") stands while the monster changes hands: it
+	// is still negated for the player who takes it, and once it is given back, until the negation's own end ("negate ..., then take
+	// control of it until the End Phase": Sky Striker Mecha - Widow Anchor). YGOProJudge only (asked 2026-11-26, no source cited); no
+	// Konami page read settles it. Only a negation follows: the other lasting modifiers of the card as it was (an ATK change) still
+	// end with the change of control, as before (the core's reading, no page read).
+	const negation = (modifier: Modifier): boolean => modifier.layer.kind === "negate" && typeof modifier.affects !== "function" && modifier.affects.card === before.id && modifier.affects.moves === before.moves;
+	return followed.modifiers.some(negation) ? { ...followed, modifiers: followed.modifiers.map((modifier) => (negation(modifier) ? { ...modifier, affects: { card: after.id, moves: after.moves } } : modifier)) } : followed;
 }

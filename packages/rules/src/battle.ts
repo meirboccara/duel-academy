@@ -3,7 +3,7 @@ import { type AttackMade, type Battle, type CardInstance, type CardRef, closedPr
 import { type CardDef, type EffectRecord } from "./effects";
 import { breakEffect, raiseEvent } from "./events";
 import { damageFor, loseLp } from "./life";
-import { atk, type AttackAllowance, attackAllowances, attackLocked, def, spareDestruction } from "./modifiers";
+import { atk, type AttackAllowance, attackAllowances, attackLocked, attackTargetLocked, def, directAttackRestricted, spareDestruction } from "./modifiers";
 import { triggerPoint } from "./triggers";
 
 /**
@@ -84,9 +84,12 @@ const inAttackingPosition = (card: CardInstance, allowances: readonly AttackAllo
  * (YGOProJudge only, asked 2026-11-24, no source cited).
  */
 function attackOptions(duel: Duel, card: CardInstance, allowances: readonly AttackAllowance[], prior: readonly AttackMade[], current: AttackMade | null, again: boolean): AttackOptions | null {
-	const defenders = duel.piles[other(card.controller)].monster;
-	// "Cannot attack directly" (a lock) closes the direct attack only.
-	const directOpen = (defenders.length === 0 || allows(allowances, "directly")) && !attackLocked(duel, card, true);
+	const opposing = duel.piles[other(card.controller)].monster;
+	// Restrictions on attack targets (the `attack-target` lock): the monsters that cannot be selected are not offered. They still count
+	// as monsters the opponent controls: no direct attack without a permission (RB10; Konami's Japanese Q&A fid 13862, OCG only).
+	const defenders = opposing.length === 0 ? opposing : opposing.filter((id) => !attackTargetLocked(duel, card.controller, duel.cards[id]!));
+	// "Cannot attack directly" (a lock) closes the direct attack only; "can only target ... for attacks" closes it too (fid 23993, case B).
+	const directOpen = (opposing.length === 0 || allows(allowances, "directly")) && !attackLocked(duel, card, true) && !directAttackRestricted(duel, card.controller);
 	if (prior.length === 0 || again) return defenders.length > 0 || directOpen ? { monsters: defenders, direct: directOpen } : null;
 	const wentDirect = prior.some((made) => made.direct) || current?.direct === true;
 	let monsters: readonly number[] = NO_MONSTERS;
@@ -132,6 +135,8 @@ function declarable(duel: Duel, card: CardInstance): AttackOptions | null {
 export function attackActions(duel: Duel, out: Action[] | null): boolean {
 	const { turn, priority } = duel;
 	if (turn.phase !== "battle" || duel.battle || duel.chain.length > 0 || !priority.open || priority.holder !== turn.player || duel.summoning) return false;
+	// RB10: attacks are declared in the Battle Step, not in the Start Step or the End Step (`Duel.battleStep`; none: a fixture's Battle Step).
+	if (duel.battleStep !== null && duel.battleStep !== "battle") return false;
 	// RB10: the player who goes first cannot conduct their Battle Phase on their first turn (record `no-battle-first-turn`).
 	if (turn.number === 1) return false;
 	let found = false;
@@ -212,7 +217,11 @@ export function advanceBattle(duel: Duel): Duel {
 			// asked 2026-11-24, no source cited).
 			const pathClosed = battle.target === null && ((defenders.length > 0 && !allows(allowances, "directly")) || attackLocked(duel, attacker, true));
 			// RB10 (records `replay-causes`, `replay`): the target removed, or a new monster on the opponent's side, before the Damage
-			// Step. The turn player may attack with the same monster again, with another, or not at all.
+			// Step. The turn player may attack with the same monster again, with another, or not at all. A restriction on attack targets
+			// ("cannot be targeted for attacks") that begins to apply after the declaration is not a cause: it restricts the selection of
+			// a target, not one already selected, so the attack goes on to damage calculation, and does not become direct (Konami's
+			// Japanese Q&A fid 10015, OCG only: record `target-lock-after-declaration`). Open: a `closesDirect` restriction that begins
+			// during a direct attack does not replay it either; no Konami page found, YGOProJudge's lead (a replay) not applied (README).
 			if (targetGone || newcomer || pathClosed) return backToBattleStep(duel, battle.attacker);
 			return enter(duel, "start");
 		}

@@ -52,11 +52,25 @@ const STEP = /^(.*?)(?: @(\d+))?(?: as (attack|defense))?$/;
  * `null` when no legal action has that name or the zone or position asked for is not open.
  */
 export function findNamed(duel: Duel, step: string): Action | null {
+	return pickNamed(
+		legalActions(duel).map((action) => ({ name: actionName(duel, action), action })),
+		step,
+	);
+}
+
+/** An action with the name it is given (by `actionName`, or by a player from their own view: src/match.ts). */
+export interface NamedAction {
+	readonly name: string;
+	readonly action: Action;
+}
+
+/** The action of `named` that a step names, with the zone and position it asks for, as `findNamed` does. */
+export function pickNamed(named: readonly NamedAction[], step: string): Action | null {
 	const [, name, zoneText, position] = STEP.exec(step.trim())!;
 	// Several actions can share a name (two copies of a card): the first that can take the zone and position asked for.
-	for (const listed of legalActions(duel)) {
-		if (actionName(duel, listed) !== name) continue;
-		const found = withChoices(listed, zoneText === undefined ? undefined : Number(zoneText), position as Position | undefined);
+	for (const listed of named) {
+		if (listed.name !== name) continue;
+		const found = withChoices(listed.action, zoneText === undefined ? undefined : Number(zoneText), position as Position | undefined);
 		if (found) return found;
 	}
 	return null;

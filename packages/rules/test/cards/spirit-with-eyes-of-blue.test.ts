@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addModifier, CARD_DEFS, type CardDef, cites, type Duel, flipFaceDown, flipFaceUp, FOREVER, isNegated, moveCard, printedFacts } from "../../src";
-import { codes, offered, play, position, type SideSpec } from "../rules/fixtures";
+import { codes, lastingLines, offered, play, position, type SideSpec } from "../rules/fixtures";
 import { blueEyesFixtures } from "./blue-eyes-fixtures";
 import { extraDeckFixtures } from "./extra-deck-fixtures";
 
@@ -67,6 +67,11 @@ describe("Spirit with Eyes of Blue, written as effect records", () => {
 			// Not the opponent: the restriction is "You cannot".
 			const theirs = position({ defs, turn: "rival", you: { monsters: [card] }, rival: { monsters: materials, extra: ["fixture-synchro-warrior-8"] } });
 			expect(specials(theirs)).toEqual(["special-summon fixture-synchro-warrior-8"]);
+		});
+		it(`${cites("spirit-with-eyes-of-blue", "lock")} says in the card's words what its Continuous Effect stops (a continuous effect is not on the board's lasting list, so its layer is put there as a lasting one)`, () => {
+			const duel = onField({ monsters: [card] });
+			const layer = defs[card]!.effects!.find((record) => record.type === "continuous")!.modifies!(duel, find(duel, card))[0]!;
+			expect(lastingLines(addModifier(duel, { affects: () => false, until: 3, layer })).join("\n")).toContain("you cannot Special Summon except Dragon monsters");
 		});
 		it(`${cites("spirit-with-eyes-of-blue", "lock")} stops when the card leaves the field or its effects are negated, and does not stop Normal Summons`, () => {
 			const duel = onField({ hand: ["fixture-warrior-4"], monsters: [card, "fixture-tuner-3", "fixture-plain-5"], extra: ["fixture-synchro-warrior-8"] });

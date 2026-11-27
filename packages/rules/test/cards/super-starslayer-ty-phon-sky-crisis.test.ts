@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { attach, CARD_DEFS, type CardDef, canSpecialSummon, cites, type Duel, moveCard, printedFacts, specialSummon } from "../../src";
+import { addModifier, attach, CARD_DEFS, type CardDef, canSpecialSummon, cites, type Duel, moveCard, printedFacts, specialSummon } from "../../src";
 import { battleCards } from "../rules/battle-fixtures";
 import { gapCards } from "../rules/blue-eyes-gap-fixtures";
-import { codes, offered, play, position, type SideSpec } from "../rules/fixtures";
+import { codes, lastingLines, offered, play, position, type SideSpec } from "../rules/fixtures";
 import { blueEyesExtraFixtures, settle } from "./blue-eyes-extra-fixtures";
 import { blueEyesFixtures } from "./blue-eyes-fixtures";
 import { extraDeckFixtures } from "./extra-deck-fixtures";
@@ -139,6 +139,11 @@ describe("Super Starslayer TY-PHON - Sky Crisis, written as effect records", () 
 			const theirTurn = { ...theirs, turn: { ...theirs.turn, player: "rival" as const }, priority: { holder: "rival" as const, passed: [], open: true } };
 			expect(activations(theirTurn)).toEqual(["activate fixture-weak-quick"]);
 			expect(theirTurn.turn.player).toBe("rival");
+		});
+		it(`${cites("super-starslayer-ty-phon-sky-crisis", "lock")} says in the card's words what its Continuous Effect stops (a continuous effect is not on the board's lasting list, so its layer is put there as a lasting one)`, () => {
+			const duel = duelWith(true);
+			const layer = defs[card]!.effects!.find((record) => record.type === "continuous")!.modifies!(duel, find(duel, card))[0]!;
+			expect(lastingLines(addModifier(duel, { affects: () => false, until: 3, layer })).join("\n")).toContain("both players cannot activate the effects of monsters with 3000 or more ATK");
 		});
 		it(`${cites("super-starslayer-ty-phon-sky-crisis", "notes-lock-both")} stops a monster that is unaffected by monster effects as well, and does not stop a Spell or Trap Card`, () => {
 			const you: SideSpec = { monsters: ["fixture-strong-immune"], hand: ["fixture-normal-spell"] };

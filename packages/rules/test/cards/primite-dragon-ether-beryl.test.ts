@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ask, askSpecialSummon, CARD_DEFS, type CardDef, cites, type Duel, printedFacts } from "../../src";
+import { ask, askSpecialSummon, CARD_DEFS, type CardDef, cites, type Duel, moveCard, printedFacts } from "../../src";
 import { nextTurn, toPhase } from "../rules/continuous-fixtures";
 import { codes, offered, play, position, type SideSpec } from "../rules/fixtures";
 import { blueEyesFixtures } from "./blue-eyes-fixtures";
@@ -107,6 +107,15 @@ describe("Primite Dragon Ether Beryl, written as effect records", () => {
 			expect(rivalStandby.turn.player).toBe("rival");
 			expect(own(rivalStandby, `activate ${card}`)).toEqual([]);
 			expect(own(nextStandby(board({ hand: [card], graveyard: [NORMAL] })), `activate ${card}`)).toEqual([]);
+		});
+		it(`${cites("primite-dragon-ether-beryl", "retrieve")} can also be activated later in that Standby Phase, once a Normal Monster reached the GY there (YGOProJudge only, asked 2026-11-26, no source cited)`, () => {
+			const start = nextStandby(grave({ deck: [NORMAL] }));
+			expect([start.turn.phase, own(start, `activate ${card}`)]).toEqual(["standby", []]);
+			// A Normal Monster is sent from the Deck to the GY during the Standby Phase (a move standing for a resolved effect).
+			const id = start.piles.you.deck.find((entry) => start.cards[entry]!.code === NORMAL)!;
+			const later = moveCard(start, id, { zone: "graveyard" });
+			expect(own(later, `activate ${card}`)).toEqual([`activate ${card}`]);
+			expect(codes(reopen(play(later, `activate ${card}`)), "you", "hand")).toEqual([card]);
 		});
 		it(`${cites("primite-dragon-ether-beryl", "once")} lets the Standby Phase effect be used once per turn by name: a second copy in the GY has no use left that turn`, () => {
 			const start = nextStandby(grave({ graveyard: [card, card, NORMAL] }));

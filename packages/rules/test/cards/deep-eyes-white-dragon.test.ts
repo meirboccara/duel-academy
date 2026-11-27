@@ -46,6 +46,13 @@ const revive = (label: string) => `activate ${card} > ${label}`;
 const sendOne = (code: string, you: SideSpec = {}) => settle(play(board({ hand: [card, "fixture-bury"], monsters: [code], ...you }), `activate fixture-bury > ${code}`));
 
 describe("Deep-Eyes White Dragon, the Blue Abyss, written as effect records", () => {
+ it(`${cites("ash-blossom-joyous-spring", "qa-discard-while-banished-instead")} its discard cost is paid when cards sent to the GY are banished instead`, () => {
+  const start = board({ hand: [card], deck: ["effect-veiler"] });
+  const replaced = addModifier(start, { affects: () => false, until: Number.MAX_SAFE_INTEGER, layer: { kind: "redirect", from: "graveyard", to: "banished" } });
+  const done = settle(play(replaced, `activate ${card}`));
+  expect(codes(done, "you", "banished")).toEqual([card]);
+  expect(codes(done, "you", "hand")).toEqual(["effect-veiler"]);
+ });
 	it(`${cites("deep-eyes-white-dragon", "facts")} is a LIGHT Dragon Effect Monster of Level 10 with 0 ATK and 0 DEF, that mentions "Blue-Eyes White Dragon"`, () => {
 		const duel = board({ hand: [card] });
 		expect(printedFacts(duel, find(duel, card).id)).toEqual({ name: "Deep-Eyes White Dragon, the Blue Abyss", attribute: "LIGHT", monsterType: "Dragon", level: 10, atk: 0, def: 0, archetypes: ["Blue-Eyes"], mentions: ["Blue-Eyes White Dragon", "Deep-Eyes White Dragon, the Blue Abyss"] });

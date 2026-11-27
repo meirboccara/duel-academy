@@ -249,7 +249,10 @@ Known limits of step 6 (what the tests do not prove):
   (asked 2026-11-23, no source cited). Konami's Q&A says Maxx "C"-like cards can be activated and only their draws fail
   (`draws-fail`), and that Drish's draw bullet cannot be chosen (`drish`, pending: not an Academy card). Each new card needs its own call.
 - `lingering` keeps the `added-to-hand` events the links of the chain raised, for the first window after the chain only; it is cleared by the next
-  break or activation. Only Droll uses it.
+  break outside a chain or activation. A break inside a link ("draw 1 card, then ...": Upstart Goblin, Pot of Sloth, Engage!) keeps the cards
+  added before it for that window: Droll's notes say "after the chain in which the card was added" with no exception for what followed in the
+  chain, and the core already let a later link follow the add. No Konami page gives a "then" example; it is the core's reading of the notes.
+  Only Droll uses it.
 - From step 7 the players choose the zones of a taken and a returning monster. A returning monster with no free Main Monster Zone
   is destroyed (YGOProJudge only), and so is a monster taken when no zone is left (YGOProJudge only). A taken monster
   that was turned face-down still goes back (see step 8's limits: YGOProJudge only).
@@ -486,7 +489,7 @@ Known limits of step 9 (what the tests do not prove):
 Exact-list readiness foundation (2026-11-24; checklist in `docs/rules-core-spec.md`, card inventory in `docs/card-plan.md`):
 - `READINESS_DECKS` / `deckReadiness` (`src/deck-manifests.ts`): exact Blue-Eyes 746021 and Sky Striker 745443 inventories with
   separate Side inventories. It reports registration only; `ready` is always `false`. Names without a code are unsupported, not
-  substituted. 49 of the 60 distinct Main/Extra names are absent (11 registered since the Mulcharmy slice).
+  substituted. As of 2026-11-24, 49 of the 60 distinct Main/Extra names were absent (11 registered since the Mulcharmy slice); all 60 are registered now (2026-11-26).
 - `Facts` now has typed printed `name`, `attribute`, `monsterType`, `archetypes` and exact `mentions`. Use `printedFacts`,
   `hasPrintedName`, `belongsTo` and `mentionsCard`; they never infer from `code` or text fragments. Effective Level/ATK/DEF stay
   in `level`/`atk`/`def`; effective name, Attribute, Type and archetype changes are not modelled.
@@ -760,7 +763,7 @@ Ace = Zero's notes, Blue-Eyes Spirit Dragon's fid 18176, Amatsu's notes and fids
 23993, 13862 (Hayate's list), 14252, 18129, 24189, 24150, 19892, 24393, 24164.
 
 Known limits of this slice (what the tests do not prove):
-- No real card is written: Hayate, Zero, Amatsu, Mausoleum of White, the Spirit Dragons, Tyrant Dragon, Neo Blue-Eyes Ultimate
+- As of 2026-11-24 (these cards were written later, see docs/card-plan.md): no real card was written: Hayate, Zero, Amatsu, Mausoleum of White, the Spirit Dragons, Tyrant Dragon, Neo Blue-Eyes Ultimate
   Dragon and Ancient Fairy Life Dragon still owe their other clauses, printed identity, French text and tests.
 - Only YGOProJudge backs (asked 2026-11-24, six chats, no official source cited): "in a row" means the next attack declared; "up to 2
   attacks on monsters" gives nothing after a direct attack and no direct second attack; both attacks of "a second attack" may be
@@ -1162,7 +1165,7 @@ What can be activated in the Damage Step (limit L1, 2026-11-25; `damageStepAllow
 Blue-Eyes second Extra Deck batch: the seven remaining Extra Deck cards of the exact 746021 list (2026-11-25; `src/cards/{blue-eyes-spirit-dragon,blue-eyes-tyrant-dragon,
 blue-eyes-ultimate-spirit-dragon,neo-blue-eyes-ultimate-dragon,psychic-end-punisher,stardust-sifr-divine-dragon,super-starslayer-ty-phon-sky-crisis}.ts`, tests in `test/cards/` with the
 made-up cards of `test/cards/blue-eyes-extra-fixtures.ts` (and the earlier fixture files), every code starting with `fixture-`, none registered). Every printed clause of the seven is a
-record, none is `unmodelled`; the seven are registered in `CARD_DEFS` / `CARD_SOURCES` and in the manifest (40 of the 60 Main/Extra names are now registered, 20 missing). Konami's EN and FR
+record, none is `unmodelled`; the seven are registered in `CARD_DEFS` / `CARD_SOURCES` and in the manifest (as of 2026-11-25: 40 of the 60 Main/Extra names registered, 20 missing; all 60 now). Konami's EN and FR
 card pages and the Japanese notes were each read once (a page fetched once, its text block quoted verbatim); the Q&A that concern each card's own clauses were opened (OCG only), the others are
 named in each card's sources. Blue-Eyes Spirit Dragon, left unwritten by the first Extra Deck batch for its Damage Step clause, is written now (limit L1: `EffectRecord.damageStep`).
 - `damageStep: true` is set on exactly the three records the notes name (src/damage-step-sources.ts): Blue-Eyes Spirit Dragon's negation (not its Tribute effect, whose notes say no), Blue-Eyes
@@ -1200,3 +1203,201 @@ named in each card's sources. Blue-Eyes Spirit Dragon, left unwritten by the fir
   follow-up, closed).
 - Tests that passed with the card absent (they assert that something is not offered): Spirit Dragon 1 of 19, Tyrant 2 of 15, Ultimate Spirit Dragon 2 of 15, Neo 2 of 17, Punisher 3 of 15, Sifr 6 of
   21, TY-PHON 1 of 13; every other test was red first. The three Spirit Dragon tests about fids 18175, 18172 and 24155, and the fixes made after the first green run, were written after the card.
+
+Core gaps: Battle Phase steps, attack targets, Special Summon once per turn, GY replacement, phase triggers (2026-11-26; records in
+`src/core-gap-sources.ts`, tests in `test/rules/{battle-phase-steps,attack-targets,special-once-per-turn,graveyard-redirect,phase-triggers}.test.ts`
+with made-up `fixture-` cards; Primite Dragon Ether Beryl moved to `during`):
+- **Start Step and End Step** (RB10: "The Battle Phase is split into 4 steps"; FET: "Each Phase and Step starts with the turn player in
+  box A"). `Duel.battleStep` is `start` as the Battle Phase begins (its `phase` event is the Start Step), `battle` once both pass there,
+  `end` once the turn player passes in the Battle Step (the `battle-step` event, `step: "end"`, raised and its triggers chained), then
+  Main Phase 2 when both pass. Attacks are declared in the Battle Step only; an attack over returns there. The Start and End Steps
+  are passed through by themselves when nobody can do anything there, so tests and play without fast effects keep their pass counts.
+  A Duel put in the Battle Phase without a step (a fixture) is in its Battle Step.
+- **Restrictions on attack targets**: the `attack-target` lock (`who`: the attacking player; `only`: the monsters that cannot be
+  selected), read by the Battle Step listing (`attackTargetLocked`). The monsters it hides still count as the opponent's: no direct
+  attack without a permission (RB10); a monster that "can attack directly" still may (Konami Q&A fids 23993 case A, 13862). With
+  `closesDirect` ("can only target ... for attacks") direct attacks are closed even by permission (fid 23993 case B,
+  `directAttackRestricted`). OCG only. A restriction that begins to apply after an attack was declared, on its target, neither
+  stops nor replays it, nor makes it direct: damage is calculated as usual (fid 10015, The Phantom Knights' Fog Blade, OCG only;
+  record `target-lock-after-declaration`).
+- **"You can only Special Summon "[name]" once per turn"**: `CardDef.summon.oncePerTurn`, per player and name, every Special Summon
+  (procedure or effect), not an effect so negation does not lift it (Hayate's notes, OCG only; `specialOnceUsed`, read by
+  `summonLocked`). `SummonNote.code` names the card Summoned. Only Summons that succeeded count (the core's reading).
+- **"Any card sent to the GY is banished instead"**: the `redirect` player layer (a Continuous Effect or a lasting modifier; `only`,
+  `face: "down"`), read by every move to a Graveyard (`graveyardRedirect`, src/duel.ts): effects, costs, battle, rules, a resolved
+  Spell. The move keeps its `reason`; `after.zone` is `banished`, so an "if you do" that needs the card sent fails (fid 18128). A cost
+  that sends a card to the GY is not paid, so the effect is not offered (`payCost`, `Duel.sentInstead`; fid 14540); a discard
+  (`MoveReason` `"discarded"`, `discardThis` in src/cards/helpers.ts), a Tribute or a material is paid, the card banished (fid 23815
+  case A). "Discard ... to the GY" (fid 23815 case B) is written as a send. OCG only.
+- **Optional Trigger Effects of a phase** ("During your Standby Phase: You can ..."): `EffectRecord.during` with no `event`; offered to
+  the turn player for their own cards in the phase's open game state (box A), as Chain Link 1, at its start and later in it (a card
+  that arrived, or a condition met, during the phase), once per phase for the card (`phaseTriggers`, src/chain.ts). **YGOProJudge
+  only** (chat 010e58c9, asked 2026-11-26, two answers, no source cited; the FET page it named says nothing on it: checked; closed,
+  no verdict).
+
+Known limits of this slice:
+- A "can only target ... for attacks" restriction (`closesDirect`) that begins to apply during a direct attack neither stops nor
+  replays it (unresolved: fid 10015 rules on an attack on a monster only; no Konami page found for this case, the Q&A of the cards
+  fid 23993 lists checked on 2026-11-27). **YGOProJudge lead, not applied:** a replay, like a monster that loses "can attack
+  directly" mid-attack (chat 0d2b43ee, 2026-11-27, Maliss in Underground and Sky Striker Ace - Hayate; kept after a contest citing fid
+  10015; no source cited; closed, ungraded). `test/rules/attack-targets.test.ts` holds it as a todo.
+- A "during the End Phase" optional effect of the player whose turn it is not has no open-state window (they never hold priority in
+  box A); mandatory phase effects stay triggers on the `phase` event.
+- A Pendulum Monster leaving the field under a GY replacement still goes to the Extra Deck (no page read). Several replacements: a
+  face-down one wins (no page read).
+- Historical (before batch 5): the Sky Striker Ace - Hayate card itself was not written; its mechanics already existed ("can attack directly" as an `attack` permission,
+  "after damage calculation, if this card battled" as a trigger on `damage-step` `after` with `battledNow`, the Special Summon limit).
+
+Sky Striker gaps S1 to S8 (2026-11-26; audit in `docs/rules-core/sky-striker-gaps.md`; records in `src/sky-striker-gap-sources.ts`, 31 of
+them, each quote checked against the page; tests in
+`test/rules/{left-by-effect,temporary-banishment,end-phase-order,summon-materials,activation-stats,target-check}.test.ts`, 31 tests,
+all red before the code, with made-up `fixture-` cards; no real card written in this slice: the Sky Striker cards that use S1 to S8 are batches 5-8 in docs/card-plan.md). Every Japanese page is OCG only. No YGOProJudge
+question was sent: each choice below is a Konami page or is named as the core's reading.
+- **S1, "leaves the field by a card effect"**: every `moved` event done by an effect's processing carries `effect` (an `EffectSource`:
+  the card as activated, its player, the effect's index): a move that names its effect (`moveCard`/`moveCards` with `effect: link`), a
+  destruction by an effect (`destruction.cause === "effect"`), and a Tribute by an effect (`tribute(duel, ids, usedFor, link)`, new
+  fourth argument). Never for a cost, a Summon procedure, battle, a rule of the game, or a material (`reason: "material"` or
+  `usedFor`; fid 23445). `leftFieldBy(event)` gives that effect for a card that was on the field and no longer is, `null` otherwise
+  (also for a move to a Spell & Trap Zone, an Xyz Material and a negated card: fid 23614). "By an opponent's effect" is
+  `by.player !== event.before.controller` (fid 8161). **An operation must name its effect on every move it does**, or the move is
+  not attributed (a destruction is, by its `destruction`).
+- **S2, temporary banishment**: `banishTemporarily(duel, ids, link, due)` (`src/temporary.ts`); `due` is a `Due`: `{ phase: "end", turn:
+  duel.turn.number }` for "until the End Phase", `{ phase: "end", turn: nextPhaseTurn(duel, "end", other(player)) }` for "until your
+  opponent's next End Phase". Face-up, or face-down for a face-down monster; a monster unaffected by the effect stays (S:P Little
+  Knight's notes). It leaves one mandatory delayed effect of the effect's player (`apply`, no Chain Link, not a Summon: Zeke's notes,
+  fid 11586 C): each player (the turn player first) chooses the zones of their monsters (fid 8571), then all are placed at once, one
+  `batch` (fid 24001), in the position and with the face they had, in a Main Monster Zone of the player who controlled them. With
+  fewer free zones than monsters their player picks which come back (fid 24029); the others are **placed** in the Graveyard
+  (`MoveTo.placed`: no `moved` event at all, so nothing "sent to the GY" triggers, and a GY replacement does not apply; fids 24001,
+  24029, Ecclesia's notes). Back on the field the monster is a new card (`moves`, `fieldEntries`): `summonedTurn` is 0 (fid 24032), it
+  keeps `proper`, `summonedBy`, `specialSummoned` and `summonedFrom` (fid 16743 B). A control change with a duration that held it is
+  removed when it is banished, and the monster goes to its previous controller at once when it returns (their zone choice); one
+  without duration (`changeControl`) is kept (fid 17476). An "and if you do" reads `duel.cards[id].zone === "banished"`.
+- **Two new card fields** (`CardInstance`): `summonedFrom` (the zone of its last Special Summon while it stays face-up in the Monster
+  Zone; lost face-down, also once face-up again: fid 16743 A) and `summonedTurn` (the turn of its Summon while it has stayed face-up
+  in the Monster Zone since; a control change keeps both). "If this card was Special Summoned this turn" is
+  `card.specialSummoned && card.summonedTurn === duel.turn.number`.
+- **`CardInstance.sentTurn`** (added with The Dragon that Devours the Dogma, 2026-11-26; test `test/rules/sent-turn.test.ts`, 5): the turn a
+  card was sent to the Graveyard while it has stayed there since, 0 elsewhere; any move to the GY counts, not a card `placed` there
+  (fid 24001) nor one banished instead. "Sent to the GY this turn" is `card.sentTurn === duel.turn.number` (the Dragon's notes, OCG only,
+  record `sent-this-turn-stayed-in-graveyard`). With `everyWindow` on, an `apply` action in the End Phase is followed by the closed
+  windows B and C (FET); a "during the End Phase" effect of the other player is offered once the open game state returns and the turn
+  player passes there: by design (`test/rules/end-phase-every-window.test.ts`).
+- **S3, "cannot be used as Link Material"**: `CardDef.cannotBeMaterial: ["link"]` (also `fusion`, `synchro`, `xyz`): the card is left
+  out of the materials of that kind of Summon, for the procedure, `summonByEffect` and `fusionSummon`. Read from the card itself,
+  so negation does not lift it (Zero's notes).
+- **S4, the materials of a Summon**: `summoned.materials` and `CardInstance.summonMaterials` (kept and lost as `summonedBy`): each
+  material or Tribute as it was just before it was used (a `CardInstance` snapshot, on the field), for Synchro, Xyz, Link, contact
+  Fusion and Tribute Summons, `summonByEffect`, `fusionSummon`, `ritualSummon` (and `specialSummon`/`askSpecialSummon` with
+  `materials`). "Using a Fusion, Synchro, Xyz, or Link Monster" reads each material's printed `facts.frame`. A waiting Trigger
+  Effect of a monster whose control changes on the field follows it (`changeControl`): its new controller activates it at the
+  trigger point (fid 24016; applied to every waiting trigger of the card, an inference).
+- **S5, "During the End Phase: You can ..." in the opponent's turn**: `EffectRecord.eitherTurn` beside `during`. The player whose
+  turn it is not is offered it once the turn player has passed in the open game state of the phase, as Chain Link 1; the turn
+  player then has priority again in the same phase (fid 11533). Without `eitherTurn`, `during` stays "during your ... Phase".
+- **S6, control given back in the End Phase**: no longer done by the core as the End Phase begins. It is a mandatory process of
+  the player who took the monster: an `apply` action (`card`: the monster, `delayed`: the stamp of the control change), listed with
+  the delayed effects (`controlReturnsDue`, `returnControlOf` in src/modifiers.ts); they cannot pass before it is done and order it
+  around their End Phase effects (fid 11555). Its previous controller still chooses the zone. A monster taken during that very End
+  Phase (`control` layer `late`) goes back as the turn ends, as before. For fid 11555's second half the monster's "once per turn"
+  must be `{ scope: "instance", acrossMoves: true }` (a plain `instance` use is forgotten by the control change).
+- **S7, ATK when the effect was activated**: `Link.stats` (`{ atk, def }`), read when a monster face-up in the Monster Zone activates
+  an effect, before its cost (fid 24164); absent for any other activation.
+- **S8, a rule over the targets together**: `EffectRecord.targetCheck(duel, ctx, targets)` (also per mode), beside `target` and
+  `targetCount`: only the combinations it accepts are listed, each once, and it is checked again at activation.
+- **A negation follows a change of control** (found by batch 5, Widow Anchor: "negate ..., then take control"): `changeControl`
+  carries the `negate` modifiers of the card as it was to the card as it is, so the monster stays negated for the player who takes
+  it and after it is given back, until the negation's own end. **YGOProJudge only** (asked 2026-11-26, no source cited; fids 8398
+  and 17476 do not cover it). Test: `test/rules/control-keeps-negation.test.ts` (2, red first). Only a negation follows: the other
+  lasting modifiers of the card (Shrink's ATK change) still end with the change of control, as `continuous.test.ts` has it (the
+  core's reading, no page read; probably the same question).
+
+Existing tests changed by S6 and the new fields: `continuous.test.ts`, `zones.test.ts` and `summon-review.test.ts` now give the
+monster back with `apply`; `nextTurn` (test/rules/continuous-fixtures.ts) does what a player owes on the way; `identity.test.ts`
+lists the three new fields. This lifts the limit above on "during the End Phase" for the player whose turn it is not, and the limit
+of the second readiness slice on Amatsu's ATK.
+
+Known limits of this slice:
+- A player who owes a mandatory End Phase process cannot pass before it is done. Fid 11533 lets them pass and do it once both
+  players have passed (the turn player's first); what they can end up doing is the same, but they cannot wait to see what the other
+  player does first.
+- Temporary banishment: only a free Main Monster Zone decides whether a monster can come back (an effect that limits how many
+  monsters a player controls is not asked: fid 24001's Kaiser Colosseum); who picks which of the opponent's monsters comes back when
+  an effect of the other player banished several (the player they return to) and the order of the two players' zone choices (turn
+  player first) are the core's readings; a face-up and a face-down monster banished together are two groups of moves. A banishment
+  "until the End Phase" made during the End Phase is whatever `due` the card gives. Tokens and Trap Monsters (fid 11586 A, B) are
+  not modelled.
+- A card "placed" in the Graveyard raises no event, so an effect about a card leaving banishment would not see it (none in the two
+  lists).
+- `summonMaterials` holds snapshots: a material's frame is its printed one; a material treated as another kind of monster is not
+  modelled. A Pendulum Summon and a built-in Special Summon have no materials.
+- The trigger that follows a control change keeps the events it matched for its previous controller.
+- With no free Main Monster Zone for a monster given back, it is destroyed: still YGOProJudge's lead only.
+## Duel harness and the hand size limit (2026-11-26)
+
+Toward the 20 agent duels of GitHub issue #1. Tests: `test/match.test.ts` (14), `test/rules/hand-limit.test.ts` (5),
+`test/rules/sky-striker-745443-lifecycle.test.ts` (3). Some were written red first: seat naming, the Summon shown in `viewFor`,
+labels for hidden field cards, replay, disputes, the hand limit. The others describe what was already there: opening hands,
+normal draws and deck-out through the harness, and the exact Sky Striker list's lifecycle.
+
+- **`src/match.ts`**, a match two players play from their own seats, on top of `startDuel`:
+  - `openMatch(setup, defs)` starts the match. `setup` is plain data: seed, the two Decks, who goes first, options.
+  - `seatFor(match, side)` gives one player's seat: what they see (`SeatView`), whether it is their decision (`decider`), their legal moves
+    named from their own view, the shared log in their own names, and the disputes.
+  - `playMove(match, side, step)` plays a named move. The step grammar is `findNamed`'s (`" @z"`, `" as defense"`). It throws
+    when it is not that seat's decision, or when the name is not offered; the error lists the moves that are.
+  - Names never show a card the seat cannot see. A face-down card on the field that the seat cannot see is named by where it is,
+    `?(rival spell 3)`, a face-down banished one by its place among the banished cards, `?(rival banished 0)`, so two of them are
+    two moves. Every other hidden card is `?`; `playMove` refuses a name with a bare `?` that stands for several moves, and
+    `playIndex(match, side, index, { expect, zone, position })` plays a move by its index in `moves` (the order of
+    `legalActions`; `src/agent-play.ts` uses it). Once a move is played, each seat names a card
+    if it saw the card before the move or right after it. So a Summon, or a card activated from the hand, is named for both; a
+    Set card stays `set ?`; a card chosen in the Extra Deck before its zone is asked stays `choose ?`.
+  - `Seat.view` (`SeatView`) is plain data read from `viewFor`'s masked Duel through an allow-list: turn, winner, each side's LP,
+    cards by zone and Deck count, the chain (who, card, targets), the visible waiting Trigger Effects, the Summon and the attack in
+    progress. No engine card id: `createDuel` numbers the cards in Deck-list order before the shuffle, so with the list an id would
+    name the card. Each card is named by where it is instead (`SeatCard.ref`: `"you monster 5"`, controller, zone, then the slot
+    on the field or the place in the pile), and the chain's cards and targets use the same references. No event snapshot, RNG or
+    pool of hidden codes either. Two Duels that differ only in the ids of hidden cards give the same seat (test). `seatBoard`
+    (`src/agent-play.ts`) is read from it, and now also lists the chain.
+  - `matchRecord(match)` gives the record: setup, log and disputes, as plain JSON. `replayMatch(record, defs)` plays the record
+    again. It stops with an error at the first move that is not legal there, or whose names differ from the log (the rules or a
+    card changed).
+  - `raiseDispute(match, side, claim)`: either seat may raise one at any time, with or without priority.
+    `settleDispute(match, index, { decision, via, sources, session? })` settles it once. `via` is `konami`, `ygoprojudge` or
+    `owner`. The core is not changed by a ruling: a ruling against the core is a rules issue to fix. The harness calls no API.
+- **`viewFor`**: a monster whose Summon is being attempted is now shown to both players. It is still in the hand, or face-down
+  for a Flip Summon. Before, the opponent asked whether to answer the Summon saw `?`.
+- **Hand size limit** (RB10, "End Phase", record `hand-limit-six`): at the end of the End Phase, once both players have passed
+  with no chain, a turn player with more than 6 cards selects the cards over 6, one at a time, then discards them together (one
+  batch, reason `discarded`). The Trigger Effects that discard sets off are chained and resolved in that End Phase (Konami Q&A
+  fid 22996, record `hand-discard-trigger-activates`); once both players pass again, the hand is checked again and the turn passes. This applies in `startDuel` play only (`normalDraws`);
+  `createDuel` fixtures keep any hand size.
+- **No Battle Phase on the first turn** (RB10, records `no-battle-first-turn`, `no-battles-main1-to-end`, `main2-after-battle`;
+  found by recorded duel 001): on turn 1 the first player's Main Phase 1 goes straight to the End Phase (`phaseAfter`), with no
+  Battle Phase, no Start/End Step windows or triggers, and no Main Phase 2. Turn 2 has its Battle Phase as usual. `startDuel` play
+  only (`normalDraws`); `createDuel` fixtures keep the full phase order. The agent-play window line reads the same `phaseAfter`.
+- **The End Phase closing** (`Duel.closing`, set by the hand size discard, off again as the next turn begins): the discard's chain can
+  be answered as any chain, but no "during the End Phase" effect can be activated any more (Konami Q&A fid 17233 on Scarm, cid 11317:
+  sent from the hand to the GY by the hand size adjustment, its "add 1 ... from your Deck" effect cannot be activated; record
+  `hand-adjustment-end-phase-effect-closed`; the core extends it to every card). Once that chain has resolved, nothing starts a new chain and the game state does not
+  open again: the hand is checked again and the turn passes. That last part is the core's reading, no Konami page (a shop blog's
+  account of the End Phase says the same: a lead only). Both tests were red first.
+
+Validation (2026-11-26, parent run after these additions): `tsc` clean; vitest 148 files, 1598 passed, 1 todo; after the review fixes (hand-size discard and its triggers, seat masking, banished labels, `playIndex`), with the agent driver: 149 files, 1609 passed, 1 todo; with `SeatView` without ids and the End Phase closing: 149 files, 1613 passed, 1 todo. The Sky Striker lifecycle tests describe behaviour already present when they were written (coverage, not strict TDD); the hand-limit tests were written red first, as listed above.
+
+Known limits:
+- Fid 17233 (official page read whole 2026-11-26; the record quotes its hand size sentence) is about Scarm's wording only: sent
+  in the End Phase, its effect is not activated at once "as it is sent", and sent by the hand size adjustment it cannot be
+  activated. It says nothing of other cards, nor of a card sent earlier in the End Phase activating later in it: the core still
+  offers a "during the End Phase" effect there (as for the Standby Phase, YGOProJudge's lead). Applying the closing to every card,
+  and to every fresh chain, is the core's reading.
+- Once the discard's chain has resolved, a mandatory delayed process due in that End Phase (a temporary banishment's return, a
+  destruction, control owed back) is still applied by its player before the turn passes (`apply`, no pass while owed); an optional
+  one is not offered and expires. The core's reading, no Konami page. Test `hand-limit.test.ts`, red first.
+- A seat names a hidden hand card by its place in the hand, which shows the order the cards came into it.
+- No loop hands the decision between two agents or asks YGOProJudge: `src/agent-play.ts` (`runCli`: new, show, move, dispute,
+  replay over a record on disk; `renderSeat`, a seat as text) is driven by hand.
+- ~~The bot worker's `rebuildDuel` still rebuilds from `createDuel`, so it cannot replay a `startDuel` match.~~ **Superseded 2026-11-27:** optional `lifecycle: "play"` replays from `startDuel`; omitted/`"fixture"` keeps `createDuel` compatibility. App integration remains separate.
+- Two copies of the same card share a name (`choose sky-striker-ace-hayate` twice). The step plays the first one, as
+  `findNamed` does.

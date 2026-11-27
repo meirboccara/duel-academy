@@ -4,6 +4,7 @@ export * from "./chain";
 export * from "./choices";
 export * from "./deck";
 export * from "./delayed";
+export * from "./temporary";
 export * from "./coverage";
 export * from "./duel";
 export * from "./effects";
@@ -23,5 +24,7 @@ export * from "./set";
 export * from "./identity";
 export * from "./procedures";
 export * from "./bot";
+export * from "./match";
 
 export * from "./deck-manifests";
+export * from "./bot/exact-deck-plans";

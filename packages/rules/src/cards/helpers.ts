@@ -3,8 +3,11 @@ import { askPlace, type EffectContext } from "../effects";
 import { canSpecialSummon, specialSummon } from "../procedures";
 import { summonZones } from "../zones";
 
-/** "Discard this card" / "send this card from your hand to the GY": the cost of a hand effect. */
+/** "Send this card from your hand to the GY": the cost requires arrival in the GY (unpayable under a GY-to-banish replacement). */
 export const sendThisToGraveyard = (duel: Duel, { card }: EffectContext): Duel => moveCard(duel, card.id, { zone: "graveyard" });
+
+/** "Discard this card": a GY-to-banish replacement does not stop payment (Konami Q&A fid 23815, Ash Blossom, OCG only). */
+export const discardThis = (duel: Duel, { card }: EffectContext): Duel => moveCard(duel, card.id, { zone: "graveyard", reason: "discarded" });
 
 /** What the core reads of a card in the hand or Deck (its `facts`). */
 export const factsOf = (duel: Duel, id: number) => duel.defs[duel.cards[id]!.code]?.facts;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { act, canSpecialSummon, CARD_DEFS, type CardDef, cites, type Duel, legalActions, moveCard, negateEffect, specialSummon, printedFacts } from "../../src";
 import { nextTurn as passUntil } from "../rules/continuous-fixtures";
 import { gapCards } from "../rules/blue-eyes-gap-fixtures";
-import { codes, offered, play, position, type SideSpec } from "../rules/fixtures";
+import { codes, lastingLines, offered, play, position, type SideSpec } from "../rules/fixtures";
 import { blueEyesFixtures } from "./blue-eyes-fixtures";
 
 const card = "roar-of-the-blue-eyed-dragons";
@@ -91,6 +91,7 @@ describe("Roar of the Blue-Eyed Dragons, written as effect records", () => {
 			expect(canSpecialSummon(start, "you", find(start, "fixture-twin").id, "fusion")).toBe(true);
 			const done = finish(play(start, `activate ${card}`));
 			expect(codes(done, "you", "monster")).toEqual([BEWD]);
+			expect(lastingLines(done).join("\n")).toContain("you cannot Special Summon from the Extra Deck, except Dragon monsters");
 			expect(canSpecialSummon(done, "you", find(done, "fixture-twin").id, "fusion")).toBe(false);
 			expect(canSpecialSummon(done, "you", find(done, "fixture-dragon-twin").id, "fusion")).toBe(true);
 			expect(canSpecialSummon(done, "you", find(done, "fixture-normal-4").id)).toBe(true);

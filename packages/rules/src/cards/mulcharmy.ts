@@ -4,7 +4,7 @@ import { type Duel, moveCards, other, type Side } from "../duel";
 import type { CardDef, EffectRecord, Facts } from "../effects";
 import type { GameEvent } from "../events";
 import { controlsNoCards } from "../negation";
-import { sendThisToGraveyard } from "./helpers";
+import { discardThis } from "./helpers";
 
 /**
  * What the "Mulcharmy" monsters share (Fuwalos, Purulia; each card's file holds its own text, sources and the Summons it counts):
@@ -57,7 +57,7 @@ export function mulcharmy(code: string, facts: Facts, counts: (event: Summoned) 
 		range: "hand",
 		categories: ["draw"],
 		condition: (duel, { player }) => controlsNoCards(duel, player) && mulcharmyActivations(duel, player) < 2,
-		cost: sendThisToGraveyard,
+		cost: discardThis,
 		operation: (duel, link) => {
 			const watching = watch(duel, link, {
 				until: duel.turn.number,

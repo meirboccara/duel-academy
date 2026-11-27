@@ -52,5 +52,5 @@ export function askUpTo(duel: Duel, player: Side, from: readonly number[], { min
  */
 export const askMay = (duel: Duel, player: Side, card: number, yes: (duel: Duel) => Duel, no: (duel: Duel) => Duel = (board) => board): Duel => {
 	const asked = ask(duel, player, [card], (board) => yes(board));
-	return { ...asked, asking: { ...asked.asking!, done: no } };
+	return { ...asked, asking: { ...asked.asking!, done: no, may: true } };
 };

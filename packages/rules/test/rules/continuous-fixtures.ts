@@ -1,4 +1,4 @@
-import { addModifier, ask, freeSlots, moveCard, takeControl, type CardDef, type Duel, type EffectRecord, type Layer, other, targetsOf } from "../../src";
+import { act, addModifier, ask, freeSlots, legalActions, moveCard, takeControl, type CardDef, type Duel, type EffectRecord, type Layer, other, targetsOf } from "../../src";
 import { play } from "./fixtures";
 
 /** Passes until the phase `phase` of the current turn (the game state open). */
@@ -8,10 +8,16 @@ export function toPhase(duel: Duel, phase: Duel["turn"]["phase"]): Duel {
 	return next;
 }
 
-/** Passes until the first phase of turn number `turn` (the game state open). */
+/**
+ * Passes until the first phase of turn number `turn` (the game state open). What a player owes on the way is done: a mandatory End
+ * Phase process (a monster taken "until the End Phase" given back, a delayed effect: `apply`), and the first choice it asks for.
+ */
 export function nextTurn(duel: Duel, turn: number): Duel {
 	let next = duel;
-	for (let guard = 0; guard < 60 && next.turn.number < turn; guard++) next = play(next, "pass");
+	for (let guard = 0; guard < 60 && next.turn.number < turn; guard++) {
+		const actions = legalActions(next);
+		next = act(next, actions.find((action) => action.type === "pass") ?? actions.find((action) => action.type === "apply") ?? actions[0]!);
+	}
 	return next;
 }
 

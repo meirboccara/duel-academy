@@ -32,9 +32,11 @@ const hasNormalMonster = (duel: Duel, player: Side): boolean => [...duel.piles[p
  *   by analogy with `search-needs-a-card`; no Konami page read). The Set card cannot be activated this turn if it is a Trap or Quick-Play Spell.
  * - Second effect: an Ignition Effect of the Monster Zone (notes), the Tribute of itself being the cost; once per turn by name. Activated only
  *   while a Normal Monster is in the Deck (the core's reading); the monster is chosen when it resolves.
- * - Third effect: a Trigger Effect of the Graveyard (notes), once per turn by name, offered when the controller's Standby Phase begins, if a
- *   Normal Monster is face-up in their Monster Zone or in their Graveyard (notes). The core offers it only once, at the start of the phase
- *   (limit L2 of docs/rules-core/blue-eyes-gaps.md): it cannot be activated later in the same Standby Phase.
+ * - Third effect: a Trigger Effect of the Graveyard (notes), once per turn by name, if a Normal Monster is face-up in their Monster Zone or
+ *   in their Graveyard (notes). An optional Trigger Effect of the phase (`during: "standby"`, src/chain.ts `phaseTriggers`): offered to its
+ *   controller in the open game state of their own Standby Phase, as Chain Link 1, as the phase begins and later in it (a card that came
+ *   to the GY, or a condition met, during the phase), once per phase. That timing rests on YGOProJudge only (asked 2026-11-26, no source
+ *   cited); it closes limit L2 of docs/rules-core/blue-eyes-gaps.md.
  * - "Primite" is read from `facts.archetypes`: the name's own archetype, which no Konami page lists; another card of the list says "Primite"
  *   cards "except Primite Drillbeam"/"except Primite Lordly Lode", the card's wording being the only evidence.
  */
@@ -63,10 +65,10 @@ export const PRIMITE_DRAGON_ETHER_BERYL: CardDef = {
 			type: "trigger",
 			range: "graveyard",
 			timing: "if",
+			during: "standby",
 			categories: ["add-to-hand"],
 			once: { scope: "name", key: "primite-dragon-ether-beryl-retrieve" },
 			condition: (duel, { player }) => hasNormalMonster(duel, player),
-			event: (duel, event, { card }) => event.type === "phase" && event.phase === "standby" && event.player === card.controller && duel.turn.player === card.controller,
 			operation: (duel, link) => {
 				const now = duel.cards[link.card.id]!;
 				return now.zone === "graveyard" && now.moves === link.card.moves ? moveCard(duel, now.id, { zone: "hand", effect: link }) : duel;

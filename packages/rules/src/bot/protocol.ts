@@ -1,6 +1,6 @@
 import type { Action } from "../action";
 import { act } from "../chain";
-import { createDuel, type Duel, type DuelSetup, type Side } from "../duel";
+import { createDuel, type Duel, type DuelSetup, type Side, startDuel } from "../duel";
 import type { CardDef } from "../effects";
 import { type DeckPlan, decide, type Level, type Progress } from "./bot";
 
@@ -13,6 +13,8 @@ import { type DeckPlan, decide, type Level, type Progress } from "./bot";
 /** What the app sends: the Duel as setup + actions, whose decision it is, and the bot's options (all plain data). */
 export interface BotRequest {
 	readonly id: number;
+	/** Omitted: a positioned fixture (`createDuel`). "play": a real game from `startDuel`. */
+	readonly lifecycle?: "fixture" | "play";
 	readonly setup: Omit<DuelSetup, "defs">;
 	readonly actions: readonly Action[];
 	readonly side: Side;
@@ -26,15 +28,16 @@ export interface BotRequest {
 /** What the worker sends back: the action with its name and the progress to send with the next request, or what went wrong. */
 export type BotAnswer = { readonly id: number; readonly action: Action; readonly name: string; readonly progress: Progress | null } | { readonly id: number; readonly error: string };
 
-/** The Duel a setup and a list of actions lead to. Throws when an action is not legal where it is played. */
-export function rebuildDuel(setup: Omit<DuelSetup, "defs">, actions: readonly Action[], defs: Readonly<Record<string, CardDef>>): Duel {
-	return actions.reduce(act, createDuel({ ...setup, defs }));
+/** Replays from a fixture by default; "play" includes opening hands and normal turn rules. Throws on illegal actions. */
+export function rebuildDuel(setup: Omit<DuelSetup, "defs">, actions: readonly Action[], defs: Readonly<Record<string, CardDef>>, lifecycle: "fixture" | "play" = "fixture"): Duel {
+	const start = lifecycle === "play" ? startDuel : createDuel;
+	return actions.reduce(act, start({ ...setup, defs }));
 }
 
 /** Answers one request. Never throws: a request that cannot be answered gets an error answer. */
 export function answerRequest(request: BotRequest, defs: Readonly<Record<string, CardDef>>): BotAnswer {
 	try {
-		const duel = rebuildDuel(request.setup, request.actions, defs);
+		const duel = rebuildDuel(request.setup, request.actions, defs, request.lifecycle);
 		const { action, name, progress } = decide(duel, request.side, { level: request.level, seed: request.seed, budgetMs: request.budgetMs, plan: request.plan, progress: request.progress });
 		return { id: request.id, action, name, progress };
 	} catch (error) {

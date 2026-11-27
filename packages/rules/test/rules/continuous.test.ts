@@ -120,7 +120,7 @@ describe("the added-to-hand event", () => {
 
 describe("control changes that last", () => {
 	const all = { ...REAL_CARDS, ...defs };
-	it(`${cites("rules", "control-until-end-phase")} a monster taken until the End Phase goes back to its owner as the End Phase begins, and what applied to it before ended when it changed hands`, () => {
+	it(`${cites("rules", "control-until-end-phase")} a monster taken until the End Phase goes back to its owner in the End Phase (a process of the player who took it), and what applied to it before ended when it changed hands`, () => {
 		const start = position({ defs: all, options, you: { hand: ["shrink", "take-control"] }, rival: { monsters: ["huge"] } });
 		const shrunk = play(start, "activate shrink > huge", "pass", "pass");
 		expect(atk(shrunk, idOf(shrunk, "huge"))).toBe(1500);
@@ -131,9 +131,11 @@ describe("control changes that last", () => {
 		expect([taken.cards[id]!.controller, taken.cards[id]!.owner]).toEqual(["you", "rival"]);
 		// It is a new card for its new controller: Shrink was applied to the card as it was.
 		expect(atk(taken, id)).toBe(3000);
-		// Still yours until the End Phase, back to the rival as it begins.
+		// Still yours until the End Phase; there you owe the return (no "pass"), and the rival chooses the zone it goes back to.
 		expect(codes(toPhase(taken, "main2"), "you", "monster")).toEqual(["huge"]);
-		const back = play(toPhase(taken, "end"), "place 4");
+		const end = toPhase(taken, "end");
+		expect([codes(end, "you", "monster"), offered(end)]).toEqual([["huge"], ["apply huge"]]);
+		const back = play(end, "apply huge", "place 4");
 		expect(back.cards[id]!.slot).toBe(4);
 		expect(back.turn.number).toBe(3);
 		expect(codes(back, "rival", "monster")).toEqual(["huge"]);

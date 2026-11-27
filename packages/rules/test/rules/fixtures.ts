@@ -1,4 +1,4 @@
-import { type Action, act, ask, CARD_DEFS, targetsOf, moveCards, breakEffect, raiseEvent, type CardDef, cardsIn, createDuel, type Duel, type EffectRecord, legalActions, moveCard, negateActivation, negateEffect, other, type Phase, type Side, type TeachingOptions, type Zone } from "../../src";
+import { openMatch, seatFor, type Action, act, ask, CARD_DEFS, targetsOf, moveCards, breakEffect, raiseEvent, type CardDef, cardsIn, createDuel, type Duel, type EffectRecord, legalActions, moveCard, negateActivation, negateEffect, other, type Phase, type Side, type TeachingOptions, type Zone } from "../../src";
 
 /**
  * Test cards, written as effect records (src/effects.ts). The made-up ones are not registered in CARD_SOURCES; the real
@@ -486,4 +486,10 @@ export function recordCards(log: string[] = []): Record<string, CardDef> {
 		{ code: "sweep", kind: "spell", effects: [{ type: "activation", operation: (duel) => (log.push("sweep"), moveCards(duel, [...duel.piles.you.monster, ...duel.piles.rival.monster], { zone: "graveyard" })) }] },
 	];
 	return Object.fromEntries(cards.map((def) => [def.code, def]));
+}
+
+/** The "lasting effects" lines a seat reads on the board (`seatFor(...).view.lasting`) for a Duel built by a test. */
+export function lastingLines(duel: Duel, side: Side = "you"): readonly string[] {
+	const base = openMatch({ seed: 1, you: { deck: Array(5).fill("raigeki"), extra: [] }, rival: { deck: Array(5).fill("raigeki"), extra: [] } }, CARD_DEFS);
+	return seatFor({ ...base, duel }, side).view.lasting;
 }

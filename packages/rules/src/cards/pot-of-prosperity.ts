@@ -89,6 +89,8 @@ export const POT_OF_PROSPERITY_SOURCES: CardSources = {
 		{ id: "qa-oath-negated-activation", kind: "jp-qa", cid: 15756, fid: 23378, url: qa(23378), read: "2026-11-24", quote: "「金満で謙虚な壺」の発動が無効になった場合、同じターン中に自分はカードの効果によってドローできます。" },
 		{ id: "qa-oath-negated-effect", kind: "jp-qa", cid: 15756, fid: 23378, url: qa(23378), read: "2026-11-24", quote: "ただし、「金満で謙虚な壺」の効果が無効になった場合、同じターン中に自分はカードの効果によってドローできません。" },
 		{ id: "qa-no-stack", kind: "jp-qa", cid: 15756, fid: 23511, url: qa(23511), read: "2026-11-24", quote: "（ダメージが半分の半分になることはありません。）" },
+		// OCG only. Konami's Q&A fid 23121 (page dated 2022-12-30, read 2026-11-26): Upstart Goblin negated and nothing actually drawn: the Pot can be activated.
+		{ id: "qa-upstart-negated", kind: "jp-qa", cid: 15756, fid: 23121, url: qa(23121), read: "2026-11-26", quote: "「成金ゴブリン」の発動や効果が無効になったことにより、このターンにカードの効果で実際にドローしていないのであれば、「金満で謙虚な壺」を発動できます。" },
 		// The two Q&A below are about "Pot of Duality" and name this card in their lists ("the same for the following cards"): "cannot add cards
 		// from the Deck to the hand" (Raiō's effect in the question) stops the activation, and with the lock applied while it resolves, the
 		// card chosen to add is sent to the GY. The tests use the core's own lock on adding cards from the Deck to the hand.
@@ -104,6 +106,7 @@ export const POT_OF_PROSPERITY_SOURCES: CardSources = {
 		{ source: "qa-oath-negated-activation" },
 		{ source: "qa-oath-negated-effect" },
 		{ source: "qa-no-stack" },
+		{ source: "qa-upstart-negated" },
 		{ source: "qa-lock-activate" },
 		{ source: "qa-lock-resolve" },
 	],

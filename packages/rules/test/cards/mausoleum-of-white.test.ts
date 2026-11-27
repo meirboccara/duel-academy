@@ -29,6 +29,14 @@ const nextTurn = (duel: Duel, by = 2): Duel => {
 };
 
 describe("Mausoleum of White, written as effect records", () => {
+	it(`${cites("ash-blossom-joyous-spring", "text")} answers the send-and-gain effect, which includes sending from the Deck even with only a Normal Monster in hand (YGOProJudge lead for the hand-only case)`, () => {
+		const start = board({ hand: ["blue-eyes-white-dragon"], monsters: ["effect-veiler"], faceupSpells: [card] }, { hand: ["ash-blossom-joyous-spring"] }, { everyWindow: true });
+		const chained = play(start, `activate ${card} > effect-veiler`);
+		expect(offered(chained)).toContain("activate ash-blossom-joyous-spring");
+		const stopped = play(chained, "activate ash-blossom-joyous-spring", "pass", "pass");
+		expect(codes(stopped, "you", "hand")).toEqual(["blue-eyes-white-dragon"]);
+		expect(atk(stopped, stopped.piles.you.monster[0]!)).toBe(0);
+	});
 	it(`${cites("mausoleum-of-white", "extra-summon")} lets its controller Normal Summon 1 Level 1 LIGHT Tuner in addition to the Normal Summon/Set: that kind of monster only, as a Normal Summon and never a Set`, () => {
 		const start = board({ hand: ["effect-veiler", "fixture-light-1", "fixture-dark-tuner", "fixture-normal-4"], faceupSpells: [card] });
 		expect(summons(start)).toEqual([

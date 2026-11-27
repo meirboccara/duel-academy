@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cites, type Duel, landSummon, specialSummon } from "../../src";
+import { addModifier, cites, type Duel, landSummon, specialSummon } from "../../src";
 import { codes, offered, play, position, REAL_CARDS } from "../rules/fixtures";
 import { readinessCards } from "../rules/readiness-fixtures";
 
@@ -12,7 +12,7 @@ const deckOf = (count: number) => Array.from({ length: count }, () => "fixture-v
 /** Passes until the turn player holds priority in an open game state of `phase`. */
 function toPhase(duel: Duel, phase: Duel["turn"]["phase"]): Duel {
 	let next = duel;
-	for (let guard = 0; !(next.turn.phase === phase && next.priority.open && next.priority.holder === next.turn.player && next.priority.passed.length === 0) && guard < 200; guard++) next = play(next, "pass");
+	for (let guard = 0; !(next.turn.phase === phase && (phase !== "battle" || next.battleStep === "battle") && next.priority.open && next.priority.holder === next.turn.player && next.priority.passed.length === 0) && guard < 200; guard++) next = play(next, "pass");
 	return next;
 }
 
@@ -23,6 +23,15 @@ function applied(defs: ReturnType<typeof cards>, rival: Parameters<typeof positi
 }
 
 describe("Mulcharmy Fuwalos: activation", () => {
+ it(`${cites("ash-blossom-joyous-spring", "qa-discard-while-banished-instead")} both Mulcharmy monsters can pay their discard cost under a GY-to-banish replacement`, () => {
+  for (const code of ["mulcharmy-fuwalos", "mulcharmy-purulia"]) {
+   const start = position({ defs: cards(), options, you: { hand: [code] } });
+   const replaced = addModifier(start, { affects: () => false, until: Number.MAX_SAFE_INTEGER, layer: { kind: "redirect", from: "graveyard", to: "banished" } });
+   const paid = play(replaced, `activate ${code}`);
+   expect(codes(paid, "you", "banished")).toEqual([code]);
+   expect(paid.chain.map((link) => link.card.code)).toEqual([code]);
+  }
+ });
 	it(`${cites("mulcharmy-fuwalos", "text-activation")} ${cites("mulcharmy-fuwalos", "notes-hand-quick")} is a Quick Effect in the hand, in either player's turn, only while its player controls no cards, and its cost is discarding itself`, () => {
 		const defs = cards();
 		const theirs = position({ defs, options, turn: "rival", you: { hand: [card] } });

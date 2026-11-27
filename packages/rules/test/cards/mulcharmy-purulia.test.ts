@@ -12,7 +12,7 @@ const deckOf = (count: number) => Array.from({ length: count }, () => "fixture-v
 /** Passes until the turn player holds priority in an open game state of `phase`. */
 function toPhase(duel: Duel, phase: Duel["turn"]["phase"]): Duel {
 	let next = duel;
-	for (let guard = 0; !(next.turn.phase === phase && next.priority.open && next.priority.holder === next.turn.player && next.priority.passed.length === 0) && guard < 200; guard++) next = play(next, "pass");
+	for (let guard = 0; !(next.turn.phase === phase && (phase !== "battle" || next.battleStep === "battle") && next.priority.open && next.priority.holder === next.turn.player && next.priority.passed.length === 0) && guard < 200; guard++) next = play(next, "pass");
 	return next;
 }
 

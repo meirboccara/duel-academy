@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CARD_DEFS, type CardDef, cites, type Duel, specialSummon, summonByEffect } from "../../src";
+import { addModifier, CARD_DEFS, type CardDef, cites, type Duel, specialSummon, summonByEffect } from "../../src";
 import { codes, offered, play, position, type SideSpec } from "../rules/fixtures";
 import { blueEyesFixtures } from "./blue-eyes-fixtures";
 
@@ -22,6 +22,14 @@ const own = (duel: Duel, label: string) => offered(duel).filter((entry) => entry
 const triggers = (duel: Duel) => own(duel, `activate ${card}`);
 
 describe("Sage with Eyes of Blue, written as effect records", () => {
+ it(`${cites("ash-blossom-joyous-spring", "qa-discard-while-banished-instead")} its discard can be paid under a GY-to-banish replacement, but the target sent to the GY is banished and no Blue-Eyes is Summoned`, () => {
+  const start = board({ hand: [card], monsters: ["fixture-effect-4"], deck: ["fixture-blue-eyes-small"] });
+  const replaced = addModifier(start, { affects: () => false, until: Number.MAX_SAFE_INTEGER, layer: { kind: "redirect", from: "graveyard", to: "banished" } });
+  const done = play(replaced, `activate ${card} > fixture-effect-4`);
+  expect(codes(done, "you", "banished")).toEqual([card, "fixture-effect-4"]);
+  expect(codes(done, "you", "monster")).toEqual([]);
+  expect(codes(done, "you", "deck")).toEqual(["fixture-blue-eyes-small"]);
+ });
 	it(`${cites("sage-with-eyes-of-blue", "add-tuner")} ${cites("sage-with-eyes-of-blue", "notes-trigger-field")} when Normal Summoned, can add 1 Level 1 LIGHT Tuner from the Deck to the hand, never another Sage with Eyes of Blue`, () => {
 		const start = board({ hand: [card], deck: ["effect-veiler", card, "fixture-light-1", "fixture-dark-tuner", "fixture-normal-4", "fixture-light-tuner"] });
 		const summoned = play(start, `summon ${card}`);

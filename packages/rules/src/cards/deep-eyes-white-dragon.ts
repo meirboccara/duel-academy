@@ -6,7 +6,7 @@ import { belongsTo, hasPrintedName } from "../identity";
 import { addModifier, banishWhenItLeaves, FOREVER, originalAtk } from "../modifiers";
 import { askSpecialSummon, canSpecialSummon } from "../procedures";
 import { konamiCardUrl } from "../sources";
-import { factsOf, sendThisToGraveyard } from "./helpers";
+import { discardThis, factsOf } from "./helpers";
 
 const NAME = "Deep-Eyes White Dragon, the Blue Abyss";
 const BEWD = "Blue-Eyes White Dragon";
@@ -96,7 +96,7 @@ export const DEEP_EYES_WHITE_DRAGON: CardDef = {
 			once: { scope: "name", key: "deep-eyes-white-dragon-search" },
 			// "search-needs-a-card" (RB10): not activated with no Level 1 LIGHT Tuner to add in the Deck.
 			condition: (duel, { player }) => tunersToAdd(duel, player).length > 0,
-			cost: sendThisToGraveyard,
+			cost: discardThis,
 			operation: (duel, link) => ask(duel, link.player, tunersToAdd(duel, link.player), (board, picked) => moveCard(board, picked, { zone: "hand" })),
 		},
 		reviveFrom("hand"),

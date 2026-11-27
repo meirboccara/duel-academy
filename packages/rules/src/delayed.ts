@@ -1,7 +1,7 @@
 import type { Action } from "./action";
 import { type CardInstance, type CardRef, type Destruction, type Duel, isStill, other, type Phase, PHASES, refOf, type Side } from "./duel";
 import type { GameEvent } from "./events";
-import type { EffectSource } from "./modifiers";
+import { controlReturnsDue, type EffectSource, returnControlOf } from "./modifiers";
 
 /**
  * Real-deck readiness (steps 3 to 6): what a resolved effect leaves to be done later, without activating again.
@@ -15,6 +15,13 @@ import type { EffectSource } from "./modifiers";
  *   cannot end before it is applied), and orders them, and their other actions, as they wish. Choices made while one is applied are
  *   its player's (`ask`). That they start no chain, their tie to the card and this ordering are YGOProJudge's answers (asked
  *   2026-11-24, no source cited); Konami's notes on Mulcharmy Fuwalos give "no Chain Link" for that card's End Phase clause.
+ *   Konami's Japanese Q&A fid 11533 (OCG only, read 2026-11-26; records `end-phase-turn-player-first`, `end-phase-other-player-next`,
+ *   `end-phase-mandatory-process-owed`, `end-phase-optional-after-mandatory`) gives the same order with one difference the core does
+ *   not model: there, a player may pass while they still owe a mandatory process, and must do it only once both players have passed
+ *   (the turn player's first); here they cannot pass before it is done.
+ * - **Control given back** (src/modifiers.ts, `controlReturnsDue`): a monster taken "until the End Phase" is given back in that End
+ *   Phase by the same `apply` action, as a mandatory process of the player who took it (the action's `delayed` is the stamp of the
+ *   control change, `card` the monster). It is listed, owed and applied here with the delayed effects.
  * - **Watches** (`Duel.watches`, `watch`): "for the rest of this turn, each time your opponent Special Summons ..., immediately draw 1
  *   card". Applied at once when the event is raised, also while a chain resolves, with no Chain Link; events that happened at the same
  *   time (one `batch`: a Pendulum Summon of several monsters) count once; several resolved copies each apply (Konami's notes on
@@ -76,13 +83,13 @@ export function delay(duel: Duel, by: EffectSource, spec: { readonly due: Due; r
 		...(spec.card ? { card: refOf(spec.card as CardInstance) } : {}),
 		...(spec.condition ? { condition: spec.condition } : {}),
 	};
-	return { ...duel, clock: stamp, delayed: [...duel.delayed, entry] };
+	return { ...duel, clock: stamp, delayed: [...duel.delayed, entry], story: [...duel.story, { type: "scheduled" }] };
 }
 
 /** Leaves a lingering operation of `by` (the resolving link), applied each time `event` accepts an event, until the end of turn `until`. */
 export function watch(duel: Duel, by: EffectSource, spec: { readonly until: number; readonly event: Watch["event"]; readonly apply: Watch["apply"] }): Duel {
 	const stamp = duel.clock + 1;
-	return { ...duel, clock: stamp, watches: [...duel.watches, { stamp, player: by.player, source: by.card, effect: by.effect ?? 0, until: spec.until, event: spec.event, apply: spec.apply }] };
+	return { ...duel, clock: stamp, watches: [...duel.watches, { stamp, player: by.player, source: by.card, effect: by.effect ?? 0, until: spec.until, event: spec.event, apply: spec.apply }], story: [...duel.story, { type: "scheduled" }] };
 }
 
 /** The destruction a delayed effect or a watch does: by its source's effect, as `effectDestruction` for a link. */
@@ -124,34 +131,55 @@ function dueNow(duel: Duel, entry: Delayed): boolean {
 	return entry.condition ? entry.condition(duel, entry) : true;
 }
 
-/** Delayed effects are applied in an open game state, with nothing else going on. */
-const calm = (duel: Duel): boolean => duel.chain.length === 0 && duel.priority.open && !duel.battle && !duel.summoning;
+/**
+ * Delayed effects are applied in an open game state, with nothing else going on; or, once the End Phase is closing (`Duel.closing`,
+ * the game state does not open again), with nothing on the chain: there, only the mandatory ones (and the control owed back), so a
+ * mandatory process the hand size discard's chain left for that End Phase is still done before the turn passes, and an optional one
+ * is not offered. The core's reading, no Konami page (fid 17233 is about one card's End Phase effect, not delayed processes).
+ */
+const calm = (duel: Duel): boolean => duel.chain.length === 0 && (duel.priority.open || duel.closing) && !duel.battle && !duel.summoning;
 
 /** The delayed effects the holder of priority may apply now. `out`: where to list them; returns whether there is one. */
 export function delayedActions(duel: Duel, out: Action[] | null, only?: number): boolean {
-	if (duel.delayed.length === 0 || !calm(duel)) return false;
+	if (!anythingDelayed(duel) || !calm(duel)) return false;
 	const player = duel.priority.holder;
 	let found = false;
 	for (const entry of duel.delayed) {
-		if (entry.player !== player || (only !== undefined && entry.source.id !== only) || !dueNow(duel, entry)) continue;
+		if (entry.player !== player || (only !== undefined && entry.source.id !== only) || (duel.closing && !entry.mandatory) || !dueNow(duel, entry)) continue;
 		if (!out) return true;
 		out.push({ type: "apply", card: entry.source.id, delayed: entry.stamp });
+		found = true;
+	}
+	// A monster taken "until the End Phase": the player who took it gives it back (`controlReturnsDue`).
+	for (const modifier of controlReturnsDue(duel)) {
+		const id = (modifier.affects as { readonly card: number }).card;
+		if (duel.cards[id]!.controller !== player || (only !== undefined && id !== only)) continue;
+		if (!out) return true;
+		out.push({ type: "apply", card: id, delayed: modifier.stamp });
 		found = true;
 	}
 	return found;
 }
 
-/** Must the holder of priority apply a delayed effect before passing: an open game state, and a mandatory one of theirs is due? */
+/** Could anything be applied at all: a delayed effect, or (in the End Phase) a control change that lasts? Cheap, for the listing. */
+export const anythingDelayed = (duel: Duel): boolean => duel.delayed.length > 0 || (duel.turn.phase === "end" && duel.modifiers.length > 0);
+
+/**
+ * Must the holder of priority apply something before passing: an open game state, and a mandatory delayed effect of theirs is due, or
+ * a monster they took "until the End Phase" is still to give back?
+ */
 export function mustApply(duel: Duel): boolean {
-	if (duel.delayed.length === 0 || !calm(duel)) return false;
+	if (!anythingDelayed(duel) || !calm(duel)) return false;
 	const player = duel.priority.holder;
-	return duel.delayed.some((entry) => entry.mandatory && entry.player === player && dueNow(duel, entry));
+	if (duel.delayed.some((entry) => entry.mandatory && entry.player === player && dueNow(duel, entry))) return true;
+	return controlReturnsDue(duel).some((modifier) => duel.cards[(modifier.affects as { readonly card: number }).card]!.controller === player);
 }
 
 /** Takes the delayed effect out of the Duel and applies it. What follows (triggers, priority) is the caller's (`act`). */
 export function applyDelayed(duel: Duel, stamp: number): Duel {
 	const entry = duel.delayed.find((candidate) => candidate.stamp === stamp);
-	if (!entry) return duel;
+	// Not a delayed effect: a control change "until the End Phase" being given back (its stamp).
+	if (!entry) return returnControlOf(duel, stamp);
 	return entry.apply({ ...duel, delayed: duel.delayed.filter((candidate) => candidate !== entry) }, entry);
 }
 

@@ -150,6 +150,15 @@ describe("Pot of Prosperity, written as effect records", () => {
 			const negated = finish(play(start, `activate ${card} x3`, "choose fixture-extra-a", "choose fixture-extra-b", "choose fixture-extra-c", "activate fixture-activation-negator"));
 			expect(drawCards(negated, "you", 1).piles.you.hand).toHaveLength(1);
 		});
+		it(`${cites("pot-of-prosperity", "qa-upstart-negated")} can be activated the turn Upstart Goblin was negated, as no card was actually drawn, and not the turn it drew`, () => {
+			const negatedGoblin = board({ hand: ["upstart-goblin", card], extra: EXTRA, deck: DECK }, { set: ["fixture-effect-negator"] }, { everyWindow: true });
+			const stopped = reopen(finish(play(negatedGoblin, "activate upstart-goblin", "activate fixture-effect-negator")));
+			expect(codes(stopped, "you", "hand")).toEqual([card]);
+			expect(own(stopped, `activate ${card}`)).not.toEqual([]);
+			const drew = reopen(finish(play(board({ hand: ["upstart-goblin", card], extra: EXTRA, deck: DECK }, {}, { everyWindow: true }), "activate upstart-goblin")));
+			expect(codes(drew, "you", "hand")).toHaveLength(2);
+			expect(own(drew, `activate ${card}`)).toEqual([]);
+		});
 		it(`${cites("pot-of-prosperity", "qa-oath-negated-effect")} still forbids drawing by card effects this turn when only the effect is negated`, () => {
 			const start = board({ hand: [card], extra: EXTRA, deck: DECK }, { set: ["fixture-effect-negator"] }, { everyWindow: true });
 			const negated = finish(play(start, `activate ${card} x3`, "choose fixture-extra-a", "choose fixture-extra-b", "choose fixture-extra-c", "activate fixture-effect-negator"));

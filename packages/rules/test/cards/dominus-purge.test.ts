@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addModifier, type Attribute, CARD_DEFS, type CardDef, cites, destroyCard, type Duel, effectDestruction, type EffectRecord, moveCards, moveCard, other, printedFacts } from "../../src";
 import { nextTurn as passUntil } from "../rules/continuous-fixtures";
-import { codes, offered, play, position, type SideSpec } from "../rules/fixtures";
+import { codes, lastingLines, offered, play, position, type SideSpec } from "../rules/fixtures";
 import { gapCards } from "../rules/blue-eyes-gap-fixtures";
 import { blueEyesFixtures } from "./blue-eyes-fixtures";
 import { primiteFixtures } from "./primite-fixtures";
@@ -163,6 +163,7 @@ describe("Dominus Purge, written as effect records", () => {
 			expect(own(done, "activate fixture-dark-quick")).toEqual([]);
 			expect(monsterEffects(toMain(done, 2))).toEqual(["activate fixture-light-effect"]);
 			expect(own(toMain(done, 2), "activate fixture-dark-quick")).toEqual([]);
+			expect(lastingLines(done).join("\n")).toContain("you cannot activate the effects of DARK, WATER, and FIRE monsters");
 		});
 		it(`${cites("dominus-purge", "lock")} leaves the opponent's DARK, WATER and FIRE monsters free`, () => {
 			const { done } = purged({ hand: [card, "fixture-searcher"] });

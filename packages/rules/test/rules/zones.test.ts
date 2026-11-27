@@ -377,7 +377,7 @@ describe("Equip Cards", () => {
 	});
 });
 
-describe("zones chosen while an effect resolves or as the End Phase begins", () => {
+describe("zones chosen while an effect resolves or when control is given back in the End Phase", () => {
 	const defs: Record<string, CardDef> = {
 		...plainCards(),
 		"atk-4": { code: "atk-4", kind: "monster", facts: { level: 4, atk: 1500 } },
@@ -397,7 +397,8 @@ describe("zones chosen while an effect resolves or as the End Phase begins", () 
 		expect(offered(asked)).toEqual(["place 1", "place 2", "place 3", "place 4"]);
 		const taken = play(asked, "place 3");
 		expect(taken.cards[link]).toMatchObject({ controller: "you", zone: "monster", slot: 3 });
-		const returning = toEnd(taken);
+		// In the End Phase the player who took it gives it back (an End Phase process of theirs), and its owner picks the zone.
+		const returning = play(toEnd(taken), "apply link-top");
 		expect(returning.asking).toMatchObject({ player: "rival" });
 		// Not the Extra Monster Zone: a Main Monster Zone of the rival (the one in slot 0 is taken).
 		expect(offered(returning)).toEqual(["place 1", "place 2", "place 3", "place 4"]);
@@ -426,7 +427,7 @@ describe("zones chosen while an effect resolves or as the End Phase begins", () 
 		const taken = play(start, "activate grab > atk-4", "place 0");
 		let full = taken;
 		for (const id of full.piles.rival.hand) full = moveCard(full, id, { zone: "monster" });
-		const ended = toEnd(full);
+		const ended = play(toEnd(full), "apply atk-4");
 		expect(ended.asking).toBeNull();
 		expect(codes(ended, "rival", "graveyard")).toEqual(["atk-4"]);
 	});

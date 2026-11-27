@@ -194,11 +194,14 @@ French text, the reading of its own Japanese notes and Q&A, its tests and an ind
   Effect and needs no flag). Set `damageStep: true` on those three negation records when scripting them. The White Phantom Beast's
   notes say its negation ("negate that effect") is NOT usable in the Damage Step: leave it unflagged. Counter Traps keep
   the TCG rulebook's limit (up to damage calculation); the OCG rulebook and Konami Q&A fid 7966 allowing them later are not followed.
-- **L2. "During your Standby Phase: You can ..."** is offered once, when the phase begins (a trigger on the `phase` event); the player
-  cannot activate it later in the same Standby Phase.
-- **"Cards sent to the GY are banished instead"** (the pending Q&A of Wishes for Eyes of Blue fid 23815, Maiden of White fid 14540,
-  Mausoleum of White fid 18128): no card of the list has such an effect; `banishWhenItLeaves` is about one card leaving the field,
-  not a rule for every card sent to the GY. Not built.
+- **L2. "During your Standby Phase: You can ..." — resolved (2026-11-26).** `EffectRecord.during` offers such an optional Trigger
+  Effect in the open game state of the phase, as Chain Link 1, also later in the phase (a card that reached the GY, or a condition met,
+  there), once per phase; Primite Dragon Ether Beryl uses it. YGOProJudge only (asked 2026-11-26, two answers, no source cited; the
+  Fast Effect Timing page it named says nothing on it).
+- **"Cards sent to the GY are banished instead" — built (2026-11-26).** The `redirect` layer (`graveyardRedirect`): every card on its
+  way to a Graveyard is banished (face-up, or face-down if the effect says so); a cost that sends a card to the GY is not paid, a discard
+  (`MoveReason` `"discarded"`), a Tribute or a material is (Konami Q&A fids 18128, 14540, 23815, OCG only). The three cards' pending
+  Q&A can now be tested (card slices; not done here).
 - A cost worded "send to the GY" paid with a monster that is banished when it leaves the field: the monster is banished and the cost
   counts as paid (no page read).
 - `CostSpec.choose` is not available to a Trigger Effect, and the targets of such an activation are offered on the board the first

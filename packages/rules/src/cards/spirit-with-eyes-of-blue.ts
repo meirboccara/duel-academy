@@ -55,7 +55,7 @@ export const SPIRIT_WITH_EYES_OF_BLUE: CardDef = {
 			type: "continuous",
 			range: "field",
 			affects: () => false,
-			modifies: (_duel, source) => [{ kind: "lock", what: "summon", who: source.controller, ways: ["special"], only: (board, monster) => factsOf(board, monster.id)?.monsterType !== "Dragon" }],
+			modifies: (_duel, source) => [{ kind: "lock", what: "summon", who: source.controller, ways: ["special"], only: (board, monster) => factsOf(board, monster.id)?.monsterType !== "Dragon", describe: "except Dragon monsters" }],
 		},
 		{
 			type: "trigger",

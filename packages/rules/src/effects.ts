@@ -1,4 +1,4 @@
-import type { Activation, CardInstance, Duel, Link, Position, Side } from "./duel";
+import type { Activation, CardInstance, Duel, Link, Phase, Position, Side } from "./duel";
 import type { GameEvent } from "./events";
 import type { Layer, LockLayer } from "./modifiers";
 
@@ -156,6 +156,7 @@ export interface EffectMode {
 	readonly condition?: (duel: Duel, ctx: EffectContext) => boolean;
 	readonly target?: EffectRecord["target"];
 	readonly targetCount?: EffectRecord["targetCount"];
+	readonly targetCheck?: EffectRecord["targetCheck"];
 	readonly categories?: EffectRecord["categories"];
 	readonly targetGroups?: EffectRecord["targetGroups"];
 	readonly sameCount?: true;
@@ -231,6 +232,20 @@ export interface EffectRecord {
 	 * does not (default "when"). A mandatory trigger never misses it.
 	 */
 	readonly timing?: "when" | "if";
+	/**
+	 * An optional Trigger Effect worded "During your Standby Phase: You can ..." (`"standby"`), or of another phase: with no `event`, it
+	 * is offered to its controller, as the turn player, in the open game state of that phase (box A, so as Chain Link 1), as the phase
+	 * begins and later in it, once per phase for the card (src/chain.ts, `phaseTriggers`). Not for mandatory effects (they stay a
+	 * trigger on the `phase` event). "During your ... Phase": its controller's own turn only, unless `eitherTurn`.
+	 */
+	readonly during?: Phase;
+	/**
+	 * With `during`: "During the End Phase: You can ..." (not "your"): also in the opponent's turn. The player whose turn it is not is
+	 * offered it once the turn player has passed in the open game state of that phase (they then hold priority there), and activates
+	 * it as Chain Link 1; afterwards the turn player has priority again in the same phase. Konami's Japanese Q&A fid 11533 (OCG only;
+	 * records `end-phase-turn-player-first`, `end-phase-other-player-next`).
+	 */
+	readonly eitherTurn?: true;
 	/** Trigger: a mandatory ("you must") effect, or optional ("you can"). Default optional. */
 	readonly mandatory?: boolean;
 	/**
@@ -265,6 +280,12 @@ export interface EffectRecord {
 	 * the cost left ("target Spells/Traps on the field up to the number of Normal Monsters in your GY +1": Lightstorm Dragon).
 	 */
 	readonly targetCount?: TargetCount | ((duel: Duel, ctx: EffectContext) => TargetCount);
+	/**
+	 * With `target`: a rule over the whole choice of targets, read on the board the cost left ("target 2 face-up monsters on the field,
+	 * including a monster you control": S:P Little Knight). Only the combinations it accepts are listed, each once, and the choice is
+	 * checked again at activation. Without it every combination of `targetCount` candidates is legal.
+	 */
+	readonly targetCheck?: (duel: Duel, ctx: EffectContext, targets: readonly number[]) => boolean;
 	/**
 	 * Coupled targets, instead of `target`: each group is chosen from its own candidates, read on the board the cost left, and a card is
 	 * never in two groups ("target 1 card on each side": two groups of one). With `sameCount`, every group has the same number of
@@ -383,6 +404,9 @@ export interface MaterialContext {
 
 export type MaterialFilter = (duel: Duel, card: CardInstance, ctx: MaterialContext) => boolean;
 
+/** The Summons a card may be barred from as material (`CardDef.cannotBeMaterial`). */
+export type MaterialKind = "fusion" | "synchro" | "xyz" | "link";
+
 /** One line of a material "recipe": "1 Tuner", "1+ non-Tuner Dragon monsters", "2 Level 4 monsters". A card fills one slot. */
 export interface MaterialSlot {
 	readonly filter?: MaterialFilter;
@@ -473,13 +497,24 @@ export interface CardDef {
 	 * it, from anywhere, even after a proper Summon. A Special Summon an effect says "is treated as a Synchro Summon" is that procedure
 	 * (`specialSummon` with `kind`: Crimson Dragon's wording).
 	 */
-	readonly summon?: { readonly cannotBeNegated?: readonly ("normal" | "special")[]; readonly cannotBeNormalSummoned?: true; readonly mustFirstBeProper?: true; readonly onlyByOwnProcedure?: true };
+	/**
+	 * `oncePerTurn`: "You can only Special Summon "[this card's name](s)" once per turn" (Sky Striker Ace - Hayate): each player, once a
+	 * turn for that name, by any way (`specialOnceUsed`, src/modifiers.ts). Not an effect.
+	 */
+	readonly summon?: { readonly cannotBeNegated?: readonly ("normal" | "special")[]; readonly cannotBeNormalSummoned?: true; readonly mustFirstBeProper?: true; readonly onlyByOwnProcedure?: true; readonly oncePerTurn?: true };
 	/**
 	 * Printed parts of the card the core does not apply yet (for Infinite Impermanence, `"column"`: step 7). The card is
 	 * playable but not done. This is the card as the game imports it (step 10's port refuses a card that has any); its
 	 * `CardSources.deferred` names the same parts at test time, and a definition-of-done test checks the two agree.
 	 */
 	readonly unmodelled?: readonly string[];
+	/**
+	 * "This card cannot be used as Link Material" (`["link"]`; Sky Striker Ace = Zero), or as Fusion, Synchro or Xyz Material: the card
+	 * is never among the materials of a Summon of that kind, performed by the player or by an effect. Not an effect: it holds while the
+	 * card's effects are negated (Konami's Japanese notes on that card, OCG only: records `cannot-be-link-material-not-an-effect`,
+	 * `cannot-be-link-material-while-negated`).
+	 */
+	readonly cannotBeMaterial?: readonly MaterialKind[];
 }
 
 /** The Spell Speed of an effect of a card: fixed by the kind of card for a card activation, by the type otherwise. */

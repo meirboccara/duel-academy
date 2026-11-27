@@ -67,7 +67,7 @@ export const BLUE_EYES_WHITE_DRAGON_THE_WHITE_PHANTOM_BEAST: CardDef = {
 			event: (_duel, event, { card }) => event.type === "summoned" && event.how === "special" && event.card.id === card.id && (event.from === "hand" || event.from === "deck"),
 			operation: (duel, link) => {
 				const destroyed = moveCards(duel, duel.piles[other(link.player)].monster, { zone: "graveyard", reason: "destroyed", destruction: effectDestruction(link) });
-				return addModifier(destroyed, { affects: () => false, until: duel.turn.number, layer: { kind: "lock", what: "attack-directly", who: link.player, only: (board, monster) => !belongsTo(board, monster.id, BLUE_EYES) } });
+				return addModifier(destroyed, { affects: () => false, until: duel.turn.number, layer: { kind: "lock", what: "attack-directly", who: link.player, only: (board, monster) => !belongsTo(board, monster.id, BLUE_EYES), describe: 'except with "Blue-Eyes" monsters' } });
 			},
 		},
 		{
@@ -77,7 +77,7 @@ export const BLUE_EYES_WHITE_DRAGON_THE_WHITE_PHANTOM_BEAST: CardDef = {
 				const top = duel.chain[duel.chain.length - 1];
 				return top !== undefined && card.zone === "monster" && card.face === "up" && top.targets.some((id, at) => id === card.id && duel.cards[id]!.moves === top.targetMoves[at]);
 			},
-			cost: { pick: (duel, { player }) => duel.piles[player].hand.map((id) => [id]), pay: (duel, _ctx, picked) => moveCards(duel, picked, { zone: "graveyard" }) },
+			cost: { pick: (duel, { player }) => duel.piles[player].hand.map((id) => [id]), pay: (duel, _ctx, picked) => moveCards(duel, picked, { zone: "graveyard", reason: "discarded" }) },
 			operation: (duel, link) => (link.answers === null ? duel : negateEffect(duel, link.answers)),
 		},
 	],

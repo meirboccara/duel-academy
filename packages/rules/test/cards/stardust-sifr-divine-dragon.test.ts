@@ -230,6 +230,12 @@ describe("Stardust Sifr Divine Dragon, written as effect records", () => {
 			const theirTurn = board({ graveyard: [card, "fixture-stardust-8"] }, { monsters: ["fixture-field-quick-a"] }, { everyWindow: true }, "rival");
 			expect(own(play(theirTurn, "activate fixture-field-quick-a"), effect)).toEqual([]);
 		});
+		it(`${cites("stardust-sifr-divine-dragon", "revive")} really banishes itself as its cost while its controller has Blue-Eyes Ultimate Spirit Dragon (which stops only the opponent)`, () => {
+			const duel = graveyardBoard({ monsters: ["blue-eyes-ultimate-spirit-dragon"] });
+			const done = settle(play(duel, `${effect} > fixture-stardust-8`));
+			expect(find(done, card).zone).toBe("banished");
+			expect(find(done, "fixture-stardust-8").zone).toBe("monster");
+		});
 		it(`${cites("stardust-sifr-divine-dragon", "notes-revive-synchro")} a Synchro Monster can be the target only if it was Synchro Summoned before`, () => {
 			const start = board({ extra: ["fixture-stardust-synchro-8"], graveyard: [card] });
 			const never = moveCard(start, find(start, "fixture-stardust-synchro-8").id, { zone: "graveyard" });

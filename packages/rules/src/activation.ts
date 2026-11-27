@@ -6,7 +6,7 @@ import { type CardInstance, type Duel, type Link, moveCard, type Side } from "./
 import { type Action, sameIds } from "./action";
 import { dropWhen, type GameEvent } from "./events";
 import { type CardDef, type Cost, type CostSpec, type Declaration, type EffectContext, type EffectMode, type EffectRecord, effectOf, type Operation, sameDeclaration, speedOf, type TargetCount, type TargetGroup } from "./effects";
-import { activationLocked, anyShield, canBeTargetedBy, drawLocked, isNegatedLasting, locked } from "./modifiers";
+import { activationLocked, anyShield, atk, canBeTargetedBy, def, drawLocked, isNegatedLasting, locked } from "./modifiers";
 import { hitByCardNegation } from "./negation";
 import { isSpent, keyOf, spend } from "./once";
 
@@ -44,6 +44,7 @@ interface Facet {
 	readonly condition?: EffectMode["condition"];
 	readonly target?: EffectRecord["target"];
 	readonly targetCount?: EffectRecord["targetCount"];
+	readonly targetCheck?: EffectRecord["targetCheck"];
 	readonly categories?: EffectRecord["categories"];
 	readonly declare?: EffectRecord["declare"];
 	readonly targetGroups?: EffectRecord["targetGroups"];
@@ -69,8 +70,18 @@ const facetOf = (effect: EffectRecord, mode: number | undefined): Facet => (mode
 /** What a link does when it resolves: the operation of the mode chosen, or the record's. */
 export const operationOf = (effect: EffectRecord, link: Link): Operation => facetOf(effect, link.mode).operation!;
 
-/** A cost as the ways of paying it: a plain function is one way, with no card chosen. */
-const costSpecOf = (cost: Cost): CostSpec => (typeof cost === "function" ? { pay: (duel, ctx) => cost(duel, ctx) } : cost);
+/**
+ * A cost as the ways of paying it: a plain function is one way, with no card chosen. Every payment goes through `payCost`.
+ */
+const costSpecOf = (cost: Cost): CostSpec => (typeof cost === "function" ? { pay: (duel, ctx) => payCost(duel, cost(duel, ctx)) } : { ...cost, pay: (duel, ctx, picked) => payCost(duel, cost.pay(duel, ctx, picked)) });
+
+/**
+ * A payment that "sent" a card to the Graveyard which was banished instead (`Duel.sentInstead`, an effect such as "any card sent to the
+ * GY is banished instead") did not pay the cost: the card or effect cannot be activated that way. Konami's Japanese Q&A fid 14540 (OCG
+ * only; record `send-cost-replaced-unpaid`): "the cost of sending a card to the GY cannot be paid". A discard (`reason: "discarded"`),
+ * a Tribute or a material is still paid, the card banished (fid 23815, case A, record `discard-cost-replaced-paid`).
+ */
+const payCost = (before: Duel, after: Duel | null): Duel | null => (after !== null && after.sentInstead > before.sentInstead ? null : after);
 
 /** The ways a cost can be paid, as lists of the cards chosen: the spec's `pick`, or the one way with no choice. */
 const waysToPay = (cost: CostSpec, duel: Duel, ctx: EffectContext) => (cost.pick ? cost.pick(duel, ctx) : PAY_WITH_NO_CHOSEN_CARDS);
@@ -146,7 +157,9 @@ function legalTargets(duel: Duel, ctx: EffectContext, facet: Facet, targets: rea
 	if (facet.target) {
 		const candidates = targetable(duel, ctx, facet.target(duel, ctx));
 		const { min, max } = countOf(facet, duel, ctx);
-		return targets.length < min || targets.length > max || new Set(targets).size !== targets.length || !targets.every((target) => candidates.includes(target)) ? null : NO_GROUPS;
+		if (targets.length < min || targets.length > max || new Set(targets).size !== targets.length || !targets.every((target) => candidates.includes(target))) return null;
+		// A rule over the whole choice ("including a monster you control").
+		return facet.targetCheck && !facet.targetCheck(duel, ctx, targets) ? null : NO_GROUPS;
 	}
 	if (!facet.targetGroups) return targets.length > 0 ? null : NO_GROUPS;
 	const matching = groupCombinations(targetableGroups(duel, ctx, facet.targetGroups(duel, ctx)), facet.sameCount === true, Infinity).filter((choice) => sameIds(choice.targets, targets) && (groups === undefined || sameIds(choice.sizes, groups)));
@@ -170,7 +183,7 @@ function placed(duel: Duel, effect: EffectRecord, card: CardInstance, slot?: num
  */
 function checkDefinition(card: CardInstance, effect: EffectRecord): void {
 	if (effect.modes) {
-		if (effect.operation || effect.target || effect.targetCount || effect.declare || effect.categories || effect.targetGroups || effect.sameCount || effect.modes.length === 0) throw new Error(`${card.code}: an effect with modes has its operation, targets and declaration in each mode`);
+		if (effect.operation || effect.target || effect.targetCount || effect.targetCheck || effect.declare || effect.categories || effect.targetGroups || effect.sameCount || effect.modes.length === 0) throw new Error(`${card.code}: an effect with modes has its operation, targets and declaration in each mode`);
 		for (const mode of effect.modes) checkTargets(card, mode);
 		checkCost(card, effect);
 		return;
@@ -190,6 +203,7 @@ function checkCost(card: CardInstance, effect: EffectRecord): void {
 
 function checkTargets(card: CardInstance, facet: Facet & { readonly targetCount?: unknown }): void {
 	if (facet.targetCount && !facet.target) throw new Error(`${card.code}: an effect with a targetCount needs a target function`);
+	if (facet.targetCheck && !facet.target) throw new Error(`${card.code}: an effect with a targetCheck needs a target function`);
 	if (facet.targetGroups && facet.target) throw new Error(`${card.code}: an effect targets with target or with targetGroups, not both`);
 	if (facet.sameCount && !facet.targetGroups) throw new Error(`${card.code}: sameCount needs targetGroups`);
 }
@@ -230,8 +244,12 @@ export function activationWays(duel: Duel, ctx: EffectContext, index: number, ef
 			const facet = facets[f]!;
 			const room = firstOnly ? 1 : Infinity;
 			const at = { ...ctx, card: after.cards[ctx.card.id]! };
+			const check = facet.targetCheck;
 			const targetChoices: readonly { readonly targets: readonly number[]; readonly sizes?: readonly number[] }[] = facet.target
-				? combinations(targetable(after, at, facet.target(after, at)), countOf(facet, after, at), room).map((targets) => ({ targets }))
+				? check
+					? // A rule over the whole choice: every combination is built, and only those it accepts are kept.
+						combinations(targetable(after, at, facet.target(after, at)), countOf(facet, after, at), Infinity).filter((targets) => check(after, at, targets)).slice(0, room).map((targets) => ({ targets }))
+					: combinations(targetable(after, at, facet.target(after, at)), countOf(facet, after, at), room).map((targets) => ({ targets }))
 				: facet.targetGroups
 					? groupCombinations(targetableGroups(after, at, facet.targetGroups(after, at)), facet.sameCount === true, room)
 					: NO_TARGET_CHOICE.map((targets) => ({ targets }));
@@ -390,7 +408,9 @@ export function activateEffect(duel: Duel, player: Side, card: CardInstance, ind
 	if (next.lingering.length > 0) next = { ...next, lingering: [] };
 	const key = keyOf(effect, player, card, index);
 	const wasSet = effect.type === "activation" && card.face === "down" && (card.zone === "spell" || card.zone === "field");
-	const link = { ...newLink(next, player, activated, index, facet, targets, key, answering, triggered), effectNegated: negatedCard, wasSet, ...(declared === undefined ? {} : { declared }), ...(sizes === undefined ? {} : { targetGroups: sizes }), ...(triggered ? { triggered } : {}) };
+	// A monster's ATK and DEF as it activates, before the cost (`Link.stats`): a monster that is its own cost is judged by these.
+	const stats = activated.zone === "monster" && activated.face === "up" ? { atk: atk(placedDuel, card.id), def: def(placedDuel, card.id) } : undefined;
+	const link = { ...newLink(next, player, activated, index, facet, targets, key, answering, triggered), effectNegated: negatedCard, wasSet, ...(declared === undefined ? {} : { declared }), ...(sizes === undefined ? {} : { targetGroups: sizes }), ...(triggered ? { triggered } : {}), ...(stats ? { stats } : {}) };
 	// The activation is noted for the turn ("the turn you activate this effect, ..."): it stays noted if it is negated.
 	return { ...spend(next, effect, key), chain: [...next.chain, link], activations: [...next.activations, { player, card: activated, effect: index }] };
 }

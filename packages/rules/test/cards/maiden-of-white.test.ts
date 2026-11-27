@@ -59,6 +59,16 @@ describe("Maiden of White, written as effect records", () => {
 			const choice = play(three, "choose true-light", "place 0");
 			expect(codes(choice, "you", "spell")).toEqual([TL]);
 		});
+		it(`${cites("maiden-of-white", "place")} ${cites("true-light", "notes-effect-in-zone")} the True Light it places face-up then works: its effect Special Summons "Blue-Eyes White Dragon" from the hand, and Maiden in the GY answers that Summon`, () => {
+			const start = board({ hand: [card, BEWD], deck: [TL] });
+			const placed = play(start, `activate ${card}`, "place 2");
+			expect(find(placed, TL)).toMatchObject({ zone: "spell", slot: 2, face: "up" });
+			expect(own(placed, `activate ${TL}`)).toEqual([`activate ${TL} :0`]);
+			const summoned = play(placed, `activate ${TL} :0`, "place 0");
+			expect(codes(summoned, "you", "monster")).toEqual([BEWD]);
+			expect(find(summoned, TL)).toMatchObject({ zone: "spell", face: "up" });
+			expect(own(summoned, `activate ${card}`)).toEqual([`activate ${card}`]);
+		});
 		it(`${cites("maiden-of-white", "place")} needs a "True Light" in the hand, Deck or GY and a free Spell & Trap Zone to be activated, and not from the Graveyard (a free zone: YGOProJudge only, no source cited)`, () => {
 			expect(own(board({ hand: [card] }), `activate ${card}`)).toEqual([]);
 			expect(own(board({ graveyard: [card], deck: [TL] }), `activate ${card}`)).toEqual([]);

@@ -256,11 +256,13 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Pot of Sloth",
-        "count": 2
+        "count": 2,
+        "code": "pot-of-sloth"
       },
       {
         "name": "Radiant Typhoon Vision",
-        "count": 3
+        "count": 3,
+        "code": "radiant-typhoon-vision"
       },
       {
         "name": "Raigeki",
@@ -269,35 +271,43 @@ const DECKS: readonly DeckManifest[] = [
       },
       {
         "name": "Sky Striker Ace - Raye",
-        "count": 3
+        "count": 3,
+        "code": "sky-striker-ace-raye"
       },
       {
         "name": "Sky Striker Ace - Roze",
-        "count": 2
+        "count": 2,
+        "code": "sky-striker-ace-roze"
       },
       {
         "name": "Sky Striker Mecha - Shark Cannon",
-        "count": 1
+        "count": 1,
+        "code": "sky-striker-mecha-shark-cannon"
       },
       {
         "name": "Sky Striker Mecha - Widow Anchor",
-        "count": 1
+        "count": 1,
+        "code": "sky-striker-mecha-widow-anchor"
       },
       {
         "name": "Sky Striker Mobilize - Engage!",
-        "count": 2
+        "count": 2,
+        "code": "sky-striker-mobilize-engage"
       },
       {
         "name": "Sky Striker Mobilize - Linkage!",
-        "count": 3
+        "count": 3,
+        "code": "sky-striker-mobilize-linkage"
       },
       {
         "name": "Sky Striker Special Maneuver - Lemnisgate!",
-        "count": 2
+        "count": 2,
+        "code": "sky-striker-special-maneuver-lemnisgate"
       },
       {
         "name": "The Fallen & The Virtuous",
-        "count": 3
+        "count": 3,
+        "code": "the-fallen-and-the-virtuous"
       },
       {
         "name": "Upstart Goblin",
@@ -308,43 +318,53 @@ const DECKS: readonly DeckManifest[] = [
     "extra": [
       {
         "name": "Ecclesia and the Dark Dragon",
-        "count": 1
+        "count": 1,
+        "code": "ecclesia-and-the-dark-dragon"
       },
       {
         "name": "Prototype Sky Striker Ace - Amatsu",
-        "count": 1
+        "count": 1,
+        "code": "prototype-sky-striker-ace-amatsu"
       },
       {
         "name": "S:P Little Knight",
-        "count": 1
+        "count": 1,
+        "code": "sp-little-knight"
       },
       {
         "name": "Sky Striker Ace - Azalea",
-        "count": 1
+        "count": 1,
+        "code": "sky-striker-ace-azalea"
       },
       {
         "name": "Sky Striker Ace - Hayate",
-        "count": 2
+        "count": 2,
+        "code": "sky-striker-ace-hayate"
       },
       {
         "name": "Sky Striker Ace - Kagari",
-        "count": 3
+        "count": 3,
+        "code": "sky-striker-ace-kagari"
       },
       {
         "name": "Sky Striker Ace - Shizuku",
-        "count": 1
+        "count": 1,
+        "code": "sky-striker-ace-shizuku"
       },
       {
         "name": "Sky Striker Ace - Zeke",
-        "count": 1
+        "count": 1,
+        "code": "sky-striker-ace-zeke"
       },
       {
         "name": "Sky Striker Ace = Zero",
-        "count": 3
+        "count": 3,
+        "code": "sky-striker-ace-zero"
       },
       {
         "name": "The Dragon that Devours the Dogma",
-        "count": 1
+        "count": 1,
+        "code": "the-dragon-that-devours-the-dogma"
       }
     ],
     "side": [

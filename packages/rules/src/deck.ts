@@ -1,6 +1,6 @@
 import { type CardInstance, cardsIn, type Duel, moveCards, type Side, type Zone } from "./duel";
 import { ask } from "./effects";
-import { raiseEvent } from "./events";
+import { raiseEvent, tell } from "./events";
 import { lose } from "./life";
 import { drawLocked } from "./modifiers";
 import { createRng, type Rng } from "./rng";
@@ -52,7 +52,8 @@ export function pickRandom(duel: Duel, from: readonly number[], count = 1): { re
 		while (picked.length < count && left.length > 0) picked.push(left.splice(rng.int(left.length), 1)[0]!);
 		return picked;
 	});
-	return { duel: next, picked: value };
+	// Told to the log only (no rule reads the story): how many, of how many, never which.
+	return { duel: tell(next, { type: "random-pick", picked: value.length, of: new Set(from).size }), picked: value };
 }
 
 /** A card shown to both players, known while it stays where it was shown: same `moves`, same zone, and in a Deck the same place in it. */
@@ -124,10 +125,21 @@ export function askBottomOrder(duel: Duel, player: Side, ids: readonly number[],
 export function drawCards(duel: Duel, side: Side, count: number): Duel {
 	if (count <= 0 || drawLocked(duel, side)) return duel;
 	const deck = duel.piles[side].deck;
-	const moved = moveCards(duel, deck.slice(0, count), { zone: "hand" });
+	const moved = moveCards(tell(duel, { type: "draw", batch: duel.batches + 1 }), deck.slice(0, count), { zone: "hand" });
 	// The turn remembers that this player drew by a card effect (`drewByEffect`), once a card really came to the hand.
 	const drawn = moved.piles[side].deck.length < deck.length && !moved.drewByEffect.includes(side) ? { ...moved, drewByEffect: [...moved.drewByEffect, side] } : moved;
 	return deck.length < count ? lose(drawn, side) : drawn;
+}
+
+/**
+ * The Draw Phase's normal draw (RB10 p. 35): not a card effect, so no `drewByEffect` and no "cannot draw by card effects"
+ * lock. It is still an add from the Main Deck to the hand, so its `moved` / `added-to-hand` events can trigger effects,
+ * and an "add from the Deck to the hand" lock stops it like other draws: `moveCards` leaves the card in the Deck (`stays`), and
+ * the player does not lose (the core's reading, no Konami page). With no card to draw, the player loses.
+ */
+export function normalDraw(duel: Duel, side: Side): Duel {
+	const top = duel.piles[side].deck[0];
+	return top === undefined ? lose(duel, side) : moveCards(tell(duel, { type: "draw", batch: duel.batches + 1, normal: true }), [top], { zone: "hand" });
 }
 
 /**

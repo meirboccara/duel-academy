@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { atk, CARD_DEFS, type CardDef, cardTypeOf, cites, type Duel, effectDestruction, fromSpells, moveCard, negateActivationAndDestroy, negateEffect, targetsOf } from "../../src";
+import { addModifier, atk, CARD_DEFS, type CardDef, cardTypeOf, cites, type Duel, effectDestruction, fromSpells, moveCard, negateActivationAndDestroy, negateEffect, targetsOf } from "../../src";
 import { codes, offered, play, position, type SideSpec } from "../rules/fixtures";
 
 const card = "wishes-for-eyes-of-blue";
@@ -48,6 +48,15 @@ const activations = (duel: Duel) => offered(duel).filter((label) => label.starts
 const find = (duel: Duel, code: string) => Object.values(duel.cards).find((entry) => entry.code === code)!;
 
 describe("Wishes for Eyes of Blue, written as effect records", () => {
+	it(`${cites("wishes-for-eyes-of-blue", "qa-discard-while-banished-instead")} can be activated while cards sent to the GY are banished instead: the discard is banished and the effect still resolves`, () => {
+		const start = board({ hand: [card, "test-bewd"], deck: ["effect-veiler", "test-roar"] });
+		const replaced = addModifier(start, { affects: () => false, until: Number.MAX_SAFE_INTEGER, layer: { kind: "redirect", from: "graveyard", to: "banished" } });
+		expect(activations(replaced)).toEqual([`activate ${card} ~ test-bewd`]);
+		const done = play(replaced, `activate ${card} ~ test-bewd`);
+		// The discarded card and the resolved Spell itself (also "sent to the GY") are banished.
+		expect(codes(done, "you", "banished").sort()).toEqual(["test-bewd", card].sort());
+		expect(codes(done, "you", "hand").sort()).toEqual(["effect-veiler", "test-roar"]);
+	});
 	it(`${cites("wishes-for-eyes-of-blue", "search")} discards 1 card as its cost, then adds 1 Level 1 LIGHT Tuner and 1 Spell/Trap that mentions "Blue-Eyes White Dragon" from the Deck to the hand, never another copy of itself`, () => {
 		const start = board({ hand: [card, "test-bewd", "test-other-dragon"], deck: ["effect-veiler", "test-roar", "test-trap", card, "test-light-1"] });
 		// One activation per card that can be discarded: the card itself is on the field by then.

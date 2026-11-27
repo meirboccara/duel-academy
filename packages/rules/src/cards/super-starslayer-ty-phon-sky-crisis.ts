@@ -55,7 +55,7 @@ export const SUPER_STARSLAYER_TY_PHON_SKY_CRISIS: CardDef = {
 			type: "continuous",
 			condition: (_duel, { card }) => card.summonedBy === "xyz",
 			affects: () => false,
-			modifies: () => [{ kind: "lock", what: "activate", who: "both", stops: (duel, attempt) => attempt.def.kind === "monster" && attempt.effect.type !== "activation" && attempt.card.zone === "monster" && attempt.card.face === "up" && atk(duel, attempt.card.id) >= 3000 }],
+			modifies: () => [{ kind: "lock", what: "activate", who: "both", stops: (duel, attempt) => attempt.def.kind === "monster" && attempt.effect.type !== "activation" && attempt.card.zone === "monster" && attempt.card.face === "up" && atk(duel, attempt.card.id) >= 3000, describe: "the effects of monsters with 3000 or more ATK" }],
 		},
 		{
 			type: "ignition",

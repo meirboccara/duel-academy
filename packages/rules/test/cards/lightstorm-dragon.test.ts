@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ask, askSpecialSummon, banishWhenItLeaves, CARD_DEFS, type CardDef, cites, type Duel, printedFacts } from "../../src";
 import { toStep } from "../rules/battle-fixtures";
 import { gapCards } from "../rules/blue-eyes-gap-fixtures";
-import { codes, offered, play, position, type SideSpec } from "../rules/fixtures";
+import { codes, lastingLines, offered, play, position, type SideSpec } from "../rules/fixtures";
 import { blueEyesFixtures } from "./blue-eyes-fixtures";
 import { extraDeckFixtures } from "./extra-deck-fixtures";
 
@@ -137,6 +137,7 @@ describe("Lightstorm Dragon, written as effect records", () => {
 				return next;
 			};
 			const later = myTurn(set);
+			expect(lastingLines(later).join("\n")).toContain("you cannot activate it unless you control a Normal Monster");
 			// The copy in the hand is activated; the Set one cannot be.
 			const labels = offered(later).filter((label) => label.startsWith("activate pot-of-greed"));
 			expect(labels).toEqual(["activate pot-of-greed"]);

@@ -46,7 +46,7 @@ const setFromGraveyard = (zone: "graveyard" | "banished"): EffectRecord => ({
 				return addModifier(board, {
 					affects: () => false,
 					until: FOREVER,
-					layer: { kind: "lock", what: "activate", who: link.player, stops: (now, attempt) => attempt.effect.type === "activation" && attempt.card.id === set.id && attempt.card.moves === set.moves && !controlsNormalMonster(now, link.player) },
+					layer: { kind: "lock", what: "activate", who: link.player, stops: (now, attempt) => attempt.effect.type === "activation" && attempt.card.id === set.id && attempt.card.moves === set.moves && !controlsNormalMonster(now, link.player), describe: "it unless you control a Normal Monster" },
 				});
 			},
 		});

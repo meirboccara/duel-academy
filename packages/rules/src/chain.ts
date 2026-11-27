@@ -1,21 +1,22 @@
 import { activateAction, activateEffect, activationWays, costChoice, operationOf } from "./activation";
 import { ask } from "./effects";
 import { type Action, PASS, type Placing, sameAction, takes } from "./action";
-import { type CardInstance, closedPriority, destroyCard, type Destruction, type Duel, freeSlots, type Link, moveCard, other, PHASES, type Side } from "./duel";
+import { type CardInstance, closedPriority, destroyCard, type Destruction, type Duel, freeSlots, type Link, moveCard, moveCards, other, phaseAfter, PHASES, type Side } from "./duel";
 import { PENDULUM_SLOTS } from "./zones";
 
 /** The Field Zone: one zone, always open to a Field Spell (the one there is sent to the Graveyard). */
 const FIELD_ZONE: readonly number[] = Object.freeze([0]);
-import { breakEffect, type GameEvent, raiseEvent } from "./events";
+import { breakBeforeLink, breakEffect, type GameEvent, raiseEvent, tell } from "./events";
 import { type CardDef, type EffectRecord, effectOf, inFieldRange, type Operation, rangeOf, sameDeclaration, speedOf } from "./effects";
-import { type EffectSource, extraNormalSummon, returnControl, summonLocked, unaffectedBy, withoutEnded } from "./modifiers";
+import { type EffectSource, extraNormalSummon, summonLocked, unaffectedBy, withoutEnded } from "./modifiers";
 import { cardNegated, immune } from "./negation";
 import { endChain, newTurn, refund } from "./once";
 import { beginSummon, finishSummon, openPendingSummon } from "./summon";
 import { beginFlipSummon, canBeNormalSummoned, canChangePosition, canFlipSummon, canPendulumSummon, canStartProcedure, canTribute, changePositionByHand, procedureWays, setMonster, startPendulumSummon, startProcedure, startTribute, summonPositions, tributesNeeded } from "./procedures";
 import { advanceBattle, attackActions, damageStepAllows, declareAttack } from "./battle";
 import { chooseTrigger, declineTriggers, triggerActions, triggerPoint } from "./triggers";
-import { applyDelayed, delayedActions, expireDelayed, mustApply } from "./delayed";
+import { anythingDelayed, applyDelayed, delayedActions, expireDelayed, mustApply } from "./delayed";
+import { normalDraw } from "./deck";
 
 /**
  * Step 2 of docs/rules-core-spec.md: one chain and the priority loop, after Konami's Fast Effect Timing chart.
@@ -59,7 +60,7 @@ import { applyDelayed, delayedActions, expireDelayed, mustApply } from "./delaye
  * - Delayed effects (src/delayed.ts): in their phase, with the game state open, the holder of priority may apply theirs (`apply`, an
  *   action that starts no chain); while a mandatory one of theirs is due, `pass` is not offered to them.
  *
- * Not here yet: the normal draw. Known limit: a Spell or Trap whose control changed while on the chain is not swept
+ * The normal draw is in `nextPhase` for Duels begun with `startDuel`. Known limit: a Spell or Trap whose control changed while on the chain is not swept
  * to the Graveyard (the sweep matches the card as activated, move count included).
  */
 /**
@@ -97,10 +98,70 @@ function activatedAway(defs: Duel["defs"]): ReadonlySet<string> {
 	return found;
 }
 
+const duringCache = new WeakMap<object, ReadonlySet<string>>();
+
+/** The codes of the cards with an optional Trigger Effect of a phase (`EffectRecord.during`), per `defs` (shared, never changed). */
+function duringCodes(defs: Duel["defs"]): ReadonlySet<string> {
+	let found = duringCache.get(defs);
+	if (!found) {
+		found = new Set(Object.values(defs).filter((def: CardDef) => def.effects?.some((effect) => effect.during !== undefined)).map((def) => def.code));
+		duringCache.set(defs, found);
+	}
+	return found;
+}
+
+/** Where a phase's Trigger Effect may be activated from, by its range. */
+const PHASE_TRIGGER_ZONES = { hand: ["hand"], graveyard: ["graveyard"], banished: ["banished"] } as const;
+
+/**
+ * "During your Standby Phase: You can ..." (`EffectRecord.during`): the turn player's optional Trigger Effects of the phase, listed in
+ * the open game state of that phase, while the turn player holds priority (box A), so each is Chain Link 1. Not only as the phase begins:
+ * later in the phase too (after a chain resolved there), once its card is where it activates from (also a card that arrived there during
+ * the phase) and its condition holds then. Once per phase for the card as it is (the activations of this turn). YGOProJudge's answer
+ * only (asked 2026-11-26, chat closed; no source cited, it named the Fast Effect Timing chart, whose page says nothing on it: checked).
+ *
+ * "During the End Phase: You can ..." (`eitherTurn`): the other player's too. They hold priority in the open game state of the phase
+ * once the turn player has passed there, and may then activate theirs, as Chain Link 1 as well; after that chain the turn player has
+ * priority again in the same phase. Konami's Japanese Q&A fid 11533 (OCG only; records `end-phase-turn-player-first`,
+ * `end-phase-other-player-next`, `end-phase-optional-after-mandatory`).
+ */
+function phaseTriggers(duel: Duel, out: Action[] | null, only: number | undefined): boolean {
+	const player = duel.priority.holder;
+	const ownTurn = player === duel.turn.player;
+	const codes = duringCodes(duel.defs);
+	let found = false;
+	for (const zone of ["monster", "spell", "field", "hand", "graveyard", "banished"] as const) {
+		for (const id of duel.piles[player][zone]) {
+			if (only !== undefined && id !== only) continue;
+			const card = duel.cards[id]!;
+			if (!codes.has(card.code)) continue;
+			const def = duel.defs[card.code]!;
+			const effects = def.effects!;
+			for (let index = 0; index < effects.length; index++) {
+				const effect = effects[index]!;
+				if (effect.during !== duel.turn.phase || effect.type !== "trigger" || effect.mandatory || (!ownTurn && !effect.eitherTurn)) continue;
+				const range = rangeOf(effect);
+				const here = range in PHASE_TRIGGER_ZONES ? (PHASE_TRIGGER_ZONES[range as keyof typeof PHASE_TRIGGER_ZONES] as readonly string[]).includes(zone) && (zone === "hand" || card.face === "up") : inFieldRange(def, card, range);
+				if (!here) continue;
+				if (duel.activations.some((made) => made.card.id === id && made.card.moves === card.moves && made.effect === index)) continue;
+				const ways = activationWays(duel, { player, card }, index, effect, out === null);
+				if (ways.length === 0) continue;
+				if (!out) return true;
+				found = true;
+				for (const way of ways) out.push(activateAction(id, index, way));
+			}
+		}
+	}
+	return found;
+}
+
 /** Lists what the holder of priority can do besides passing; with no list, only tells whether there is anything. */
 function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 	const { chain, priority, turn, options, defs } = duel;
 	if (options.chainLimit !== null && chain.length >= options.chainLimit) return false;
+	// The End Phase is closing (`Duel.closing`): only answers to the chain the hand size discard set off (and to a Summon it performs),
+	// and, with nothing on the chain, the mandatory delayed processes still owed in that End Phase (src/delayed.ts; no fresh chain).
+	if (duel.closing && chain.length === 0 && !duel.summoning) return anythingDelayed(duel) && delayedActions(duel, out, only);
 	const player = priority.holder;
 	const topSpeed = chain.length > 0 ? chain[chain.length - 1]!.speed : 0;
 	const ownTurn = player === turn.player;
@@ -247,6 +308,12 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 			}
 		}
 	}
+	// "During your Standby Phase: You can ...": optional Trigger Effects of the phase (`EffectRecord.during`), in an open game state:
+	// the turn player's, and, once the turn player has passed, the other player's "during the End Phase" ones (`eitherTurn`).
+	if (priority.open && chain.length === 0 && !duel.battle && !duel.summoning && duringCodes(defs).size > 0 && phaseTriggers(duel, out, only)) {
+		if (!out) return true;
+		found = true;
+	}
 	// Step 8: the Summons of the Extra Deck's monsters by their own procedure (Synchro, Xyz, Link, contact Fusion), each listed once
 	// when one legal set of materials exists, and the Pendulum Summon.
 	if (slow) {
@@ -274,8 +341,8 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 		if (!out) return true;
 		found = true;
 	}
-	// The delayed effects of the player that are due in this phase.
-	if (duel.delayed.length > 0 && delayedActions(duel, out, only)) {
+	// The delayed effects of the player that are due in this phase, and the monsters they took "until the End Phase" to give back.
+	if (anythingDelayed(duel) && delayedActions(duel, out, only)) {
 		if (!out) return true;
 		found = true;
 	}
@@ -290,7 +357,8 @@ function collect(duel: Duel, out: Action[] | null, only?: number): boolean {
 export function act(duel: Duel, action: Action): Duel {
 	const listed = legalMatch(duel, action);
 	if (!listed) throw new Error(`not a legal action for ${duel.asking ? duel.asking.player : duel.priority.holder}: ${JSON.stringify(action)}`);
-	let next = apply(duel, withZone(action, listed));
+	// The story tells what this action does (`Duel.story`): it starts empty.
+	let next = apply(duel.story.length === 0 ? duel : { ...duel, story: [] }, withZone(action, listed));
 	while (!next.winner && !next.building && !next.asking && !next.options.everyWindow && !decides(next) && !collect(next, null)) next = pass(next);
 	return next;
 }
@@ -368,8 +436,12 @@ const unchanged = (duel: Duel): Duel => duel;
 const levelOf = (duel: Duel, id: number): number => duel.defs[duel.cards[id]!.code]?.facts?.level ?? 0;
 
 
-/** In an open game state the turn player always decides for themselves, even when all they can do is end the phase. */
-const decides = (duel: Duel) => duel.chain.length === 0 && duel.priority.open && duel.priority.passed.length === 0 && duel.priority.holder === duel.turn.player;
+/**
+ * In an open game state the turn player always decides for themselves, even when all they can do is end the phase. The Battle Phase's
+ * Start Step and End Step are passed through when nobody can do anything there (they are windows for fast effects: RB10 lists only
+ * "Activate Trap Cards and Quick-Play Spell Cards" besides battles), so ending the Battle Phase stays one decision of the turn player.
+ */
+const decides = (duel: Duel) => duel.chain.length === 0 && duel.priority.open && duel.priority.passed.length === 0 && duel.priority.holder === duel.turn.player && !(duel.turn.phase === "battle" && duel.battleStep !== null && duel.battleStep !== "battle");
 
 function set(duel: Duel, id: number, slot: number | undefined): Duel {
 	// A Field Spell is Set in the Field Zone (step 7), any other Spell or Trap in the Spell & Trap Zone chosen.
@@ -413,9 +485,29 @@ function pass(duel: Duel): Duel {
 	if (duel.summoning) return finishSummon(duel);
 	// An attack moves to its next timing (step 6b).
 	if (duel.battle) return advanceBattle(duel);
+	// The End Phase is closing (`Duel.closing`): its game state does not open again; the hand is checked again and the turn passes.
+	if (!open && duel.closing) return nextPhase(duel);
 	// Nothing happened and both passed: the game state is open again, and the events before are no longer the last thing.
 	if (!open) return { ...breakEffect(duel), priority: { holder: turnPlayer, passed: [], open: true } };
+	// The Battle Phase's steps (RB10): Start Step, then the Battle Step, where the turn player passing ends their attacks, then the End Step.
+	if (duel.turn.phase === "battle") {
+		const step = duel.battleStep ?? "battle";
+		if (step === "start") return nextBattleStep(duel, "battle");
+		if (step === "battle") return nextBattleStep(duel, "end");
+	}
 	return nextPhase(duel);
+}
+
+/**
+ * The Battle Phase moves on to its Battle Step or its End Step (RB10, records `battle-phase-steps`, `start-step`, `end-step`): something
+ * happens, so what came before is no longer the last thing, and the turn player has the game state open (FET: each step starts in box
+ * A). Attacks are declared in the Battle Step only; entering the End Step raises `battle-step` (`step: "end"`), the moment "at the end of
+ * the Battle Phase" effects wait for. Both players passing in the End Step goes on to Main Phase 2.
+ */
+function nextBattleStep(duel: Duel, step: "battle" | "end"): Duel {
+	const next = { ...breakEffect(duel), battleStep: step, replay: null };
+	const open = { holder: duel.turn.player, passed: [], open: true };
+	return step === "end" ? triggerPoint(raiseEvent(next, { type: "battle-step", step, player: duel.turn.player }), open) : { ...next, priority: open };
 }
 
 /**
@@ -438,12 +530,14 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 	for (;;) {
 		if (result === null) {
 			if (next.chain.length === 0) break;
-			next = breakEffect(next);
+			next = breakBeforeLink(next);
 			const index = next.chain.length - 1;
 			const link = next.chain[index]!;
 			all[index] = link;
+			const negated = link.activationNegated ? "activation" : link.effectNegated ? "effect" : cardNegated(next, link) ? "card" : null;
+			next = tell(next, { type: "link-resolves", index, link, negated, lp: next.lp });
 			// A link whose effect was replaced ("that effect becomes ...") does that instead of what its card says; negated, it does neither.
-			result = link.activationNegated || link.effectNegated || cardNegated(next, link) ? next : (link.replaced?.operation ?? operationOf(effectOf(next, link), link))(next, link, index);
+			result = negated ? next : (link.replaced?.operation ?? operationOf(effectOf(next, link), link))(next, link, index);
 		}
 		// The Duel was decided while this link resolved (a draw from an empty Deck): it ends here. Nothing more is asked, the links
 		// below are not resolved and no card is swept: the Duel stays as it stood when it was lost.
@@ -456,10 +550,12 @@ function resolveChain(duel: Duel, activated: readonly Link[], pending: Duel | nu
 			continue;
 		}
 		// The cards this link added to a hand stop being the last thing that happened when the next one resolves; a `lingers` effect may still answer it after the chain.
-		for (const event of result.live) if (event.type === "added-to-hand" && !carried.includes(event)) carried.push(event);
+		// Those added before a "then" of the link were set aside in `lingering` by its `breakEffect`.
+		for (const event of [...result.lingering, ...result.live]) if (event.type === "added-to-hand" && !carried.includes(event)) carried.push(event);
 		next = { ...result, chain: result.chain.slice(0, -1) };
 		result = null;
 	}
+	next = tell(next, { type: "chain-resolved", lp: next.lp });
 	for (const link of all) {
 		const activated = effectOf(next, link);
 		// A Continuous Spell or Trap Card stays on the field (`stays`), as does a Pendulum Monster in its Pendulum Zone (step 7), unless its activation was negated.
@@ -532,25 +628,58 @@ export function resumeAfter(duel: Duel, resume: (duel: Duel) => Duel): Duel {
 	return next.asking ? { ...next, asking: { ...next.asking, resume: next.asking.resume ?? resume } } : resume(next);
 }
 
-/** The next phase, or the other player's next turn after the End Phase. The game state is open, the turn player first. */
+/** The most cards a turn player may keep in hand at the end of their End Phase (RB10). */
+const HAND_LIMIT = 6;
+
+/**
+ * The next phase (`phaseAfter`: on the first player's first turn, Main Phase 1 goes to the End Phase), or the other player's next
+ * turn after the End Phase. The game state is open, the turn player first.
+ */
 function nextPhase(duel: Duel): Duel {
-	const at = PHASES.indexOf(duel.turn.phase);
+	const phase = phaseAfter(duel);
 	// A new phase is something that happens: nothing before it is the last thing any more, and its triggers are chained first.
 	const moved = breakEffect(duel);
-	if (at < PHASES.length - 1) {
-		const phase = PHASES[at + 1]!;
+	if (phase !== null) {
 		const turn = { ...moved.turn, phase };
-		// Control taken "until the End Phase" goes back as it begins (its owner choosing the zone), before its triggers are put on a chain.
+		// Control taken "until the End Phase" is not given back here: it is an End Phase process of the player who took it, done when they
+		// hold priority in the phase (`controlReturnsDue`; Konami's Japanese Q&A fid 11555).
 		const begin = (entered: Duel) => triggerPoint(raiseEvent(entered, { type: "phase", phase, player: turn.player }), { holder: turn.player, passed: [], open: true });
-		// The delayed effects of the phase that is over are gone (an optional one that was not applied).
-		const entering = expireDelayed({ ...moved, turn });
-		return phase === "end" ? resumeAfter(returnControl(entering, turn.number), begin) : begin(entering);
+		// The delayed effects of the phase that is over are gone (an optional one that was not applied). The Battle Phase begins with its Start Step.
+		return begin(expireDelayed({ ...moved, turn, battleStep: phase === "battle" ? "start" : null }));
 	}
+	// RB10, End Phase (record `hand-limit-six`): at the end of the phase, the turn player selects the cards over 6, one at a time, then
+	// discards them together (one move: "select and discard cards"). In `startDuel` play only (`normalDraws`): `createDuel` fixtures keep
+	// any hand size.
+	const hand = duel.piles[duel.turn.player].hand;
+	if (duel.normalDraws && hand.length > HAND_LIMIT) return resumeAfter(selectDiscards({ ...moved, closing: true }, duel.turn.player, hand.length - HAND_LIMIT, []), afterHandLimit);
 	const player: Side = other(duel.turn.player);
 	const turn = { player, number: duel.turn.number + 1, phase: PHASES[0]! };
-	const fresh = expireDelayed({ ...moved, turn, setThisTurn: [], normalSummoned: false, attacked: moved.attacked.length === 0 ? moved.attacked : [], replay: null, again: null, extraNormalSummoned: false, repositioned: [], pendulumSummoned: false, spared: moved.spared.length === 0 ? moved.spared : [], activations: moved.activations.length === 0 ? moved.activations : [], drewByEffect: moved.drewByEffect.length === 0 ? moved.drewByEffect : [], summons: moved.summons.some((note) => note.turn < duel.turn.number) ? moved.summons.filter((note) => note.turn >= duel.turn.number) : moved.summons });
-	return triggerPoint(raiseEvent(newTurn(withoutEnded(fresh, duel.turn.number)), { type: "phase", phase: turn.phase, player }), { holder: player, passed: [], open: true });
+	const fresh = expireDelayed({ ...moved, turn, closing: false, setThisTurn: [], normalSummoned: false, attacked: moved.attacked.length === 0 ? moved.attacked : [], replay: null, again: null, extraNormalSummoned: false, repositioned: [], pendulumSummoned: false, spared: moved.spared.length === 0 ? moved.spared : [], activations: moved.activations.length === 0 ? moved.activations : [], drewByEffect: moved.drewByEffect.length === 0 ? moved.drewByEffect : [], summons: moved.summons.some((note) => note.turn < duel.turn.number) ? moved.summons.filter((note) => note.turn >= duel.turn.number) : moved.summons });
+	const entered = raiseEvent(newTurn(withoutEnded(fresh, duel.turn.number)), { type: "phase", phase: turn.phase, player });
+	// RB10 p. 35: the turn player draws as the Draw Phase begins (none on turn 1: `createDuel` starts there without this step).
+	const drawn = entered.normalDraws ? normalDraw(entered, player) : entered;
+	if (drawn.winner) return drawn;
+	return triggerPoint(drawn, entered.normalDraws ? closedPriority(player) : { holder: player, passed: [], open: true });
 }
+
+/** The hand size discard: `count` cards of `player`'s hand selected one at a time (`chosen` so far), then discarded together, as one batch. */
+function selectDiscards(duel: Duel, player: Side, count: number, chosen: readonly number[]): Duel {
+	if (chosen.length === count) return moveCards(duel, chosen, { zone: "graveyard", reason: "discarded" });
+	const from = duel.piles[player].hand.filter((id) => !chosen.includes(id));
+	return ask(duel, player, from, (board, picked) => selectDiscards(board, player, count, [...chosen, picked]));
+}
+
+/**
+ * After the hand size discard: the Trigger Effects it set off are chained and resolved in that End Phase, before the turn passes
+ * (Konami's Japanese Q&A fid 22996: a card sent from the hand to the GY by the adjustment can activate its "sent to the GY" effect;
+ * record `hand-discard-trigger-activates`); the turn player then has priority, and when both players pass the hand is checked again
+ * (`nextPhase`) and the turn passes. With nothing waiting, the turn passes at once. The End Phase is closing (`Duel.closing`): the
+ * chain can be answered as any chain, but no "during the End Phase" effect can be activated any more (Konami's Japanese Q&A fid 17233,
+ * record `hand-adjustment-end-phase-effect-closed`, says so for Scarm's effect; the core applies it to all), and once it has resolved
+ * nothing starts a new chain and the game state does not open again (the core's reading, no Konami page: a shop blog's account of the
+ * End Phase says the same, a lead only). A mandatory delayed process still owed in that End Phase is applied first (src/delayed.ts).
+ */
+const afterHandLimit = (duel: Duel): Duel => (duel.waiting.length > 0 ? triggerPoint(duel, closedPriority(duel.turn.player)) : nextPhase(duel));
 
 const flag = (duel: Duel, index: number, change: Partial<Link>): Duel => (duel.chain[index] ? { ...duel, chain: duel.chain.map((link, i) => (i === index ? { ...link, ...change } : link)) } : duel);
 
@@ -575,7 +704,7 @@ export function negateActivation(duel: Duel, index: number): Duel {
 	const link = duel.chain[index];
 	// "Cannot be negated" is read now, when the negating effect resolves (record `cannot-be-negated-checked-at-resolution`).
 	if (link && (immune(duel, link, "activation") || shielded(duel, link))) return duel;
-	const flagged = flag(duel, index, { activationNegated: true });
+	const flagged = link ? tell(flag(duel, index, { activationNegated: true }), { type: "link-negated", index, what: "activation" }) : duel;
 	return link ? refund(forsworn(flagged, link), link, effectOf(duel, link)) : flagged;
 }
 
@@ -596,7 +725,7 @@ function forsworn(duel: Duel, link: Link): Duel {
 /** Negates the effect of the link at `index`: the activation stands, the effect is not applied. */
 export const negateEffect = (duel: Duel, index: number): Duel => {
 	const link = duel.chain[index];
-	return link && (immune(duel, link, "effect") || shielded(duel, link)) ? duel : flag(duel, index, { effectNegated: true });
+	return !link || immune(duel, link, "effect") || shielded(duel, link) ? duel : tell(flag(duel, index, { effectNegated: true }), { type: "link-negated", index, what: "effect" });
 };
 
 /**

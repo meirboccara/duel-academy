@@ -53,6 +53,8 @@ export const MAUSOLEUM_OF_WHITE: CardDef = {
 		{
 			type: "ignition",
 			range: "field",
+			// "Send 1 Normal Monster from your hand or Deck to the GY" includes sending from the Deck: Ash Blossom answers it (YGOProJudge only, 2026-11-26).
+			categories: ["send-from-deck"],
 			once: { scope: "instance" },
 			condition: (duel, { player }) => normalMonsters(duel, player).length > 0,
 			target: (duel, { player }) => duel.piles[player].monster.filter((id) => duel.cards[id]!.face === "up"),

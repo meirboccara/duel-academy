@@ -70,6 +70,15 @@ describe("Blue-Eyes Tyrant Dragon, written as effect records", () => {
 			expect(find(done, card)).toMatchObject({ zone: "monster", face: "up", proper: true, specialSummoned: true, summonedBy: null });
 			expect(done.chain).toEqual([]);
 		});
+		it(`${cites("blue-eyes-tyrant-dragon", "alternative")} ${cites("wishes-for-eyes-of-blue", "equip")} with real cards only: Wishes for Eyes of Blue equips Neo Blue-Eyes Ultimate Dragon to "Blue-Eyes White Dragon", which is then Tributed for this card`, () => {
+			const start = board({ graveyard: ["wishes-for-eyes-of-blue"], monsters: ["blue-eyes-white-dragon"], extra: ["neo-blue-eyes-ultimate-dragon", card] });
+			const equipped = settle(play(start, "activate wishes-for-eyes-of-blue > blue-eyes-white-dragon", "choose neo-blue-eyes-ultimate-dragon", "place 2"));
+			expect(find(equipped, "neo-blue-eyes-ultimate-dragon")).toMatchObject({ zone: "spell", face: "up", equippedTo: find(equipped, "blue-eyes-white-dragon").id });
+			expect(own(equipped, `special-summon ${card}`)).toEqual([`special-summon ${card}`]);
+			const done = play(equipped, `special-summon ${card}`, "place 0");
+			expect(find(done, card)).toMatchObject({ zone: "monster", face: "up", proper: true, specialSummoned: true });
+			expect(find(done, "blue-eyes-white-dragon").zone).toBe("graveyard");
+		});
 		it(`${cites("blue-eyes-tyrant-dragon", "notes-extra-deck-only")} ${cites("blue-eyes-tyrant-dragon", "qa-mutation")} comes from the Extra Deck only by those two ways: an effect that just Special Summons from the Extra Deck does not Summon it, and from the Graveyard it follows the rule of Fusion Monsters`, () => {
 			const start = board({ hand: ["fixture-extra-call"], extra: [card] });
 			expect(canSpecialSummon(start, "you", find(start, card).id)).toBe(false);

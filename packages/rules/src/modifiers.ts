@@ -29,8 +29,13 @@ export type Stat = "atk" | "def" | "level";
  * - `attack` / `attack-directly`: the monsters `only` accepts (default: all) controlled by `who` cannot declare an attack / a direct attack.
  * - `summon-together`: "cannot Special Summon 2 or more monsters at the same time": `who` Special Summons one monster at a time
  *   (`specialSummonTogether` Summons nothing, a Pendulum Summon is of one monster).
+ * - `attack-target`: `who` (the attacking player) cannot select the monsters `only` accepts (default: all) as attack targets: "cannot
+ *   be targeted for attacks", "your opponent cannot target other monsters for attacks" (`only`: every monster but this one). It
+ *   restricts monsters as targets, not the player: a monster that "can attack directly" still may (Konami's Japanese Q&A fid 23993,
+ *   case A, and fid 13862). With `closesDirect` ("your opponent can only target [this monster] for attacks": the choice of an attack
+ *   target itself is restricted) a direct attack is closed too, even by permission (fid 23993, case B). See `attackTargetLocked`.
  */
-export type LockKind = "add-to-hand" | "summon" | "activate" | "draw" | "banish-from-graveyard" | "attack" | "attack-directly" | "summon-together";
+export type LockKind = "add-to-hand" | "summon" | "activate" | "draw" | "banish-from-graveyard" | "attack" | "attack-directly" | "summon-together" | "attack-target";
 
 /** An activation a lock may stop: who activates, which card (as it is before it is placed), and which of its effects. */
 export interface ActivationAttempt extends EffectContext {
@@ -80,8 +85,9 @@ export type AttackAllowance =
 export type LockLayer = Extract<Layer, { kind: "lock" }>;
 type PermitLayer = Extract<Layer, { kind: "permit" }>;
 type DamageLayer = Extract<Layer, { kind: "damage" }>;
+type RedirectLayer = Extract<Layer, { kind: "redirect" }>;
 /** Layers about a player, not about the cards a modifier reaches: read by `playerLayersNow`, never by a card's own queries. */
-const aboutPlayers = (layer: Layer): layer is LockLayer | PermitLayer | DamageLayer => layer.kind === "lock" || layer.kind === "permit" || layer.kind === "damage";
+const aboutPlayers = (layer: Layer): layer is LockLayer | PermitLayer | DamageLayer | RedirectLayer => layer.kind === "lock" || layer.kind === "permit" || layer.kind === "damage" || layer.kind === "redirect";
 type ProtectLayer = Extract<Layer, { kind: "protect" }>;
 
 /** "For the rest of this Duel": a modifier that no turn ends. It needs no source on the field: lasting modifiers never do. */
@@ -122,7 +128,7 @@ export type Layer =
 	/** The card's effects are negated: its continuous effects and the effects it activates in the Monster Zone. */
 	| { readonly kind: "negate" }
 	/** "Neither player can ...": a lock on the players it names. */
-	| { readonly kind: "lock"; readonly what: LockKind; readonly who: Side | "both"; readonly ways?: readonly SummonWay[]; readonly only?: (duel: Duel, card: CardInstance) => boolean; readonly stops?: (duel: Duel, attempt: ActivationAttempt) => boolean; readonly banisher?: "opponent" }
+	| { readonly kind: "lock"; readonly what: LockKind; readonly who: Side | "both"; readonly ways?: readonly SummonWay[]; readonly only?: (duel: Duel, card: CardInstance) => boolean; readonly stops?: (duel: Duel, attempt: ActivationAttempt) => boolean; readonly banisher?: "opponent"; readonly closesDirect?: true; readonly describe?: string }
 	/**
 	 * A protection of the cards the modifier reaches: `against` what, `from` which effects (default: every effect; `fromOpponent`,
 	 * `fromTraps`, `fromOtherCards`). `firstEachTurn`: "the first time each would be destroyed each turn, it is not destroyed"
@@ -140,10 +146,21 @@ export type Layer =
 	 * (`damageFor`, src/life.ts). Several of them do not add up: the damage is halved once (Konami's Japanese Q&A fid 23511, OCG only).
 	 */
 	| { readonly kind: "damage"; readonly who: Side; readonly halved: true }
+	/**
+	 * "Any card sent to the GY is banished instead": a replacement for every card on its way to a Graveyard, whoever sends it and from
+	 * wherever (`only`: just the cards it accepts, "any monster sent to the GY"; `face: "down"`: banished face-down). Read by every move
+	 * (`graveyardRedirect`). Konami's Japanese Q&A (OCG only): a card an effect sends is banished, and an "if you do" on its arrival in
+	 * the GY is not applied (fid 18128); a cost that sends a card to the GY cannot be paid, a discard cost can (fids 14540, 23815):
+	 * `payCost` in src/activation.ts.
+	 */
+	| { readonly kind: "redirect"; readonly from: "graveyard"; readonly to: "banished"; readonly face?: "down"; readonly only?: (duel: Duel, card: CardInstance) => boolean }
 	/** A permission about attacks, for the monsters the modifier reaches (see `AttackAllowance`; src/battle.ts reads it). */
 	| { readonly kind: "attack"; readonly allows: AttackAllowance }
-	/** Bookkeeping for a control change that lasts: the card goes back to its owner when it ends. */
-	| { readonly kind: "control"; readonly to: Side }
+	/**
+	 * Bookkeeping for a control change that lasts: the card goes back to the player it was taken from (`to`) when it ends. `late`: it
+	 * was taken during the End Phase it lasts until: it goes back as that turn ends, not as an End Phase process (`controlReturnsDue`).
+	 */
+	| { readonly kind: "control"; readonly to: Side; readonly late?: true }
 	/**
 	 * "Banish it when it leaves the field" (`banishWhenItLeaves`): the card it reaches, leaving the field for the Graveyard, the hand,
 	 * the Deck or the Extra Deck, is banished instead (face-up). Read by every move (`leavesFieldTo`).
@@ -174,12 +191,17 @@ export interface Modifier {
 	 * Japanese notes on Deep-Eyes White Dragon, the Blue Abyss (OCG only, record `own-lasting-effect-stops-while-negated`).
 	 */
 	readonly own?: true;
+	/**
+	 * Display only, never read by a rule: the one card a lock is about when its filter is code ("it cannot attack": Shark Cannon), as it
+	 * was then (`moves` frozen). The log names it, and stops listing the line once that card has moved (the filter reaches nothing then).
+	 */
+	readonly about?: { readonly card: number; readonly moves: number };
 }
 
 /** Adds a lasting modifier, stamped now. */
 export function addModifier(duel: Duel, modifier: Omit<Modifier, "stamp">): Duel {
 	const stamp = duel.clock + 1;
-	return { ...duel, clock: stamp, modifiers: [...duel.modifiers, { ...modifier, stamp }] };
+	return { ...duel, clock: stamp, modifiers: [...duel.modifiers, { ...modifier, stamp }], story: [...duel.story, { type: "modifier-added", stamp }] };
 }
 
 const reaches = (duel: Duel, affects: Affects, target: CardInstance, source: CardInstance | null): boolean =>
@@ -193,16 +215,47 @@ export function withoutEnded(duel: Duel, endedTurn: number): Duel {
 }
 
 /**
- * The End Phase of turn number `turn` begins: each control change "until the End Phase" ends, and the card goes back to the player it
+ * Each control change "until the End Phase" of turn number `turn` (or earlier) ends, and the card goes back to the player it
  * was taken from, if it is still the card that was taken (`moves` unchanged); it is then a new card for them (record
  * `control-until-end-phase`). That player chooses one of their free Main Monster Zones (Konami's notes; a monster from an Extra Monster
  * Zone goes to a Main Monster Zone, record `control-extra-zone-to-main`): the duel returned may be asking them (`Duel.asking`, `place`),
  * one card after the other. With no free Main Monster Zone the monster is destroyed: YGOProJudge (no source cited), no Konami page read.
+ *
+ * In the End Phase itself the return is not done by the core as the phase begins: it is a mandatory End Phase process of the player
+ * who took the monster (`controlReturnsDue`, `returnControlOf`), which they order around their other End Phase effects. This function
+ * is what is left for the end of the turn (`withoutEnded`): a monster taken during that End Phase.
  */
 export function returnControl(duel: Duel, turn: number, choose = true): Duel {
 	const ending = duel.modifiers.filter((modifier) => modifier.layer.kind === "control" && modifier.until <= turn);
 	if (ending.length === 0) return duel;
 	return giveBack({ ...duel, modifiers: duel.modifiers.filter((modifier) => !ending.includes(modifier)) }, ending, choose);
+}
+
+const NO_MODIFIERS: readonly Modifier[] = Object.freeze([]);
+
+/**
+ * The control changes "until the End Phase" that are owed now: it is the End Phase of the turn they last until, and the monster is
+ * still the card that was taken, in a Monster Zone. Giving it back is a mandatory End Phase process of the player who took it (its
+ * controller), with no Chain Link: they do it with an `apply` action (src/delayed.ts) when they hold priority in the open game state,
+ * before or after their other End Phase effects, and cannot pass before it is done. Konami's Japanese Q&A fid 11555 (OCG only;
+ * records `control-return-ordered-by-taker`, `control-return-then-controller-activates`): the player who took Sky Striker Ace -
+ * Shizuku with Mind Control chooses whether to give it back first or to activate its End Phase effect first. A monster taken during
+ * that very End Phase (`late`) goes back as the turn ends instead (`withoutEnded`; the core's reading, no page read).
+ */
+export function controlReturnsDue(duel: Duel): readonly Modifier[] {
+	if (duel.turn.phase !== "end" || duel.modifiers.length === 0) return NO_MODIFIERS;
+	const due = duel.modifiers.filter((modifier) => {
+		if (modifier.layer.kind !== "control" || modifier.layer.late || modifier.until > duel.turn.number || typeof modifier.affects === "function") return false;
+		const card = duel.cards[modifier.affects.card]!;
+		return card.moves === modifier.affects.moves && card.zone === "monster";
+	});
+	return due.length === 0 ? NO_MODIFIERS : due;
+}
+
+/** The control change with this stamp is given back now (see `controlReturnsDue`): its previous controller chooses the zone. */
+export function returnControlOf(duel: Duel, stamp: number): Duel {
+	const modifier = duel.modifiers.find((candidate) => candidate.stamp === stamp && candidate.layer.kind === "control");
+	return modifier ? giveBack({ ...duel, modifiers: duel.modifiers.filter((candidate) => candidate !== modifier) }, [modifier], true) : duel;
 }
 
 function giveBack(duel: Duel, ending: readonly Modifier[], choose: boolean): Duel {
@@ -220,7 +273,8 @@ function giveBack(duel: Duel, ending: readonly Modifier[], choose: boolean): Due
 
 /**
  * "Take control of that monster until the End Phase": the card moves to `side`'s field now (a new card for them: what was applied to
- * it before ends, record `negated-monster-state`), and goes back when the End Phase of turn number `until` begins (`returnControl`). Control stays a
+ * it before ends, except a negation of its effects, which follows it: `changeControl`, YGOProJudge only), and goes back in the End Phase of turn number `until`, as a mandatory End Phase
+ * process of `side` (`controlReturnsDue`). Control stays a
  * physical move (design D3): piles are kept by controller. The card must be on the field and controlled by the other player.
  */
 export function takeControl(duel: Duel, id: number, side: Side, until: number, by?: EffectSource): Duel {
@@ -236,7 +290,9 @@ export function takeControl(duel: Duel, id: number, side: Side, until: number, b
 	// The player taking it chooses a free Main Monster Zone, also for a monster in an Extra Monster Zone (record `control-extra-zone-to-main`).
 	const take = (board: Duel, slot: number) => {
 		const taken = changeControl(board, id, side, slot);
-		return addModifier(taken, { affects: { card: id, moves: taken.cards[id]!.moves }, until, layer: { kind: "control", to: before.controller } });
+		// Taken during the End Phase it lasts until: it goes back as that turn ends, not as an End Phase process.
+		const late = taken.turn.phase === "end" && until <= taken.turn.number;
+		return addModifier(taken, { affects: { card: id, moves: taken.cards[id]!.moves }, until, layer: { kind: "control", to: before.controller, ...(late ? { late: true as const } : {}) } });
 	};
 	return zones.length === 1 ? take(duel, zones[0]!) : askZone(duel, side, zones, take);
 }
@@ -594,8 +650,10 @@ interface PlayerLayers {
 	readonly locks: readonly LockEntry[];
 	readonly permits: readonly PermitLayer[];
 	readonly damage: readonly DamageLayer[];
+	readonly redirects: readonly RedirectLayer[];
 }
-const NO_PLAYER_LAYERS: PlayerLayers = Object.freeze({ locks: NO_LOCKS, permits: NO_PERMITS, damage: NO_DAMAGE });
+const NO_REDIRECTS: readonly RedirectLayer[] = Object.freeze([]);
+const NO_PLAYER_LAYERS: PlayerLayers = Object.freeze({ locks: NO_LOCKS, permits: NO_PERMITS, damage: NO_DAMAGE, redirects: NO_REDIRECTS });
 /** The locks and permissions of a Duel, read once per Duel value (a Duel never changes): every listing asks about them for each effect it offers. */
 const playerCache = new WeakMap<Duel, PlayerLayers>();
 
@@ -638,10 +696,12 @@ function playerLayersNow(duel: Duel): PlayerLayers {
 		}
 	}
 	let damage: DamageLayer[] | null = null;
+	let redirects: RedirectLayer[] | null = null;
 	for (const modifier of duel.modifiers) {
 		if (modifier.layer.kind === "lock") found.push({ layer: modifier.layer, source: null });
 		else if (modifier.layer.kind === "permit") (permits ??= []).push(modifier.layer);
 		else if (modifier.layer.kind === "damage") (damage ??= []).push(modifier.layer);
+		else if (modifier.layer.kind === "redirect") (redirects ??= []).push(modifier.layer);
 	}
 	const codes = codesWithContinuous(duel.defs);
 	if (codes.size > 0) {
@@ -658,6 +718,7 @@ function playerLayersNow(duel: Duel): PlayerLayers {
 						for (const layer of layers) {
 							if (layer.kind === "lock") found.push({ layer, source });
 							else if (layer.kind === "permit") (permits ??= []).push(layer);
+							else if (layer.kind === "redirect") (redirects ??= []).push(layer);
 							else (damage ??= []).push(layer);
 						}
 					}
@@ -665,7 +726,10 @@ function playerLayersNow(duel: Duel): PlayerLayers {
 			}
 		}
 	}
-	const result: PlayerLayers = found.length === 0 && permits === null && damage === null ? NO_PLAYER_LAYERS : { locks: found.length === 0 ? NO_LOCKS : found, permits: permits ?? NO_PERMITS, damage: damage ?? NO_DAMAGE };
+	const result: PlayerLayers =
+		found.length === 0 && permits === null && damage === null && redirects === null
+			? NO_PLAYER_LAYERS
+			: { locks: found.length === 0 ? NO_LOCKS : found, permits: permits ?? NO_PERMITS, damage: damage ?? NO_DAMAGE, redirects: redirects ?? NO_REDIRECTS };
 	playerCache.set(duel, result);
 	return result;
 }
@@ -752,6 +816,51 @@ export function attackLocked(duel: Duel, card: CardInstance, directly = false): 
 }
 
 /**
+ * May the attacking player `who` not select this monster as an attack target now (the `attack-target` lock)? A lock with `only`
+ * reads the monster that would be attacked.
+ */
+export function attackTargetLocked(duel: Duel, who: Side, target: CardInstance): boolean {
+	if (locksNow(duel).length === 0) return false;
+	return locked(duel, "attack-target", who, (layer) => layer.only === undefined || layer.only(duel, target));
+}
+
+/**
+ * Is the choice of attack target itself restricted for `who` ("your opponent can only target [this monster] for attacks": an
+ * `attack-target` lock with `closesDirect`), so that no direct attack can be declared either, even by a monster that "can attack
+ * directly" (Konami's Japanese Q&A fid 23993, case B, OCG only)?
+ */
+export const directAttackRestricted = (duel: Duel, who: Side): boolean => locksNow(duel).length > 0 && locked(duel, "attack-target", who, (layer) => layer.closesDirect === true);
+
+/**
+ * Where a card on its way to a Graveyard goes instead: `"up"` or `"down"`, the face it is banished with, when an effect that banishes
+ * the cards sent to the GY instead (a `redirect` layer, see `Layer`) applies to it now; `null` when the card goes to the Graveyard.
+ * Read by every move (src/duel.ts), costs, effects, battle and the game's rules alike: a card sent by a cost is banished too, and the
+ * cost then counts as unpaid unless it was a discard, a Tribute or a material (`Duel.sentInstead`). With several, a face-down one wins
+ * (no page read: no card of the two lists banishes face-down).
+ */
+export function graveyardRedirect(duel: Duel, card: CardInstance): "up" | "down" | null {
+	const { redirects } = playerLayersNow(duel);
+	if (redirects.length === 0) return null;
+	let found: "up" | "down" | null = null;
+	for (const layer of redirects) if (layer.only === undefined || layer.only(duel, card)) found = layer.face === "down" || found === "down" ? "down" : "up";
+	return found;
+}
+
+/**
+ * Has `player` already Special Summoned a monster of this card's name this turn, so that its "You can only Special Summon "[name]"
+ * once per turn" (`CardDef.summon.oncePerTurn`) stops another? That line is no effect (it cannot be negated) and counts every Special
+ * Summon of the name, by its own procedure or not (Konami's Japanese notes on Sky Striker Ace - Hayate, OCG only: records
+ * `special-once-not-an-effect`, `special-once-any-way`). Only Summons that succeeded count (`Duel.summons`): a negated one does not
+ * (the core's reading, no page read).
+ */
+export function specialOnceUsed(duel: Duel, who: Side, card: CardInstance): boolean {
+	const def = duel.defs[card.code];
+	if (!def?.summon?.oncePerTurn) return false;
+	const name = def.facts?.name ?? def.code;
+	return duel.summons.some((note) => note.turn === duel.turn.number && note.player === who && note.how === "special" && note.code !== undefined && (duel.defs[note.code]?.facts?.name ?? note.code) === name);
+}
+
+/**
  * Is `who` stopped from Special Summoning 2 or more monsters at the same time (Blue-Eyes Spirit Dragon's wording)? Konami's Japanese
  * Q&A fid 18176 (OCG only; records `summon-together-lock`, `summon-together-lock-at-resolution`): an effect that must Summon two or
  * more at once cannot be activated, and Summons none if the lock began to apply in its chain.
@@ -789,6 +898,8 @@ export const drawLocked = (duel: Duel, who: Side): boolean => locked(duel, "draw
  * (`summon-lock-set-allowed`).
  */
 export function summonLocked(duel: Duel, who: Side, card: CardInstance, way: SummonWay): boolean {
+	// "You can only Special Summon "[name]" once per turn": not a lock of an effect, but read with them (`specialOnceUsed`).
+	if (way === "special" && duel.summons.length > 0 && specialOnceUsed(duel, who, card)) return true;
 	if (noPlayerLayers(duel)) return false;
 	return locked(duel, "summon", who, (layer) => (layer.ways === undefined || layer.ways.includes(way)) && (layer.only === undefined || layer.only(duel, card)));
 }

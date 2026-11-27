@@ -83,8 +83,8 @@ describe("hand effects", () => {
 	it(`${cites("rules", "fast-effects-either-turn")} lets you use Ash Blossom from your hand in your own turn, against the rival's Needlebug Nest`, () => {
 		const deck = ["celtic-guardian", "celtic-guardian", "celtic-guardian", "celtic-guardian", "celtic-guardian", "umi"];
 		const start = position({ defs, you: { hand: ["ash-blossom-joyous-spring"] }, rival: { set: ["needlebug-nest"], deck } });
-		// Nothing to answer yet: Ash Blossom is not offered in an open game state.
-		expect(offered(start)).toEqual(["pass"]);
+		// Nothing to answer yet: Ash Blossom's effect is not offered in an open game state (it can still be Summoned or Set as a monster).
+		expect(offered(start).filter((label) => label.startsWith("activate"))).toEqual([]);
 		const rival = play(start, "pass");
 		expect(rival.priority.holder).toBe("rival");
 		const nest = play(rival, "activate needlebug-nest");

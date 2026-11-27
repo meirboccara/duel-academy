@@ -37,9 +37,8 @@ const blueEyesToEquip = (duel: Duel, player: Side, monster: number): number[] =>
  * - First effect: the effect of the card's activation; both kinds must be in the Deck to activate it (Konami's notes, OCG). The two
  *   cards are added at the same time, and nothing is added if one kind is missing when it resolves: YGOProJudge only (asked
  *   2026-11-24, it cited no official source). The Deck is shuffled afterwards. The cards added are not shown to the opponent by the
- *   core (as for Terraforming: the bot's view keeps them hidden). Known limit: the core has no "discarded" reason (`MoveReason` is
- *   destroyed, Tributed or material), so the discard is a plain move from the hand to the Graveyard, as for every card that discards
- *   (Ash Blossom, D.D. Crow): an "if this card is discarded" effect could not tell it from a card sent there otherwise.
+ *   core (as for Terraforming: the bot's view keeps them hidden). The discard cost is a move with the reason `discarded`: under "cards sent to the GY
+ *   are banished instead" the card is banished and the cost is paid (Konami's Q&A fid 23815, OCG only: the text does not say "to the GY").
  * - Second effect: an Ignition Effect in the Graveyard that starts a Chain Link (notes). Banishing itself is the cost. It is not
  *   applied to the target (notes): a monster unaffected by Spell effects is equipped too. The 400 ATK is the effect of the Equip Card
  *   (`equipMonster`'s `gives`): YGOProJudge only. A target that is no longer the card targeted (it left, was flipped face-down or
@@ -58,11 +57,11 @@ export const WISHES_FOR_EYES_OF_BLUE: CardDef = {
 			requiresAddToHand: true,
 			once: { scope: "name" },
 			condition: (duel, { player }) => lightTuners(duel, player).length > 0 && mentioning(duel, player).length > 0,
-			// "Discard 1 card": another card of the hand (this one is on the field by then). A plain move: the core has no discard reason (see above).
+			// "Discard 1 card": another card of the hand (this one is on the field by then), moved with the reason `discarded`.
 			cost: {
 				can: (duel, { player, card }) => duel.piles[player].hand.some((id) => id !== card.id),
 				pick: (duel, { player, card }) => duel.piles[player].hand.filter((id) => id !== card.id).map((id) => [id]),
-				pay: (duel, _ctx, picked) => (picked.length === 1 ? moveCard(duel, picked[0]!, { zone: "graveyard" }) : null),
+				pay: (duel, _ctx, picked) => (picked.length === 1 ? moveCard(duel, picked[0]!, { zone: "graveyard", reason: "discarded" }) : null),
 			},
 			operation: (duel, link) => {
 				const player = link.player;
@@ -143,6 +142,6 @@ export const WISHES_FOR_EYES_OF_BLUE_SOURCES: CardSources = {
 		{ source: "notes-mentions" },
 		{ source: "notes-graveyard" },
 		{ source: "notes-not-applied" },
-		{ source: "qa-discard-while-banished-instead", pending: "needs an effect that banishes cards sent to the GY instead (Macro Cosmos and the like), which the core does not have" },
+		{ source: "qa-discard-while-banished-instead" },
 	],
 };
